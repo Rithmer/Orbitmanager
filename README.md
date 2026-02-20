@@ -1,4 +1,4 @@
-# 🗂 TaskMaster — Сервис управления проектами и задачами
+# 🗂 Orbitmanager — Сервис управления проектами и задачами
 
 Современная full-stack платформа для управления проектами и задачами: создание проектов, распределение задач, отслеживание статусов и аналитика.
 
@@ -13,7 +13,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
 <p align="center">
-  <img src="https://via.placeholder.com/1200x600/0ea5e9/ffffff?text=TaskMaster+—+Главный+экран" alt="Главный экран TaskMaster" width="800"/>
+  <img src="https://via.placeholder.com/1200x600/0ea5e9/ffffff?text=Orbitmanager+—+Главный+экран" alt="Главный экран Orbitmanager" width="800"/>
   <br/>
   <em>Современный и адаптивный дизайн с Tailwind CSS</em>
 </p>
