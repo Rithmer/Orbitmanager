@@ -32,8 +32,8 @@
 | :--: | ------------------------------------ | ------------------------------------------------------- |
 |  1   | Каркас проекта                       | NestJS init, конфиг, глобальные фильтры, Swagger        |
 |  2   | JSON Storage Layer                   | json-file.service, query.helper                         |
-|  3   | Auth + Users                     | users, auth, JWT, guards                               |
-|  4   | Команды + Участники                  | teams, team_members, TeamRolesGuard                    |
+|  3   | Auth + Users                         | users, auth, JWT, guards                                |
+|  4   | Команды + Участники                  | teams, team_members, TeamRolesGuard                     |
 |  5   | Проекты + Участники проекта + Задачи + БИ1 | projects, project_members, tasks, ProjectRolesGuard, БИ1 |
 |  6   | Аудит (+ история статусов) + БП2     | audit_logs (с oldValue/newValue), БП2                   |
 |  7   | Risk / AI + БП3                      | risk module, stub-сервис, мониторинг, БП3               |
