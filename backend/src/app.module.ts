@@ -4,6 +4,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { envValidationSchema } from './config/env.validation';
+import { StorageModule } from './infrastructure/storage/storage.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { envValidationSchema } from './config/env.validation';
         },
       ],
     }),
+    StorageModule,
   ],
   controllers: [AppController],
   providers: [AppService],
