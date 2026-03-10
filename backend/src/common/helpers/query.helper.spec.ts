@@ -118,8 +118,6 @@ describe('QueryHelper', () => {
         limit: 2,
       };
       const result = QueryHelper.apply(items, params);
-      // active items with 'a' in name: Alpha Project (1), Gamma Tool (3) — no 'a' in Gamma, Epsilon API (5) has 'a' → no, API has A
-      // Alpha Project has 'a', Gamma Tool has 'a' (gAmma), Epsilon API has 'a' (API)
       expect(result.total).toBeGreaterThanOrEqual(1);
       expect(result.page).toBe(1);
       expect(result.limit).toBe(2);

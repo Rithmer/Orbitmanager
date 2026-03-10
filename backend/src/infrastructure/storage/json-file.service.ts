@@ -28,9 +28,6 @@ export class JsonFileService implements OnModuleInit {
     }
   }
 
-  /**
-   * Читает JSON-файл из кэша или с диска.
-   */
   async read<T>(entity: string): Promise<JsonFile<T>> {
     const cached = this.cache.get(entity);
     if (cached) {
@@ -54,20 +51,12 @@ export class JsonFileService implements OnModuleInit {
     return data;
   }
 
-  /**
-   * Атомарно записывает JSON-файл (tmp → rename) и инвалидирует кэш.
-   * Записи в один и тот же файл выполняются последовательно через очередь.
-   */
   async write<T>(entity: string, data: JsonFile<T>): Promise<void> {
     return this.enqueue(entity, async () => {
       await this.atomicWrite(entity, data);
     });
   }
 
-  /**
-   * Создаёт новую запись: автоинкремент lastId, добавляет в items, записывает файл.
-   * Возвращает присвоенный id.
-   */
   async create<T extends { id?: number }>(
     entity: string,
     item: Omit<T, 'id'>,
@@ -82,9 +71,6 @@ export class JsonFileService implements OnModuleInit {
     });
   }
 
-  /**
-   * Обновляет запись по id.
-   */
   async update<T extends { id: number }>(
     entity: string,
     id: number,
@@ -101,9 +87,6 @@ export class JsonFileService implements OnModuleInit {
     });
   }
 
-  /**
-   * Удаляет запись по id.
-   */
   async remove<T extends { id: number }>(
     entity: string,
     id: number,
@@ -119,16 +102,10 @@ export class JsonFileService implements OnModuleInit {
     });
   }
 
-  /**
-   * Инвалидирует кэш для конкретной сущности.
-   */
   invalidateCache(entity: string): void {
     this.cache.delete(entity);
   }
 
-  /**
-   * Полностью очищает кэш.
-   */
   clearCache(): void {
     this.cache.clear();
   }
@@ -137,17 +114,11 @@ export class JsonFileService implements OnModuleInit {
     return join(this.dataDir, `${entity}.json`);
   }
 
-  /**
-   * Читает данные, минуя кэш (для операций внутри очереди).
-   */
   private async readFresh<T>(entity: string): Promise<JsonFile<T>> {
     this.cache.delete(entity);
     return this.read<T>(entity);
   }
 
-  /**
-   * Ставит операцию в очередь для последовательного выполнения по entity.
-   */
   private async enqueue<R>(
     entity: string,
     fn: () => Promise<R>,
@@ -189,13 +160,10 @@ export class JsonFileService implements OnModuleInit {
       this.logger.debug(`Written ${entity}.json (${data.items.length} items)`);
     } catch (error) {
       this.logger.error(`Failed to write ${entity}.json`, error);
-      // Попытка удалить tmp-файл при ошибке
       try {
         const { unlink } = await import('fs/promises');
         await unlink(tmpPath);
-      } catch {
-        // ignore cleanup error
-      }
+      } catch {}
       throw error;
     }
   }

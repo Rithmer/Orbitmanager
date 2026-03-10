@@ -2,9 +2,9 @@ export interface QueryParams {
   search?: string;
   searchFields?: string[];
   filters?: Record<string, unknown>;
-  sort?: string; // '-name' для DESC
-  page?: number; // default 1
-  limit?: number; // default 20, max 100
+  sort?: string;
+  page?: number;
+  limit?: number;
 }
 
 export interface PaginatedResult<T> {
@@ -16,21 +16,16 @@ export interface PaginatedResult<T> {
 }
 
 export class QueryHelper {
-  /**
-   * Применяет фильтрацию, поиск, сортировку и пагинацию к массиву.
-   */
   static apply<T extends Record<string, unknown>>(
     items: T[],
     params: QueryParams,
   ): PaginatedResult<T> {
     let result = [...items];
 
-    // Фильтрация
     if (params.filters) {
       result = QueryHelper.applyFilters(result, params.filters);
     }
 
-    // Поиск
     if (params.search && params.searchFields?.length) {
       result = QueryHelper.applySearch(
         result,
@@ -39,18 +34,13 @@ export class QueryHelper {
       );
     }
 
-    // Сортировка
     if (params.sort) {
       result = QueryHelper.applySort(result, params.sort);
     }
 
-    // Пагинация
     return QueryHelper.applyPagination(result, params.page, params.limit);
   }
 
-  /**
-   * Фильтрация: точное совпадение по полям.
-   */
   static applyFilters<T extends Record<string, unknown>>(
     items: T[],
     filters: Record<string, unknown>,
@@ -63,9 +53,6 @@ export class QueryHelper {
     );
   }
 
-  /**
-   * Поиск: частичное совпадение (case-insensitive) по указанным полям.
-   */
   static applySearch<T extends Record<string, unknown>>(
     items: T[],
     search: string,
@@ -81,9 +68,6 @@ export class QueryHelper {
     );
   }
 
-  /**
-   * Сортировка: '-fieldName' для DESC, 'fieldName' для ASC.
-   */
   static applySort<T extends Record<string, unknown>>(
     items: T[],
     sort: string,
@@ -110,9 +94,6 @@ export class QueryHelper {
     });
   }
 
-  /**
-   * Пагинация с дефолтами: page=1, limit=20, max limit=100.
-   */
   static applyPagination<T>(
     items: T[],
     page?: number,

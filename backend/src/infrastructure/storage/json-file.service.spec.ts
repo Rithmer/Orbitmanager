@@ -32,7 +32,6 @@ describe('JsonFileService', () => {
     service = module.get<JsonFileService>(JsonFileService);
     await service.onModuleInit();
 
-    // Создаём тестовый JSON-файл
     await writeFile(testFilePath, JSON.stringify(emptyFile, null, 2), 'utf-8');
     service.clearCache();
   });
@@ -42,9 +41,7 @@ describe('JsonFileService', () => {
       if (existsSync(testFilePath)) {
         await rm(testFilePath);
       }
-    } catch {
-      // ignore cleanup errors
-    }
+    } catch {}
   });
 
   describe('read', () => {
@@ -79,7 +76,6 @@ describe('JsonFileService', () => {
       };
       await service.write(testEntity, data);
 
-      // Проверяем файл на диске
       const raw = await readFile(testFilePath, 'utf-8');
       const parsed = JSON.parse(raw) as JsonFile<{ id: number; name: string }>;
       expect(parsed.meta.lastId).toBe(1);
@@ -174,7 +170,6 @@ describe('JsonFileService', () => {
       await service.read(testEntity);
       service.invalidateCache(testEntity);
 
-      // Modify file directly
       const data: JsonFile<{ id: number; name: string }> = {
         meta: { entity: testEntity, lastId: 5 },
         items: [{ id: 5, name: 'Direct' }],
@@ -198,7 +193,6 @@ describe('JsonFileService', () => {
 
       const results = await Promise.all(writes);
       const ids = results.map((r) => r.id);
-      // Все id уникальны
       expect(new Set(ids).size).toBe(5);
 
       const data = await service.read<{ id: number; name: string }>(

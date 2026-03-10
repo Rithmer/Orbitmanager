@@ -1,0 +1,261 @@
+import {
+  Injectable,
+  Inject,
+  NotFoundException,
+  ForbiddenException,
+  ConflictException,
+} from '@nestjs/common';
+import type { ITeamRepository } from '../../domain/repositories/team.repository';
+import { TEAM_REPOSITORY } from '../../domain/repositories/team.repository';
+import type { ITeamMemberRepository } from '../../domain/repositories/team-member.repository';
+import { TEAM_MEMBER_REPOSITORY } from '../../domain/repositories/team-member.repository';
+import type { IUserRepository } from '../../domain/repositories/user.repository';
+import { USER_REPOSITORY } from '../../domain/repositories/user.repository';
+import { Team } from '../../domain/models/team.model';
+import { TeamMember } from '../../domain/models/team-member.model';
+import { TeamRole } from '../../common/enums/team-role.enum';
+import { AccountRole } from '../../common/enums/account-role.enum';
+import { CreateTeamDto } from './dto/create-team.dto';
+import { UpdateTeamDto } from './dto/update-team.dto';
+import { AddTeamMemberDto } from './dto/add-team-member.dto';
+import { UpdateTeamMemberDto } from './dto/update-team-member.dto';
+import {
+  QueryHelper,
+  QueryParams,
+  PaginatedResult,
+} from '../../common/helpers/query.helper';
+import { JsonFileService } from '../../infrastructure/storage/json-file.service';
+import { ProjectMember } from '../../domain/models/project-member.model';
+
+@Injectable()
+export class TeamsService {
+  constructor(
+    @Inject(TEAM_REPOSITORY)
+    private readonly teamRepository: ITeamRepository,
+    @Inject(TEAM_MEMBER_REPOSITORY)
+    private readonly teamMemberRepository: ITeamMemberRepository,
+    @Inject(USER_REPOSITORY)
+    private readonly userRepository: IUserRepository,
+    private readonly jsonFileService: JsonFileService,
+  ) {}
+
+  async findAll(params: QueryParams): Promise<PaginatedResult<Team>> {
+    const teams = await this.teamRepository.findAll();
+    return QueryHelper.apply(teams as unknown as Record<string, unknown>[], {
+      ...params,
+      searchFields: params.searchFields ?? ['name', 'description'],
+    }) as unknown as PaginatedResult<Team>;
+  }
+
+  async findById(id: number): Promise<Team> {
+    const team = await this.teamRepository.findById(id);
+    if (!team) throw new NotFoundException(`Команда #${id} не найдена`);
+    return team;
+  }
+
+  async create(
+    dto: CreateTeamDto,
+    userId: number,
+  ): Promise<Team> {
+    const now = new Date().toISOString();
+    const team = await this.teamRepository.create({
+      name: dto.name,
+      description: dto.description ?? '',
+      createdAt: now,
+      createdById: userId,
+    });
+
+    await this.teamMemberRepository.create({
+      userId,
+      teamId: team.id,
+      teamRole: TeamRole.OWNER,
+    });
+
+    return team;
+  }
+
+  async update(
+    id: number,
+    dto: UpdateTeamDto,
+    userId: number,
+    userRole: AccountRole,
+  ): Promise<Team> {
+    const team = await this.findById(id);
+    await this.assertOwnerOrAdmin(userId, id, userRole);
+
+    const updated = await this.teamRepository.update(id, {
+      ...dto,
+    });
+    if (!updated) throw new NotFoundException(`Команда #${id} не найдена`);
+    return updated;
+  }
+
+  async remove(
+    id: number,
+    userId: number,
+    userRole: AccountRole,
+  ): Promise<void> {
+    await this.findById(id);
+    await this.assertOwnerOrAdmin(userId, id, userRole);
+
+    const members = await this.teamMemberRepository.findByTeam(id);
+    for (const m of members) {
+      await this.teamMemberRepository.delete(m.id);
+    }
+
+    await this.cascadeDeleteProjectMembersByTeam(id);
+
+    await this.teamRepository.delete(id);
+  }
+
+  async findMembers(teamId: number): Promise<TeamMember[]> {
+    await this.findById(teamId);
+    return this.teamMemberRepository.findByTeam(teamId);
+  }
+
+  async addMember(
+    teamId: number,
+    dto: AddTeamMemberDto,
+    userId: number,
+    userRole: AccountRole,
+  ): Promise<TeamMember> {
+    await this.findById(teamId);
+    await this.assertOwnerOrAdmin(userId, teamId, userRole);
+
+    const user = await this.userRepository.findById(dto.userId);
+    if (!user) throw new NotFoundException(`Пользователь #${dto.userId} не найден`);
+
+    const existing = await this.teamMemberRepository.findByUserAndTeam(
+      dto.userId,
+      teamId,
+    );
+    if (existing) {
+      throw new ConflictException(
+        `Пользователь #${dto.userId} уже является участником команды #${teamId}`,
+      );
+    }
+
+    return this.teamMemberRepository.create({
+      userId: dto.userId,
+      teamId,
+      teamRole: dto.teamRole,
+    });
+  }
+
+  async updateMember(
+    memberId: number,
+    dto: UpdateTeamMemberDto,
+    userId: number,
+    userRole: AccountRole,
+  ): Promise<TeamMember> {
+    const member = await this.findMemberById(memberId);
+    await this.assertOwnerOrAdmin(userId, member.teamId, userRole);
+
+    const updated = await this.teamMemberRepository.update(memberId, {
+      teamRole: dto.teamRole,
+    });
+    if (!updated)
+      throw new NotFoundException(`Участник #${memberId} не найден`);
+    return updated;
+  }
+
+  async removeMember(
+    memberId: number,
+    userId: number,
+    userRole: AccountRole,
+  ): Promise<void> {
+    const member = await this.findMemberById(memberId);
+    await this.assertOwnerOrAdmin(userId, member.teamId, userRole);
+
+    if (member.teamRole === TeamRole.OWNER) {
+      const teamMembers = await this.teamMemberRepository.findByTeam(
+        member.teamId,
+      );
+      const owners = teamMembers.filter((m) => m.teamRole === TeamRole.OWNER);
+      if (owners.length <= 1) {
+        throw new ForbiddenException(
+          'Нельзя удалить единственного владельца команды',
+        );
+      }
+    }
+
+    await this.cascadeDeleteProjectMembersByUser(
+      member.userId,
+      member.teamId,
+    );
+
+    await this.teamMemberRepository.delete(memberId);
+  }
+
+  private async findMemberById(id: number): Promise<TeamMember> {
+    const all = await this.teamMemberRepository.findAll();
+    const member = all.find((m) => m.id === id);
+    if (!member) throw new NotFoundException(`Участник #${id} не найден`);
+    return member;
+  }
+
+  private async assertOwnerOrAdmin(
+    userId: number,
+    teamId: number,
+    accountRole: AccountRole,
+  ): Promise<void> {
+    if (accountRole === AccountRole.ADMIN) return;
+
+    const membership = await this.teamMemberRepository.findByUserAndTeam(
+      userId,
+      teamId,
+    );
+    if (!membership || membership.teamRole !== TeamRole.OWNER) {
+      throw new ForbiddenException(
+        'Только владелец команды может выполнить это действие',
+      );
+    }
+  }
+
+  private async cascadeDeleteProjectMembersByUser(
+    userId: number,
+    teamId: number,
+  ): Promise<void> {
+    const projectsData = await this.jsonFileService.read<{ id: number; teamId: number }>(
+      'projects',
+    );
+    const teamProjectIds = projectsData.items
+      .filter((p) => p.teamId === teamId)
+      .map((p) => p.id);
+
+    if (teamProjectIds.length === 0) return;
+
+    const pmData = await this.jsonFileService.read<ProjectMember>(
+      'project_members',
+    );
+    const toDelete = pmData.items.filter(
+      (pm) => pm.userId === userId && teamProjectIds.includes(pm.projectId),
+    );
+    for (const pm of toDelete) {
+      await this.jsonFileService.remove<ProjectMember>('project_members', pm.id);
+    }
+  }
+
+  private async cascadeDeleteProjectMembersByTeam(
+    teamId: number,
+  ): Promise<void> {
+    const projectsData = await this.jsonFileService.read<{ id: number; teamId: number }>(
+      'projects',
+    );
+    const teamProjectIds = projectsData.items
+      .filter((p) => p.teamId === teamId)
+      .map((p) => p.id);
+
+    if (teamProjectIds.length === 0) return;
+
+    const pmData = await this.jsonFileService.read<ProjectMember>(
+      'project_members',
+    );
+    const toDelete = pmData.items.filter((pm) =>
+      teamProjectIds.includes(pm.projectId),
+    );
+    for (const pm of toDelete) {
+      await this.jsonFileService.remove<ProjectMember>('project_members', pm.id);
+    }
+  }
+}

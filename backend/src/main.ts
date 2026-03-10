@@ -9,11 +9,9 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Security
   app.use(helmet());
   app.enableCors();
 
-  // Global validation pipe
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -22,13 +20,10 @@ async function bootstrap() {
     }),
   );
 
-  // Global exception filter
   app.useGlobalFilters(new GlobalExceptionFilter());
 
-  // Global logging interceptor
   app.useGlobalInterceptors(new LoggingInterceptor());
 
-  // Swagger / OpenAPI
   const config = new DocumentBuilder()
     .setTitle('Task Management API')
     .setDescription('Сервис управления проектами и задачами')

@@ -7,6 +7,7 @@ import { envValidationSchema } from './config/env.validation';
 import { StorageModule } from './infrastructure/storage/storage.module';
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { TeamsModule } from './modules/teams/teams.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { AuthModule } from './modules/auth/auth.module';
     StorageModule,
     UsersModule,
     AuthModule,
+    TeamsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
