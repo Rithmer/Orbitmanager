@@ -12,6 +12,7 @@ import { TeamsModule } from './modules/teams/teams.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
+import { RiskModule } from './modules/risk/risk.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
     ProjectsModule,
     TasksModule,
     AuditLogsModule,
+    RiskModule,
   ],
   controllers: [AppController],
   providers: [

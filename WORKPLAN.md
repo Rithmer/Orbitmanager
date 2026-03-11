@@ -476,7 +476,7 @@ src/common/interceptors/audit.interceptor.ts
 
 #### Интерфейс сервиса
 
-- [ ] `IRiskAssessmentService`:
+- [x] `IRiskAssessmentService`:
   ```typescript
   interface IRiskAssessmentService {
     assessTask(input: TaskRiskInput): Promise<TaskRiskOutput>;
@@ -486,7 +486,7 @@ src/common/interceptors/audit.interceptor.ts
 
 #### Входные/выходные данные
 
-- [ ] `TaskRiskInput`:
+- [x] `TaskRiskInput`:
   ```typescript
   interface TaskRiskInput {
     taskId: number;
@@ -501,7 +501,7 @@ src/common/interceptors/audit.interceptor.ts
     daysUntilDeadline: number;    // может быть отрицательным
   }
   ```
-- [ ] `TaskRiskOutput`:
+- [x] `TaskRiskOutput`:
   ```typescript
   interface TaskRiskOutput {
     predictedCompletionDate: string;
@@ -509,7 +509,7 @@ src/common/interceptors/audit.interceptor.ts
     riskLevel: 'low' | 'medium' | 'high';
   }
   ```
-- [ ] `ProjectRiskOutput`:
+- [x] `ProjectRiskOutput`:
   ```typescript
   interface ProjectRiskOutput {
     riskScore: number;            // 0 — 100
@@ -521,7 +521,7 @@ src/common/interceptors/audit.interceptor.ts
 
 #### Stub-реализация (rule-based)
 
-- [ ] `RiskStubService` implements `IRiskAssessmentService`:
+- [x] `RiskStubService` implements `IRiskAssessmentService`:
   - Deadline прошёл → `delayProbability = 0.95`
   - ≤2 дня до deadline и статус не `review` → `0.7`
   - `difficulty ≥ 4` и нагрузка исполнителя > 5 задач → `0.6`
@@ -531,14 +531,14 @@ src/common/interceptors/audit.interceptor.ts
 
 #### Модуль risk
 
-- [ ] `GET /projects/:id/risk` — оценка рисков проекта
-- [ ] `GET /tasks/:id/risk` — оценка рисков задачи
-- [ ] RiskController + RiskStubService
-- [ ] Регистрация через DI (при подключении ML — просто заменить провайдер)
+- [x] `GET /projects/:id/risk` — оценка рисков проекта
+- [x] `GET /tasks/:id/risk` — оценка рисков задачи
+- [x] RiskController + RiskStubService
+- [x] Регистрация через DI (при подключении ML — просто заменить провайдер)
 
 #### Бизнес-процесс 3 — Мониторинг
 
-- [ ] Полный flow:
+- [x] Полный flow:
   1. Проверка прав (пользователь имеет доступ к проекту)
   2. Агрегация: все задачи проекта + аудит (статусы)
   3. Вызов `riskService.assessProject(projectId)`
@@ -562,19 +562,19 @@ scripts/generate-training-data.ts
 
 #### Подготовка данных для будущего ML-обучения
 
-- [ ] Скрипт `scripts/generate-training-data.ts`:
+- [x] Скрипт `scripts/generate-training-data.ts`:
   - Генерация синтетических данных (≥ 1000 записей) на основе статистических распределений
   - Признаки: difficulty, deadline, status, assigneeCount, avgLoad, statusChanges
   - Метки: фактическое время завершения, флаг просрочки
   - Выход: `data/training_data.csv`
-- [ ] Интерфейс `IRiskAssessmentService` с методом `loadModel()` для загрузки модели из файла
-- [ ] Заглушка `POST /risk/retrain` (admin) — возвращает `{ message: "Retraining not implemented yet" }`
+- [x] Интерфейс `IRiskAssessmentService` с методом `loadModel()` для загрузки модели из файла
+- [x] Заглушка `POST /risk/retrain` (admin) — возвращает `{ message: "Retraining not implemented yet" }`
 
 #### Результат интерпретации для пользователя
 
-- [ ] `ProjectRiskOutput.summary` — текстовое пояснение: «Проект имеет высокий риск срыва сроков: 3 задачи с вероятностью задержки > 60%»
-- [ ] `TaskRiskOutput.riskFactors` — массив ключевых причин («близкий дедлайн», «высокая сложность»)
-- [ ] `TaskRiskOutput.recommendation` — краткий совет по снижению риска
+- [x] `ProjectRiskOutput.summary` — текстовое пояснение: «Проект имеет высокий риск срыва сроков: 3 задачи с вероятностью задержки > 60%»
+- [x] `TaskRiskOutput.riskFactors` — массив ключевых причин («близкий дедлайн», «высокая сложность»)
+- [x] `TaskRiskOutput.recommendation` — краткий совет по снижению риска
 
 #### Метрики качества (для будущей ML-модели)
 
@@ -850,7 +850,7 @@ npx ts-node scripts/seed.ts
 |  4   | ✅ Выполнен | С отклонениями по TeamRolesGuard и каскадному удалению |
 |  5   | ✅ Выполнен | С отклонениями (см. ниже) |
 |  6   | ✅ Выполнен | С отклонениями (см. ниже) |
-|  7   | ❌ Не начат | |
+|  7   | ✅ Выполнен | С отклонениями (см. ниже) |
 |  8   | ❌ Не начат | |
 
 ### Отклонения
@@ -919,3 +919,17 @@ npx ts-node scripts/seed.ts
 | `auth.service.spec.ts` | Без AuditService | Мок `AuditService` | Синхронизация с рефакторингом |
 | `teams.service.spec.ts` | Без AuditService | Мок `AuditService` | Синхронизация с рефакторингом |
 | `users.service.spec.ts` | Без AuditService, тест remove через delete=false | Мок `AuditService`, тест remove через findById=null | Синхронизация с рефакторингом |
+
+### Исправления, внесённые при реализации Этапа 7
+
+| Файл | Было | Стало | Причина |
+| ---- | ---- | ----- | ------- |
+| `app.module.ts` | Без RiskModule | `imports: [..., RiskModule]` | Регистрация модуля |
+| `common/enums/index.ts` | 6 экспортов | 7 экспортов (+ RiskLevel) | Новый enum |
+
+### Отклонения Этапа 7
+
+| № | Описание | Влияние |
+| - | -------- | ------- |
+| 13 | **`riskService.assessTask()` не вызывается в `TasksService.update()`:** В БП2 шаг 4 указывает вызов `riskService.assessTask()` при смене статуса. Stub-реализация вычисляет риск on-the-fly через GET-endpoint, поэтому вызов в update не имеет эффекта. | Нет — риск доступен через `GET /tasks/:id/risk` |
+| 14 | **`TaskRiskOutput` расширен полями `riskFactors` и `recommendation`:** План определял 3 поля, реализовано 5 (добавлены `riskFactors[]`, `recommendation`). | Нет — требование из раздела «Результат интерпретации для пользователя». |
