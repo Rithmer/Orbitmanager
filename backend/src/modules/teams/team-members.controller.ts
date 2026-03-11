@@ -28,6 +28,7 @@ import { AccountRole } from '../../common/enums/account-role.enum';
 @ApiTags('Team Members')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, AccountRolesGuard)
+@Controller()
 export class TeamMembersController {
   constructor(private readonly teamsService: TeamsService) {}
 

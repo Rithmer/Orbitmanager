@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  login         String   @unique @db.VarChar(50)
+  password      String
+  fullName      String   @map("full_name")
+  profession    String   @default("")
+  accountStatus String   @default("active") @map("account_status")
+  accountRole   String   @default("member") @map("account_role")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  teams          Team[]
+  teamMembers    TeamMember[]
+  projectMembers ProjectMember[]
+  createdTasks   Task[]    @relation("TaskCreator")
+  assignedTasks  Task[]    @relation("TaskAssignee")
+  auditLogs      AuditLog[]
+
+  @@map("users")
+}
+
+model Team {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String   @default("")
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdById Int      @map("created_by_id")
+
+  createdBy   User         @relation(fields: [createdById], references: [id])
+  members     TeamMember[]
+  projects    Project[]
+
+  @@map("teams")
+}
+
+model TeamMember {
+  id       Int    @id @default(autoincrement())
+  userId   Int    @map("user_id")
+  teamId   Int    @map("team_id")
+  teamRole String @map("team_role")
+
+  user User @relation(fields: [userId], references: [id])
+  team Team @relation(fields: [teamId], references: [id])
+
+  @@unique([userId, teamId])
+  @@map("team_members")
+}
+
+model Project {
+  id          Int      @id @default(autoincrement())
+  teamId      Int      @map("team_id")
+  name        String
+  description String   @default("")
+  status      String   @default("active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  team    Team            @relation(fields: [teamId], references: [id])
+  members ProjectMember[]
+  tasks   Task[]
+
+  @@map("projects")
+}
+
+model ProjectMember {
+  id         Int      @id @default(autoincrement())
+  projectId  Int      @map("project_id")
+  userId     Int      @map("user_id")
+  role       String
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  project Project @relation(fields: [projectId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([projectId, userId])
+  @@map("project_members")
+}
+
+model Task {
+  id          Int      @id @default(autoincrement())
+  projectId   Int      @map("project_id")
+  name        String
+  description String   @default("")
+  deadline    DateTime
+  status      String   @default("new")
+  difficulty  Int
+  assigneeId  Int?     @map("assignee_id")
+  createdById Int      @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  project   Project @relation(fields: [projectId], references: [id])
+  assignee  User?   @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  createdBy User    @relation("TaskCreator", fields: [createdById], references: [id])
+
+  @@map("tasks")
+}
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  action      String
+  entityType  String   @map("entity_type")
+  entityId    Int?     @map("entity_id")
+  oldValue    String?  @map("old_value")
+  newValue    String?  @map("new_value")
+  timestamp   DateTime @default(now())
+  description String   @default("")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}

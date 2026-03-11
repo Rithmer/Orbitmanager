@@ -592,7 +592,7 @@ scripts/generate-training-data.ts
 
 ---
 
-## 9. Этап 8 — Финализация + Docker + Тесты
+яяяяяяяяяяяяяяяяяяяяяяяяяяяяя## 9. Этап 8 — Финализация + Docker + Тесты
 
 ### Цель
 Подготовить проект к сдаче: контейнеризация, seed-данные, тесты, резервное копирование, документация.
@@ -601,7 +601,7 @@ scripts/generate-training-data.ts
 
 #### Docker
 
-- [ ] **Dockerfile** (мультистейдж):
+- [x] **Dockerfile** (мультистейдж):
   ```dockerfile
   # Build stage
   FROM node:20-alpine AS builder
@@ -620,41 +620,41 @@ scripts/generate-training-data.ts
   EXPOSE 3000
   CMD ["node", "dist/main.js"]
   ```
-- [ ] **docker-compose.yml** — 3 контейнера:
+- [x] **docker-compose.yml** — 3 контейнера:
   - `postgres` (postgres:16-alpine, намед volume `pgdata`, healthcheck)
   - `backend` (сборка из Dockerfile, depends_on postgres, маппинг портов)
   - `frontend` (опционально, nginx + static build)
-- [ ] Сетевое взаимодействие: bridge-сеть `app-network`
-- [ ] Тома: `pgdata`, `./data`, `./logs`, `./backups`, `./models`
-- [ ] `.dockerignore` (node_modules, dist, data/, logs/)
+- [x] Сетевое взаимодействие: bridge-сеть `app-network`
+- [x] Тома: `pgdata`, `./data`, `./logs`, `./backups`, `./models`
+- [x] `.dockerignore` (node_modules, dist, data/, logs/)
 
 #### Заглушки под PostgreSQL
 
-- [ ] Переменная `STORAGE_MODE` (`json` | `postgres`):
+- [x] Переменная `STORAGE_MODE` (`json` | `postgres`):
   - `json` — используются `*JsonRepository`
   - `postgres` — используются `*PrismaRepository` (через Prisma Client)
-- [ ] `StorageModule` — динамический модуль, регистрирующий нужные провайдеры по `STORAGE_MODE`
-- [ ] `PrismaService` (extends PrismaClient, implements OnModuleInit) — 5 строк, подключение к БД
-- [ ] `prisma/schema.prisma` — схема всех 7 сущностей (единая точка правды)
-- [ ] Начальная миграция: `npx prisma migrate dev --name init`
-- [ ] `prisma/seed.ts` — начальные данные через `prisma db seed`
+- [x] `StorageModule` — динамический модуль, регистрирующий нужные провайдеры по `STORAGE_MODE`
+- [x] `PrismaService` (extends PrismaClient, implements OnModuleInit) — 5 строк, подключение к БД
+- [x] `prisma/schema.prisma` — схема всех 7 сущностей (единая точка правды)
+- [ ] Начальная миграция: `npx prisma migrate dev --name init` *(требует запущенный PostgreSQL)*
+- [x] `prisma/seed.ts` — начальные данные через `prisma db seed`
 
 #### Seed-скрипт
 
-- [ ] `scripts/seed.ts`:
+- [x] `scripts/seed.ts`:
   - 1 admin-пользователь (login=`admin`, password=`Admin123!`, accountRole=`admin`)
   - Остальные файлы: пустые items, lastId=0
 
 #### Резервное копирование
 
-- [ ] `scripts/backup.sh` — бэкап JSON-файлов и/или `pg_dump` для PostgreSQL
-- [ ] `npm run backup` / `npm run restore` команды в `package.json`
-- [ ] Ротация: 7 ежедневных + 4 еженедельных
-- [ ] Документация действий администратора при аварии
+- [x] `scripts/backup.sh` — бэкап JSON-файлов и/или `pg_dump` для PostgreSQL
+- [x] `npm run backup` / `npm run restore` команды в `package.json`
+- [x] Ротация: 7 ежедневных + 4 еженедельных
+- [x] Документация действий администратора при аварии
 
 #### Тестирование
 
-- [ ] **Unit-тесты** (`test/unit/`):
+- [x] **Unit-тесты** (`test/unit/`):
   - `query.helper.spec.ts` — фильтрация, сортировка, пагинация
   - `tasks.service.spec.ts` — переходы статусов, валидация
   - `account-role.guard.spec.ts` — проверка доступа (по enum-полю)
@@ -662,21 +662,21 @@ scripts/generate-training-data.ts
   - `project-roles.guard.spec.ts` — проверка проектных ролей
   - `risk-stub.service.spec.ts` — правила оценки рисков
   - `json-file.service.spec.ts` — атомарность, кэш
-- [ ] **e2e тесты** (`test/e2e/`) — 3 сквозных бизнес-процесса:
+- [x] **e2e тесты** (`test/e2e/`) — 3 сквозных бизнес-процесса:
   - Тест БП1: register → login → create team → create project → assign to project → create task → проверить audit
   - Тест БП2: login → create task → assign → change status → проверить history + audit
   - Тест БП3: login → создать проект с задачами → GET /projects/:id/risk → проверить ответ
 
 #### Swagger-проверка
 
-- [ ] Все endpoint-ы имеют теги
-- [ ] Все DTO декорированы `@ApiProperty()` с описанием и примером
-- [ ] Auth-схема (Bearer) подключена
+- [x] Все endpoint-ы имеют теги
+- [x] Все DTO декорированы `@ApiProperty()` с описанием и примером
+- [x] Auth-схема (Bearer) подключена
 
 #### Документация
 
-- [ ] README.md — архитектура, API, инструкция запуска
-- [ ] Пользовательская инструкция (регистрация, роли, основной сценарий, поиск/фильтрация)
+- [x] README.md — архитектура, API, инструкция запуска
+- [x] Пользовательская инструкция (регистрация, роли, основной сценарий, поиск/фильтрация)
 
 ### Результат
 Проект полностью готов к демонстрации и сдаче.

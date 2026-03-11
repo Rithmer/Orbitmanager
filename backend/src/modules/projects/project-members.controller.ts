@@ -28,6 +28,7 @@ import { AccountRole } from '../../common/enums/account-role.enum';
 @ApiTags('Project Members')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, AccountRolesGuard)
+@Controller()
 export class ProjectMembersController {
   constructor(private readonly projectsService: ProjectsService) {}
 

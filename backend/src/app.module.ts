@@ -29,7 +29,7 @@ import { RiskModule } from './modules/risk/risk.module';
         },
       ],
     }),
-    StorageModule,
+    StorageModule.register(),
     UsersModule,
     AuthModule,
     TeamsModule,

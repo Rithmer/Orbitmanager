@@ -81,7 +81,13 @@ export class JsonFileService implements OnModuleInit {
       const index = data.items.findIndex((item) => item.id === id);
       if (index === -1) return null;
 
-      data.items[index] = { ...data.items[index], ...partial };
+      // Filter out undefined values to avoid overwriting existing fields
+      const filtered = Object.fromEntries(
+        Object.entries(partial as Record<string, unknown>).filter(
+          ([, v]) => v !== undefined,
+        ),
+      );
+      data.items[index] = { ...data.items[index], ...filtered };
       await this.atomicWrite(entity, data);
       return data.items[index];
     });
