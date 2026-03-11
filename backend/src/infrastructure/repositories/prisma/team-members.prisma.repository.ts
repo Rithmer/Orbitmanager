@@ -46,13 +46,20 @@ export class TeamMembersPrismaRepository implements ITeamMemberRepository {
     return this.toDomain(row);
   }
 
+  /**
+   * Оптимизация: убран предварительный findUnique.
+   * Prisma P2025 = запись не найдена → возвращаем null.
+   */
   async update(id: number, partial: Partial<TeamMember>): Promise<TeamMember | null> {
-    const exists = await this.prisma.teamMember.findUnique({ where: { id } });
-    if (!exists) return null;
-
     const { id: _id, ...data } = partial as Record<string, unknown>;
-    const row = await this.prisma.teamMember.update({ where: { id }, data });
-    return this.toDomain(row);
+    try {
+      const row = await this.prisma.teamMember.update({ where: { id }, data });
+      return this.toDomain(row);
+    } catch (e: unknown) {
+      const prismaError = e as { code?: string };
+      if (prismaError.code === 'P2025') return null;
+      throw e;
+    }
   }
 
   async delete(id: number): Promise<boolean> {

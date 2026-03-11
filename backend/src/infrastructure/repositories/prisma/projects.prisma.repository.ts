@@ -26,6 +26,14 @@ export class ProjectsPrismaRepository implements IProjectRepository {
     return rows.map(this.toDomain);
   }
 
+  async findByTeams(teamIds: number[]): Promise<Project[]> {
+    const rows = await this.prisma.project.findMany({
+      where: { teamId: { in: teamIds } },
+      orderBy: { id: 'asc' },
+    });
+    return rows.map(this.toDomain);
+  }
+
   async create(project: Omit<Project, 'id'>): Promise<Project> {
     const row = await this.prisma.project.create({
       data: {

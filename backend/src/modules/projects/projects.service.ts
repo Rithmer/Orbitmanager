@@ -281,34 +281,48 @@ export class ProjectsService {
   }
 
   private async getVisibleProjects(userId: number): Promise<Project[]> {
-    // Get all team memberships
     const teamMemberships = await this.teamMemberRepository.findByUser(userId);
     if (teamMemberships.length === 0) return [];
 
-    const allProjects: Project[] = [];
+    // Один запрос вместо N (по одному на каждую команду)
+    const teamIds = teamMemberships.map((tm) => tm.teamId);
+    const allTeamProjects = await this.projectRepository.findByTeams(teamIds);
 
-    for (const tm of teamMemberships) {
-      const teamProjects = await this.projectRepository.findByTeam(tm.teamId);
+    const ownerOrMemberTeams = new Set(
+      teamMemberships
+        .filter(
+          (tm) =>
+            tm.teamRole === TeamRole.OWNER || tm.teamRole === TeamRole.MEMBER,
+        )
+        .map((tm) => tm.teamId),
+    );
+    const observerTeams = new Set(
+      teamMemberships
+        .filter((tm) => tm.teamRole === TeamRole.OBSERVER)
+        .map((tm) => tm.teamId),
+    );
 
-      if (tm.teamRole === TeamRole.OWNER || tm.teamRole === TeamRole.MEMBER) {
-        // owner and member see all projects of the team
-        allProjects.push(...teamProjects);
-      } else if (tm.teamRole === TeamRole.OBSERVER) {
-        // observer sees only assigned projects
-        const projectMemberships =
-          await this.projectMemberRepository.findByUser(userId);
-        const assignedProjectIds = new Set(
-          projectMemberships.map((pm) => pm.projectId),
-        );
-        allProjects.push(
-          ...teamProjects.filter((p) => assignedProjectIds.has(p.id)),
-        );
-      }
+    let visibleProjects: Project[];
+    if (observerTeams.size > 0) {
+      const projectMemberships =
+        await this.projectMemberRepository.findByUser(userId);
+      const assignedProjectIds = new Set(
+        projectMemberships.map((pm) => pm.projectId),
+      );
+      visibleProjects = allTeamProjects.filter(
+        (p) =>
+          ownerOrMemberTeams.has(p.teamId) ||
+          (observerTeams.has(p.teamId) && assignedProjectIds.has(p.id)),
+      );
+    } else {
+      visibleProjects = allTeamProjects.filter((p) =>
+        ownerOrMemberTeams.has(p.teamId),
+      );
     }
 
-    // Deduplicate by id
+    // Дедупликация
     const seen = new Set<number>();
-    return allProjects.filter((p) => {
+    return visibleProjects.filter((p) => {
       if (seen.has(p.id)) return false;
       seen.add(p.id);
       return true;

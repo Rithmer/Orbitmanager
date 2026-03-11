@@ -17,6 +17,7 @@ import { AccountRole } from '../../common/enums/account-role.enum';
 import type { Task } from '../../domain/models/task.model';
 import type { Project } from '../../domain/models/project.model';
 import { ProjectStatus } from '../../common/enums/project-status.enum';
+import { BusinessException } from '../../common/exceptions/business.exception';
 
 const now = new Date();
 const futureISO = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -59,6 +60,7 @@ const mockTaskRepository = {
   findAll: jest.fn().mockResolvedValue([mockTask]),
   findById: jest.fn().mockResolvedValue(mockTask),
   findByProject: jest.fn().mockResolvedValue([mockTask]),
+  findByProjects: jest.fn().mockResolvedValue([mockTask]),
   create: jest.fn().mockImplementation((data: Omit<Task, 'id'>) =>
     Promise.resolve({ ...data, id: TASK_ID }),
   ),
@@ -72,6 +74,7 @@ const mockProjectRepository = {
   findAll: jest.fn().mockResolvedValue([mockProject]),
   findById: jest.fn().mockResolvedValue(mockProject),
   findByTeam: jest.fn().mockResolvedValue([mockProject]),
+  findByTeams: jest.fn().mockResolvedValue([mockProject]),
   create: jest.fn(),
   update: jest.fn(),
   delete: jest.fn(),
@@ -137,8 +140,8 @@ describe('TasksService', () => {
       mockTeamMemberRepository.findByUser.mockResolvedValueOnce([
         { id: 1, userId: OWNER_ID, teamId: TEAM_ID, teamRole: TeamRole.OWNER },
       ]);
-      mockProjectRepository.findByTeam.mockResolvedValueOnce([mockProject]);
-      mockTaskRepository.findByProject.mockResolvedValueOnce([mockTask]);
+      mockProjectRepository.findByTeams.mockResolvedValueOnce([mockProject]);
+      mockTaskRepository.findByProjects.mockResolvedValueOnce([mockTask]);
 
       const result = await service.findAll({}, OWNER_ID, AccountRole.MEMBER);
       expect(result.items).toHaveLength(1);
@@ -315,7 +318,7 @@ describe('TasksService', () => {
           OWNER_ID,
           AccountRole.MEMBER,
         ),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(BusinessException);
     });
 
     it('should allow developer to change status of their own task', async () => {
@@ -446,7 +449,7 @@ describe('TasksService', () => {
         if (expected) {
           await expect(promise).resolves.toBeDefined();
         } else {
-          await expect(promise).rejects.toThrow(BadRequestException);
+          await expect(promise).rejects.toThrow(BusinessException);
         }
       },
     );

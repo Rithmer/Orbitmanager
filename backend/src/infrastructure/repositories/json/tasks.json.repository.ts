@@ -24,6 +24,12 @@ export class TasksJsonRepository implements ITaskRepository {
     return data.items.filter((t) => t.projectId === projectId);
   }
 
+  async findByProjects(projectIds: number[]): Promise<Task[]> {
+    const data = await this.jsonFileService.read<Task>(this.entity);
+    const set = new Set(projectIds);
+    return data.items.filter((t) => set.has(t.projectId));
+  }
+
   async create(task: Omit<Task, 'id'>): Promise<Task> {
     return this.jsonFileService.create<Task>(this.entity, task);
   }

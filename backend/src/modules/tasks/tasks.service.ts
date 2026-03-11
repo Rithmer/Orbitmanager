@@ -27,6 +27,7 @@ import {
 } from '../../common/helpers/query.helper';
 import { AuditService } from '../audit-logs/audit.service';
 import { AuditAction } from '../../common/enums/audit-action.enum';
+import { BusinessException } from '../../common/exceptions/business.exception';
 
 @Injectable()
 export class TasksService {
@@ -232,36 +233,51 @@ export class TasksService {
     const teamMemberships = await this.teamMemberRepository.findByUser(userId);
     if (teamMemberships.length === 0) return [];
 
-    const allTasks: Task[] = [];
+    // Один запрос вместо N (по одному на каждую команду)
+    const teamIds = teamMemberships.map((tm) => tm.teamId);
+    const allTeamProjects = await this.projectRepository.findByTeams(teamIds);
+    if (allTeamProjects.length === 0) return [];
 
-    for (const tm of teamMemberships) {
-      // Get all projects of this team
-      const projects = await this.projectRepository.findByTeam(tm.teamId);
-      const projectIds = projects.map((p) => p.id);
+    const ownerOrMemberTeams = new Set(
+      teamMemberships
+        .filter(
+          (tm) =>
+            tm.teamRole === TeamRole.OWNER || tm.teamRole === TeamRole.MEMBER,
+        )
+        .map((tm) => tm.teamId),
+    );
+    const observerTeams = new Set(
+      teamMemberships
+        .filter((tm) => tm.teamRole === TeamRole.OBSERVER)
+        .map((tm) => tm.teamId),
+    );
 
-      if (tm.teamRole === TeamRole.OWNER || tm.teamRole === TeamRole.MEMBER) {
-        // See all tasks in all team projects
-        for (const pid of projectIds) {
-          const tasks = await this.taskRepository.findByProject(pid);
-          allTasks.push(...tasks);
-        }
-      } else if (tm.teamRole === TeamRole.OBSERVER) {
-        // See tasks only in assigned projects
-        const projectMemberships =
-          await this.projectMemberRepository.findByUser(userId);
-        const assignedProjectIds = new Set(
-          projectMemberships.map((pm) => pm.projectId),
-        );
-        for (const pid of projectIds) {
-          if (assignedProjectIds.has(pid)) {
-            const tasks = await this.taskRepository.findByProject(pid);
-            allTasks.push(...tasks);
-          }
-        }
-      }
+    let visibleProjectIds: number[];
+    if (observerTeams.size > 0) {
+      const projectMemberships =
+        await this.projectMemberRepository.findByUser(userId);
+      const assignedProjectIds = new Set(
+        projectMemberships.map((pm) => pm.projectId),
+      );
+      visibleProjectIds = allTeamProjects
+        .filter(
+          (p) =>
+            ownerOrMemberTeams.has(p.teamId) ||
+            (observerTeams.has(p.teamId) && assignedProjectIds.has(p.id)),
+        )
+        .map((p) => p.id);
+    } else {
+      visibleProjectIds = allTeamProjects
+        .filter((p) => ownerOrMemberTeams.has(p.teamId))
+        .map((p) => p.id);
     }
 
-    // Deduplicate
+    if (visibleProjectIds.length === 0) return [];
+
+    // Один запрос вместо M (по одному на каждый проект)
+    const allTasks = await this.taskRepository.findByProjects(visibleProjectIds);
+
+    // Дедупликация
     const seen = new Set<number>();
     return allTasks.filter((t) => {
       if (seen.has(t.id)) return false;
@@ -380,7 +396,8 @@ export class TasksService {
   ): void {
     const allowed = ALLOWED_TASK_TRANSITIONS[currentStatus];
     if (!allowed || !allowed.includes(newStatus)) {
-      throw new BadRequestException(
+      // BusinessException (HTTP 422) — нарушение бизнес-правила переходов статусов
+      throw new BusinessException(
         `Недопустимый переход статуса: ${currentStatus} → ${newStatus}. Допустимые: ${allowed?.join(', ') || 'нет'}`,
       );
     }

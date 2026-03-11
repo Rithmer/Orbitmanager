@@ -1,73 +1,75 @@
-# React + TypeScript + Vite
+# Frontend  Сервис управления проектами и задачами
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> **Курсовой проект**  РТУ МИРЭА, ЭФБО-10-24, Ким Андрей  
+> **Стек:** React 19 + TypeScript + Vite + React Router v7 + Axios
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Описание
 
-## React Compiler
+React SPA  клиентская часть системы управления проектами и задачами.  
+Взаимодействует с NestJS-backend исключительно через REST API.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+>  **Статус:** Frontend в разработке. Backend API полностью готов и доступен через Swagger: `http://localhost:3000/api/docs`
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Технологии
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+| Пакет | Версия | Назначение |
+|-------|--------|------------|
+| React | 19.x | UI-фреймворк |
+| TypeScript | 5.9.x | Типизация |
+| Vite | 7.x | Сборщик / dev-сервер |
+| React Router DOM | 7.x | Клиентский роутинг |
+| Axios | 1.x | HTTP-клиент |
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+---
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Запуск
+
+```bash
+# Установить зависимости
+npm install
+
+# Development-сервер (http://localhost:5173)
+npm run dev
+
+# Production сборка
+npm run build
+
+# Предпросмотр production сборки
+npm run preview
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Переменные окружения
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Создайте файл `.env.local` в папке `frontend/`:
+
+```bash
+# URL backend API (по умолчанию локальный dev-сервер)
+VITE_API_URL=http://localhost:3000
 ```
+
+---
+
+## Структура (планируемая)
+
+```
+src/
+ api/          # Axios-клиент и API-функции
+ components/   # Переиспользуемые компоненты
+ pages/        # Страницы (маршруты)
+ hooks/        # Кастомные React-хуки
+ types/        # TypeScript-типы (соответствуют backend DTO)
+ utils/        # Вспомогательные функции
+```
+
+---
+
+## Связанные ресурсы
+
+- **Backend API (Swagger):** http://localhost:3000/api/docs
+- **Основной README:** `../README.md`

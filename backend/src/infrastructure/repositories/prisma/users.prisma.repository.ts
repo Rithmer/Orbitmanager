@@ -37,13 +37,20 @@ export class UsersPrismaRepository implements IUserRepository {
     return this.toDomain(row);
   }
 
+  /**
+   * Оптимизация: убран предварительный findUnique.
+   * Prisma P2025 = запись не найдена → возвращаем null.
+   */
   async update(id: number, partial: Partial<User>): Promise<User | null> {
-    const exists = await this.prisma.user.findUnique({ where: { id } });
-    if (!exists) return null;
-
     const { id: _id, createdAt: _ca, updatedAt: _ua, ...data } = partial as Record<string, unknown>;
-    const row = await this.prisma.user.update({ where: { id }, data });
-    return this.toDomain(row);
+    try {
+      const row = await this.prisma.user.update({ where: { id }, data });
+      return this.toDomain(row);
+    } catch (e: unknown) {
+      const prismaError = e as { code?: string };
+      if (prismaError.code === 'P2025') return null;
+      throw e;
+    }
   }
 
   async delete(id: number): Promise<boolean> {

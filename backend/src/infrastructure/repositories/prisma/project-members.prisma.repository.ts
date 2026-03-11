@@ -46,13 +46,20 @@ export class ProjectMembersPrismaRepository implements IProjectMemberRepository 
     return this.toDomain(row);
   }
 
+  /**
+   * Оптимизация: убран предварительный findUnique.
+   * Prisma P2025 = запись не найдена → возвращаем null.
+   */
   async update(id: number, partial: Partial<ProjectMember>): Promise<ProjectMember | null> {
-    const exists = await this.prisma.projectMember.findUnique({ where: { id } });
-    if (!exists) return null;
-
     const { id: _id, assignedAt: _aa, ...data } = partial as Record<string, unknown>;
-    const row = await this.prisma.projectMember.update({ where: { id }, data });
-    return this.toDomain(row);
+    try {
+      const row = await this.prisma.projectMember.update({ where: { id }, data });
+      return this.toDomain(row);
+    } catch (e: unknown) {
+      const prismaError = e as { code?: string };
+      if (prismaError.code === 'P2025') return null;
+      throw e;
+    }
   }
 
   async delete(id: number): Promise<boolean> {

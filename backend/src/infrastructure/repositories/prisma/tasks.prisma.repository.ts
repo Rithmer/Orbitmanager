@@ -26,6 +26,14 @@ export class TasksPrismaRepository implements ITaskRepository {
     return rows.map(this.toDomain);
   }
 
+  async findByProjects(projectIds: number[]): Promise<Task[]> {
+    const rows = await this.prisma.task.findMany({
+      where: { projectId: { in: projectIds } },
+      orderBy: { id: 'asc' },
+    });
+    return rows.map(this.toDomain);
+  }
+
   async create(task: Omit<Task, 'id'>): Promise<Task> {
     const row = await this.prisma.task.create({
       data: {

@@ -24,6 +24,12 @@ export class ProjectsJsonRepository implements IProjectRepository {
     return data.items.filter((p) => p.teamId === teamId);
   }
 
+  async findByTeams(teamIds: number[]): Promise<Project[]> {
+    const data = await this.jsonFileService.read<Project>(this.entity);
+    const set = new Set(teamIds);
+    return data.items.filter((p) => set.has(p.teamId));
+  }
+
   async create(project: Omit<Project, 'id'>): Promise<Project> {
     return this.jsonFileService.create<Project>(this.entity, project);
   }

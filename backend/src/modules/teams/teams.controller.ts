@@ -22,8 +22,11 @@ import {
 import { TeamsService } from './teams.service';
 import { CreateTeamDto, UpdateTeamDto } from './dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { TeamRolesGuard } from '../../common/guards/team-roles.guard';
+import { TeamRoles } from '../../common/decorators/team-roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccountRole } from '../../common/enums/account-role.enum';
+import { TeamRole } from '../../common/enums/team-role.enum';
 
 @ApiTags('Teams')
 @ApiBearerAuth()
@@ -72,6 +75,8 @@ export class TeamsController {
   }
 
   @Patch(':id')
+  @UseGuards(TeamRolesGuard)
+  @TeamRoles(TeamRole.OWNER)
   @ApiOperation({ summary: 'Обновить команду (только owner)' })
   @ApiResponse({ status: 200, description: 'Команда обновлена' })
   @ApiResponse({ status: 403, description: 'Нет прав' })
@@ -87,6 +92,8 @@ export class TeamsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(TeamRolesGuard)
+  @TeamRoles(TeamRole.OWNER)
   @ApiOperation({ summary: 'Удалить команду (только owner)' })
   @ApiResponse({ status: 204, description: 'Команда удалена' })
   @ApiResponse({ status: 403, description: 'Нет прав' })

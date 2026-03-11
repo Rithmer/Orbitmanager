@@ -22,8 +22,11 @@ import {
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto, UpdateProjectDto } from './dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { ProjectRolesGuard } from '../../common/guards/project-roles.guard';
+import { ProjectRoles } from '../../common/decorators/project-roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccountRole } from '../../common/enums/account-role.enum';
+import { ProjectRole } from '../../common/enums/project-role.enum';
 import { ProjectStatus } from '../../common/enums/project-status.enum';
 
 @ApiTags('Projects')
@@ -94,6 +97,8 @@ export class ProjectsController {
   }
 
   @Patch(':id')
+  @UseGuards(ProjectRolesGuard)
+  @ProjectRoles(ProjectRole.TEAM_LEAD)
   @ApiOperation({ summary: 'Обновить проект (owner / team_lead)' })
   @ApiResponse({ status: 200, description: 'Проект обновлён' })
   @ApiResponse({ status: 403, description: 'Нет прав' })
