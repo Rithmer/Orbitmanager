@@ -30,7 +30,7 @@ export class UsersService {
   async findAll(params: QueryParams): Promise<PaginatedResult<Omit<User, 'password'>>> {
     const users = await this.userRepository.findAll();
     const safe = users.map((u) => this.omitPassword(u));
-    return QueryHelper.apply(safe as Record<string, unknown>[], {
+    return QueryHelper.apply(safe, {
       ...params,
       searchFields: params.searchFields ?? ['login', 'fullName', 'profession'],
     }) as PaginatedResult<Omit<User, 'password'>>;

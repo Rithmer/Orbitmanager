@@ -21,9 +21,8 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccountRole } from '../../common/enums/account-role.enum';
 import { TeamRole } from '../../common/enums/team-role.enum';
-import { TaskStatus } from '../../common/enums/task-status.enum';
 import { AuditAction } from '../../common/enums/audit-action.enum';
-import type { IRiskAssessmentService, TaskRiskInput } from '../../domain/services/risk-assessment.interface';
+import type { IRiskAssessmentService } from '../../domain/services/risk-assessment.interface';
 import { RISK_ASSESSMENT_SERVICE } from '../../domain/services/risk-assessment.interface';
 import type { ITaskRepository } from '../../domain/repositories/task.repository';
 import { TASK_REPOSITORY } from '../../domain/repositories/task.repository';
@@ -36,6 +35,7 @@ import { TEAM_MEMBER_REPOSITORY } from '../../domain/repositories/team-member.re
 import type { IAuditLogRepository } from '../../domain/repositories/audit-log.repository';
 import { AUDIT_LOG_REPOSITORY } from '../../domain/repositories/audit-log.repository';
 import { TaskRiskOutputDto, ProjectRiskOutputDto } from './dto';
+import { buildTaskRiskInput } from './helpers/build-task-risk-input';
 
 @ApiTags('Risk Assessment')
 @ApiBearerAuth()
@@ -80,41 +80,24 @@ export class RiskController {
     }
 
     // Gather input data
-    const allTasks = await this.taskRepository.findAll();
-    const auditLogs = await this.auditLogRepository.findAll();
+    const auditLogs = await this.auditLogRepository.findByEntity('task', task.id);
+    const allTasks = await this.taskRepository.findByProject(task.projectId);
 
     const statusChangesCount = auditLogs.filter(
-      (l) => l.entityType === 'task' && l.entityId === task.id && l.action === AuditAction.STATUS_CHANGE,
+      (l) => l.action === AuditAction.STATUS_CHANGE,
     ).length;
 
     const assigneeLoad = task.assigneeId
       ? allTasks.filter(
           (t) =>
             t.assigneeId === task.assigneeId &&
-            t.status !== TaskStatus.DONE &&
-            t.status !== TaskStatus.CANCELLED &&
+            t.status !== 'done' &&
+            t.status !== 'cancelled' &&
             t.id !== task.id,
         ).length
       : 0;
 
-    const now = new Date();
-    const deadline = new Date(task.deadline);
-    const created = new Date(task.createdAt);
-    const daysSinceCreation = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
-    const daysUntilDeadline = Math.floor((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-
-    const input: TaskRiskInput = {
-      taskId: task.id,
-      difficulty: task.difficulty,
-      deadline: task.deadline,
-      createdAt: task.createdAt,
-      status: task.status,
-      assigneeCount: task.assigneeId ? 1 : 0,
-      assigneeLoad,
-      statusChangesCount,
-      daysSinceCreation,
-      daysUntilDeadline,
-    };
+    const input = buildTaskRiskInput(task, statusChangesCount, assigneeLoad);
 
     return this.riskService.assessTask(input);
   }

@@ -2,6 +2,7 @@ import { TeamMember } from '../models/team-member.model';
 
 export interface ITeamMemberRepository {
   findAll(): Promise<TeamMember[]>;
+  findById(id: number): Promise<TeamMember | null>;
   findByTeam(teamId: number): Promise<TeamMember[]>;
   findByUser(userId: number): Promise<TeamMember[]>;
   findByUserAndTeam(userId: number, teamId: number): Promise<TeamMember | null>;

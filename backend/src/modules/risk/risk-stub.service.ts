@@ -8,6 +8,7 @@ import type { IAuditLogRepository } from '../../domain/repositories/audit-log.re
 import { AUDIT_LOG_REPOSITORY } from '../../domain/repositories/audit-log.repository';
 import { AuditAction } from '../../common/enums/audit-action.enum';
 import { TaskStatus } from '../../common/enums/task-status.enum';
+import { buildTaskRiskInput } from './helpers/build-task-risk-input';
 
 @Injectable()
 export class RiskStubService implements IRiskAssessmentService {
@@ -57,7 +58,7 @@ export class RiskStubService implements IRiskAssessmentService {
     }
 
     const allAuditLogs = await this.auditLogRepository.findAll();
-    const allTasks = await this.taskRepository.findAll();
+    const projectTasks = await this.taskRepository.findByProject(projectId);
 
     const taskRisks: { taskId: number; taskName: string; delayProbability: number }[] = [];
     let totalDelay = 0;
@@ -71,7 +72,7 @@ export class RiskStubService implements IRiskAssessmentService {
       ).length;
 
       const assigneeLoad = task.assigneeId
-        ? allTasks.filter(
+        ? projectTasks.filter(
             (t) =>
               t.assigneeId === task.assigneeId &&
               t.status !== TaskStatus.DONE &&
@@ -80,24 +81,7 @@ export class RiskStubService implements IRiskAssessmentService {
           ).length
         : 0;
 
-      const now = new Date();
-      const deadline = new Date(task.deadline);
-      const created = new Date(task.createdAt);
-      const daysSinceCreation = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
-      const daysUntilDeadline = Math.floor((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-
-      const input: TaskRiskInput = {
-        taskId: task.id,
-        difficulty: task.difficulty,
-        deadline: task.deadline,
-        createdAt: task.createdAt,
-        status: task.status,
-        assigneeCount: task.assigneeId ? 1 : 0,
-        assigneeLoad,
-        statusChangesCount,
-        daysSinceCreation,
-        daysUntilDeadline,
-      };
+      const input = buildTaskRiskInput(task, statusChangesCount, assigneeLoad);
 
       const { delayProbability } = this.calculateTaskRisk(input);
       totalDelay += delayProbability;

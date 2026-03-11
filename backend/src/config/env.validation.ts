@@ -21,7 +21,9 @@ export const envValidationSchema = Joi.object({
   DATABASE_URL: Joi.string().optional(),
 
   THROTTLE_TTL: Joi.number().default(60000),
-  THROTTLE_LIMIT: Joi.number().default(5),
+  THROTTLE_LIMIT: Joi.number().default(60),
+
+  CORS_ORIGIN: Joi.string().default('http://localhost:5173,http://localhost:3000'),
 
   LOG_LEVEL: Joi.string()
     .valid('error', 'warn', 'info', 'debug')

@@ -22,20 +22,17 @@ import {
 import { TeamsService } from './teams.service';
 import { CreateTeamDto, UpdateTeamDto } from './dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { AccountRolesGuard } from '../../common/guards/account-roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccountRole } from '../../common/enums/account-role.enum';
 
 @ApiTags('Teams')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, AccountRolesGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('teams')
 export class TeamsController {
   constructor(private readonly teamsService: TeamsService) {}
 
   @Get()
-  @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
   @ApiOperation({ summary: 'Получить список команд' })
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'page', required: false, type: Number })
@@ -57,7 +54,6 @@ export class TeamsController {
   }
 
   @Get(':id')
-  @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
   @ApiOperation({ summary: 'Получить команду по ID' })
   @ApiResponse({ status: 200, description: 'Команда найдена' })
   @ApiResponse({ status: 404, description: 'Команда не найдена' })
@@ -66,7 +62,6 @@ export class TeamsController {
   }
 
   @Post()
-  @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
   @ApiOperation({ summary: 'Создать команду (автор становится owner)' })
   @ApiResponse({ status: 201, description: 'Команда создана' })
   create(
@@ -77,7 +72,6 @@ export class TeamsController {
   }
 
   @Patch(':id')
-  @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
   @ApiOperation({ summary: 'Обновить команду (только owner)' })
   @ApiResponse({ status: 200, description: 'Команда обновлена' })
   @ApiResponse({ status: 403, description: 'Нет прав' })
@@ -92,7 +86,6 @@ export class TeamsController {
   }
 
   @Delete(':id')
-  @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Удалить команду (только owner)' })
   @ApiResponse({ status: 204, description: 'Команда удалена' })

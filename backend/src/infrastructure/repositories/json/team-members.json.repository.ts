@@ -14,6 +14,11 @@ export class TeamMembersJsonRepository implements ITeamMemberRepository {
     return data.items;
   }
 
+  async findById(id: number): Promise<TeamMember | null> {
+    const data = await this.jsonFileService.read<TeamMember>(this.entity);
+    return data.items.find((m) => m.id === id) ?? null;
+  }
+
   async findByTeam(teamId: number): Promise<TeamMember[]> {
     const data = await this.jsonFileService.read<TeamMember>(this.entity);
     return data.items.filter((m) => m.teamId === teamId);

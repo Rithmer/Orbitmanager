@@ -22,21 +22,18 @@ import {
 import { TasksService } from './tasks.service';
 import { CreateTaskDto, UpdateTaskDto } from './dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { AccountRolesGuard } from '../../common/guards/account-roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccountRole } from '../../common/enums/account-role.enum';
 import { TaskStatus } from '../../common/enums/task-status.enum';
 
 @ApiTags('Tasks')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, AccountRolesGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('tasks')
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
   @Get()
-  @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
   @ApiOperation({ summary: 'Получить список задач' })
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'projectId', required: false, type: Number })
@@ -78,7 +75,6 @@ export class TasksController {
   }
 
   @Get(':id')
-  @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
   @ApiOperation({ summary: 'Получить задачу по ID' })
   @ApiResponse({ status: 200, description: 'Задача найдена' })
   @ApiResponse({ status: 404, description: 'Задача не найдена' })
@@ -91,7 +87,6 @@ export class TasksController {
   }
 
   @Post()
-  @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
   @ApiOperation({ summary: 'Создать задачу (БП1: owner / team_lead)' })
   @ApiResponse({ status: 201, description: 'Задача создана' })
   @ApiResponse({ status: 400, description: 'Ошибка валидации' })
@@ -106,7 +101,6 @@ export class TasksController {
   }
 
   @Patch(':id')
-  @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
   @ApiOperation({ summary: 'Обновить задачу / изменить статус (БП2)' })
   @ApiResponse({ status: 200, description: 'Задача обновлена' })
   @ApiResponse({ status: 400, description: 'Недопустимый переход статуса' })
@@ -122,7 +116,6 @@ export class TasksController {
   }
 
   @Delete(':id')
-  @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Удалить задачу (owner / team_lead)' })
   @ApiResponse({ status: 204, description: 'Задача удалена' })

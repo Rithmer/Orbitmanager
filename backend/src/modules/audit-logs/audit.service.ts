@@ -70,8 +70,8 @@ export class AuditService {
     }
 
     return QueryHelper.apply(
-      logs as unknown as Record<string, unknown>[],
+      logs,
       { ...params, searchFields: params.searchFields ?? ['description', 'entityType', 'action'] },
-    ) as unknown as PaginatedResult<AuditLog>;
+    ) as PaginatedResult<AuditLog>;
   }
 }

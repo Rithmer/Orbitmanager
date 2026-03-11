@@ -53,6 +53,7 @@ const mockTeamRepository = {
 
 const mockTeamMemberRepository = {
   findAll: jest.fn().mockResolvedValue([mockOwner, mockMember]),
+  findById: jest.fn().mockResolvedValue(mockOwner),
   findByTeam: jest.fn().mockResolvedValue([mockOwner, mockMember]),
   findByUser: jest.fn().mockResolvedValue([mockOwner]),
   findByUserAndTeam: jest.fn().mockResolvedValue(mockOwner),
@@ -274,7 +275,7 @@ describe('TeamsService', () => {
 
   describe('updateMember', () => {
     it('should update role', async () => {
-      mockTeamMemberRepository.findAll.mockResolvedValueOnce([mockOwner, mockMember]);
+      mockTeamMemberRepository.findById.mockResolvedValueOnce(mockMember);
       mockTeamMemberRepository.findByUserAndTeam.mockResolvedValueOnce(mockOwner);
       mockTeamMemberRepository.update.mockResolvedValueOnce({
         ...mockMember,
@@ -293,7 +294,7 @@ describe('TeamsService', () => {
 
   describe('removeMember', () => {
     it('should remove a non-owner member', async () => {
-      mockTeamMemberRepository.findAll.mockResolvedValueOnce([mockOwner, mockMember]);
+      mockTeamMemberRepository.findById.mockResolvedValueOnce(mockMember);
       mockTeamMemberRepository.findByUserAndTeam.mockResolvedValueOnce(mockOwner);
       mockProjectRepository.findByTeam.mockResolvedValueOnce([]);
 
@@ -302,7 +303,7 @@ describe('TeamsService', () => {
     });
 
     it('should not remove the last owner', async () => {
-      mockTeamMemberRepository.findAll.mockResolvedValueOnce([mockOwner, mockMember]);
+      mockTeamMemberRepository.findById.mockResolvedValueOnce(mockOwner);
       mockTeamMemberRepository.findByTeam.mockResolvedValueOnce([mockOwner]);
 
       await expect(

@@ -16,11 +16,11 @@ export interface PaginatedResult<T> {
 }
 
 export class QueryHelper {
-  static apply<T extends Record<string, unknown>>(
+  static apply<T>(
     items: T[],
     params: QueryParams,
   ): PaginatedResult<T> {
-    let result = [...items];
+    let result = [...items] as Record<string, unknown>[];
 
     if (params.filters) {
       result = QueryHelper.applyFilters(result, params.filters);
@@ -38,7 +38,7 @@ export class QueryHelper {
       result = QueryHelper.applySort(result, params.sort);
     }
 
-    return QueryHelper.applyPagination(result, params.page, params.limit);
+    return QueryHelper.applyPagination(result, params.page, params.limit) as PaginatedResult<T>;
   }
 
   static applyFilters<T extends Record<string, unknown>>(

@@ -22,21 +22,18 @@ import {
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto, UpdateProjectDto } from './dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { AccountRolesGuard } from '../../common/guards/account-roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccountRole } from '../../common/enums/account-role.enum';
 import { ProjectStatus } from '../../common/enums/project-status.enum';
 
 @ApiTags('Projects')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, AccountRolesGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('projects')
 export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
 
   @Get()
-  @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
   @ApiOperation({ summary: 'Получить список проектов' })
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'teamId', required: false, type: Number })
@@ -72,7 +69,6 @@ export class ProjectsController {
   }
 
   @Get(':id')
-  @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
   @ApiOperation({ summary: 'Получить проект по ID' })
   @ApiResponse({ status: 200, description: 'Проект найден' })
   @ApiResponse({ status: 404, description: 'Проект не найден' })
@@ -85,7 +81,6 @@ export class ProjectsController {
   }
 
   @Post()
-  @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
   @ApiOperation({ summary: 'Создать проект (только owner команды)' })
   @ApiResponse({ status: 201, description: 'Проект создан' })
   @ApiResponse({ status: 403, description: 'Нет прав' })
@@ -99,7 +94,6 @@ export class ProjectsController {
   }
 
   @Patch(':id')
-  @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
   @ApiOperation({ summary: 'Обновить проект (owner / team_lead)' })
   @ApiResponse({ status: 200, description: 'Проект обновлён' })
   @ApiResponse({ status: 403, description: 'Нет прав' })
@@ -114,7 +108,6 @@ export class ProjectsController {
   }
 
   @Delete(':id')
-  @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Удалить проект (только owner команды)' })
   @ApiResponse({ status: 204, description: 'Проект удалён' })

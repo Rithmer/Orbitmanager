@@ -53,10 +53,10 @@ export class TeamsService {
 
   async findAll(params: QueryParams): Promise<PaginatedResult<Team>> {
     const teams = await this.teamRepository.findAll();
-    return QueryHelper.apply(teams as unknown as Record<string, unknown>[], {
+    return QueryHelper.apply(teams, {
       ...params,
       searchFields: params.searchFields ?? ['name', 'description'],
-    }) as unknown as PaginatedResult<Team>;
+    }) as PaginatedResult<Team>;
   }
 
   async findById(id: number): Promise<Team> {
@@ -216,8 +216,7 @@ export class TeamsService {
   }
 
   private async findMemberById(id: number): Promise<TeamMember> {
-    const all = await this.teamMemberRepository.findAll();
-    const member = all.find((m) => m.id === id);
+    const member = await this.teamMemberRepository.findById(id);
     if (!member) throw new NotFoundException(`Участник #${id} не найден`);
     return member;
   }

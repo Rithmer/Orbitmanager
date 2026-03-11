@@ -85,7 +85,8 @@
   - Уровни: `error`, `warn`, `info`, `debug`
   - `LoggingInterceptor` — лог каждого HTTP-запроса (method, url, status, время отклика)
   - Вывод: stdout (dev), JSON-файл `logs/app.log` (prod)
-  - ⚠️ **Отклонение:** `nest-winston` и `winston` установлены, но не настроены. Используется встроенный NestJS Logger. Вывод в файл `logs/app.log` не реализован.
+  - ~~⚠️ **Отклонение:** `nest-winston` и `winston` установлены, но не настроены. Используется встроенный NestJS Logger. Вывод в файл `logs/app.log` не реализован.~~
+  - ✅ **Исправлено:** `nest-winston` + `winston` настроены в `main.ts`. Console-транспорт (colorize dev / JSON prod) + File-транспорт (`logs/app.log`, ротация 5 МБ, 5 файлов).
 - [x] Создать `.env.example` с полным списком переменных окружения (включая DB_HOST, DB_PORT, STORAGE_MODE)
 
 ### Результат
@@ -830,7 +831,7 @@ npx ts-node scripts/seed.ts
 | 13 | Unit-тесты проходят (`npm test`)                                | ⏳ частично (62 теста, Этапы 1–4) |
 | 14 | e2e-тесты 3 БП проходят (`npm run test:e2e`)                    |    |
 | 15 | Резервное копирование и восстановление работают                  |    |
-| 16 | Серверные логи пишутся (ошибки, HTTP-запросы, ключевые события)| ⏳ частично (LoggingInterceptor, без файлового вывода) |
+| 16 | Серверные логи пишутся (ошибки, HTTP-запросы, ключевые события)| ✅ Winston + LoggingInterceptor + файловый вывод |
 | 17 | Переход на PostgreSQL потребует только новых репозиториев + STORAGE_MODE=postgres |    |
 | 18 | Пользовательская инструкция в README                              |    |
 
@@ -844,7 +845,7 @@ npx ts-node scripts/seed.ts
 
 | Этап | Статус | Примечание |
 | :--: | ------ | ---------- |
-|  1   | ✅ Выполнен | С отклонениями по логированию |
+|  1   | ✅ Выполнен | ~~С отклонениями по логированию~~ Логирование настроено |
 |  2   | ✅ Выполнен | Полностью соответствует плану |
 |  3   | ✅ Выполнен | Полностью соответствует плану |
 |  4   | ✅ Выполнен | С отклонениями по TeamRolesGuard и каскадному удалению |
@@ -857,7 +858,7 @@ npx ts-node scripts/seed.ts
 
 | № | Этап | Описание | Влияние |
 | - | :--: | -------- | ------- |
-| 1 | 1 | **Логирование:** пакеты `nest-winston` и `winston` установлены как зависимости, но не настроены. Используется встроенный NestJS Logger. Вывод в файл `logs/app.log` не реализован. | Низкое — `LoggingInterceptor` логирует все HTTP-запросы в stdout. Файловый вывод добавить на Этапе 8. |
+| 1 | 1 | ~~**Логирование:** пакеты `nest-winston` и `winston` установлены как зависимости, но не настроены. Используется встроенный NestJS Logger. Вывод в файл `logs/app.log` не реализован.~~ | ✅ **Устранено.** Winston настроен: console (dev) + file `logs/app.log` (prod). |
 | 2 | 4 | **TeamRolesGuard не используется:** Guard и декоратор `@TeamRoles()` созданы, но не применяются в контроллерах. Вместо этого права проверяются вручную в `TeamsService.assertOwnerOrAdmin()`. | Среднее — функционал работает, но архитектурно правильнее использовать guard. Аналогичный подход применён и в Этапе 5 (ProjectRolesGuard создан, но права проверяются в сервисах). |
 | 3 | 4→5 | **~~Прямой доступ к JsonFileService~~ — ИСПРАВЛЕНО на Этапе 5:** каскадное удаление `project_members` теперь использует `IProjectMemberRepository.deleteByProject()` и `deleteByUserAndProjects()`. `TeamsService` больше не зависит от `JsonFileService`. | ✅ Устранено. |
 | 4 | 4 | **ProjectMember модель создана досрочно:** файл `src/domain/models/project-member.model.ts` создан на Этапе 4 (планировался на Этапе 5), так как используется для типизации каскадного удаления. На Этапе 5 обновлён: `role: string` → `role: ProjectRole`. | Нет — модель соответствует плану, просто создана раньше. |
@@ -874,8 +875,8 @@ npx ts-node scripts/seed.ts
 
 | Файл | Описание |
 | ---- | -------- |
-| `src/common/exceptions/business.exception.ts` | Класс `BusinessException` определён, но нигде не вызывается. Пригодится на следующих этапах. |
-| `src/app.controller.ts` + `src/app.service.ts` + `src/app.controller.spec.ts` | Шаблонный код NestJS (`Hello World`). Не нужен проекту, но не мешает. |
+| `src/common/exceptions/business.exception.ts` | Класс `BusinessException` определён и экспортирован, но пока не вызывается. Готов к применению при рефакторинге обработки ошибок. |
+| ~~`src/app.controller.ts` + `src/app.service.ts` + `src/app.controller.spec.ts`~~ | ~~Шаблонный код NestJS (`Hello World`).~~ ✅ Заменён на health-check endpoint (`GET /` → `{ status, timestamp, uptime }`). |
 
 ### Исправления, внесённые при code review
 
@@ -926,6 +927,77 @@ npx ts-node scripts/seed.ts
 | ---- | ---- | ----- | ------- |
 | `app.module.ts` | Без RiskModule | `imports: [..., RiskModule]` | Регистрация модуля |
 | `common/enums/index.ts` | 6 экспортов | 7 экспортов (+ RiskLevel) | Новый enum |
+
+### Исправления, внесённые при code review (после Этапа 7)
+
+> Зафиксировано после полного сравнительного анализа README, WORKPLAN и кода.
+
+#### Критические баги
+
+| Файл | Было | Стало | Причина |
+| ---- | ---- | ----- | ------- |
+| `projects.service.ts` | Удаление проекта не удаляло задачи | Каскадное удаление всех задач проекта перед удалением | Осиротевшие задачи при удалении проекта |
+| `projects.module.ts` | Нет `TASK_REPOSITORY` | Добавлен провайдер `TASK_REPOSITORY` → `TasksJsonRepository` | Для каскадного удаления задач |
+| `main.ts` | `enableCors()` без параметров (any origin) | Настроенный CORS: `CORS_ORIGIN` из env, credentials, методы, заголовки | Безопасность: открытый CORS |
+| `env.validation.ts` | `THROTTLE_LIMIT` default=5 | default=60 | 5 запросов/мин — слишком мало для нормальной работы |
+
+#### Логирование (устранение отклонения #1)
+
+| Файл | Было | Стало | Причина |
+| ---- | ---- | ----- | ------- |
+| `main.ts` | Встроенный NestJS Logger | `WinstonModule.createLogger()`: Console (colorize dev / JSON prod) + File (`logs/app.log`, 5MB, 5 файлов) | README и WORKPLAN требуют Winston с файловым выводом |
+| `env.validation.ts` | Нет `CORS_ORIGIN` | Добавлена валидация `CORS_ORIGIN` с default | Конфигурация origins |
+
+#### Инфраструктура
+
+| Файл | Было | Стало | Причина |
+| ---- | ---- | ----- | ------- |
+| `json-file.service.ts` | Temp-файл в `os.tmpdir()` | Temp-файл в том же `data/` каталоге | EXDEV ошибка при cross-device rename |
+| `query.helper.ts` | `apply<T extends Record<string, unknown>>` | `apply<T>` с internal cast | Устранение двойного `as unknown as` во всех вызывающих сервисах |
+| `business.exception.ts` | Файл существовал, но был пуст / не экспортировал | Полноценный класс `BusinessException extends HttpException` | README указывает класс в структуре |
+
+#### Оптимизация репозиториев
+
+| Файл | Было | Стало | Причина |
+| ---- | ---- | ----- | ------- |
+| `team-member.repository.ts` | Нет `findById` | Добавлен `findById(id): Promise<TeamMember \| null>` | `findAll().find()` неэффективен |
+| `project-member.repository.ts` | Нет `findById` | Добавлен `findById(id): Promise<ProjectMember \| null>` | Аналогично |
+| `audit-log.repository.ts` | Нет `findByEntity` | Добавлен `findByEntity(entityType, entityId): Promise<AuditLog[]>` | Фильтрация на уровне репозитория |
+| `team-members.json.repository.ts` | — | Реализация `findById` | Имплементация интерфейса |
+| `project-members.json.repository.ts` | — | Реализация `findById` | Имплементация интерфейса |
+| `audit-logs.json.repository.ts` | — | Реализация `findByEntity` | Имплементация интерфейса |
+
+#### Оптимизация Risk-модуля
+
+| Файл | Было | Стало | Причина |
+| ---- | ---- | ----- | ------- |
+| `risk/helpers/build-task-risk-input.ts` | — | Новый shared-хелпер `buildTaskRiskInput()` | Дублирование ~30 строк между controller и service |
+| `risk-stub.service.ts` | `assessProject()` загружал ВСЕ задачи через `findAll()` | Используется `findByProject(projectId)` | Загрузка лишних данных |
+| `risk.controller.ts` | `getTaskRisk()` загружал все audit_logs | Используется `findByEntity('task', taskId)` + `buildTaskRiskInput` | Загрузка лишних данных + дублирование кода |
+
+#### Dead code + Guards cleanup
+
+| Файл | Было | Стало | Причина |
+| ---- | ---- | ----- | ------- |
+| `app.controller.ts` | `getHello()` → `'Hello World!'` | `getHealth()` → `{ status, timestamp, uptime }` | Бесполезный шаблонный код → полезный health endpoint |
+| `app.service.ts` | `getHello(): string` | `getHealth()` с status/timestamp/uptime | Аналогично |
+| `app.controller.spec.ts` | Тест `'Hello World!'` | Тест health endpoint | Синхронизация с рефакторингом |
+| `tasks.controller.ts` | `@Roles(AccountRole.ADMIN, AccountRole.MEMBER)` на всех endpoints | Удалено + `AccountRolesGuard` | Бессмысленная проверка (любой JWT-user = ADMIN или MEMBER) |
+| `teams.controller.ts` | Аналогично | Удалено | Аналогично |
+| `team-members.controller.ts` | Аналогично | Удалено | Аналогично |
+| `projects.controller.ts` | Аналогично | Удалено | Аналогично |
+| `users.controller.ts` | `@Roles(ADMIN, MEMBER)` на GET endpoints | Удалено (оставлены `@Roles(ADMIN)` на CUD) | Redundant guard на чтение |
+
+#### Остальные сервисы (удаление двойных кастов)
+
+| Файл | Было | Стало | Причина |
+| ---- | ---- | ----- | ------- |
+| `teams.service.ts` | `as unknown as Record<...>[]` | Прямой вызов `QueryHelper.apply<Team>(...)` | QueryHelper теперь generic |
+| `users.service.ts` | Аналогично | Аналогично | Аналогично |
+| `tasks.service.ts` | Аналогично | Аналогично | Аналогично |
+| `audit.service.ts` | Аналогично | Аналогично | Аналогично |
+| `projects.service.ts` | Аналогично + `findMemberById` через `findAll().find()` | `findById()` через репозиторий | Оптимизация |
+| `teams.service.ts` | `findMemberById` через `findAll().find()` | `findById()` через репозиторий | Оптимизация |
 
 ### Отклонения Этапа 7
 

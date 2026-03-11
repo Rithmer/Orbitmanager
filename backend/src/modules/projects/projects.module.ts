@@ -10,6 +10,8 @@ import { TEAM_MEMBER_REPOSITORY } from '../../domain/repositories/team-member.re
 import { TeamMembersJsonRepository } from '../../infrastructure/repositories/json/team-members.json.repository';
 import { TEAM_REPOSITORY } from '../../domain/repositories/team.repository';
 import { TeamsJsonRepository } from '../../infrastructure/repositories/json/teams.json.repository';
+import { TASK_REPOSITORY } from '../../domain/repositories/task.repository';
+import { TasksJsonRepository } from '../../infrastructure/repositories/json/tasks.json.repository';
 import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
@@ -21,6 +23,7 @@ import { AuditLogsModule } from '../audit-logs/audit-logs.module';
     { provide: PROJECT_MEMBER_REPOSITORY, useClass: ProjectMembersJsonRepository },
     { provide: TEAM_MEMBER_REPOSITORY, useClass: TeamMembersJsonRepository },
     { provide: TEAM_REPOSITORY, useClass: TeamsJsonRepository },
+    { provide: TASK_REPOSITORY, useClass: TasksJsonRepository },
   ],
   exports: [
     ProjectsService,

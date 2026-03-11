@@ -2,6 +2,7 @@ import { ProjectMember } from '../models/project-member.model';
 
 export interface IProjectMemberRepository {
   findAll(): Promise<ProjectMember[]>;
+  findById(id: number): Promise<ProjectMember | null>;
   findByProject(projectId: number): Promise<ProjectMember[]>;
   findByUser(userId: number): Promise<ProjectMember[]>;
   findByUserAndProject(userId: number, projectId: number): Promise<ProjectMember | null>;

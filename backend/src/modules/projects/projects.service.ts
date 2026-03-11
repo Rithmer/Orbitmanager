@@ -12,6 +12,8 @@ import type { IProjectMemberRepository } from '../../domain/repositories/project
 import { PROJECT_MEMBER_REPOSITORY } from '../../domain/repositories/project-member.repository';
 import type { ITeamMemberRepository } from '../../domain/repositories/team-member.repository';
 import { TEAM_MEMBER_REPOSITORY } from '../../domain/repositories/team-member.repository';
+import type { ITaskRepository } from '../../domain/repositories/task.repository';
+import { TASK_REPOSITORY } from '../../domain/repositories/task.repository';
 import type { ITeamRepository } from '../../domain/repositories/team.repository';
 import { TEAM_REPOSITORY } from '../../domain/repositories/team.repository';
 import { Project } from '../../domain/models/project.model';
@@ -41,6 +43,8 @@ export class ProjectsService {
     private readonly projectMemberRepository: IProjectMemberRepository,
     @Inject(TEAM_MEMBER_REPOSITORY)
     private readonly teamMemberRepository: ITeamMemberRepository,
+    @Inject(TASK_REPOSITORY)
+    private readonly taskRepository: ITaskRepository,
     @Inject(TEAM_REPOSITORY)
     private readonly teamRepository: ITeamRepository,
     private readonly auditService: AuditService,
@@ -62,9 +66,9 @@ export class ProjectsService {
     }
 
     return QueryHelper.apply(
-      projects as unknown as Record<string, unknown>[],
+      projects,
       { ...params, searchFields: params.searchFields ?? ['name', 'description'] },
-    ) as unknown as PaginatedResult<Project>;
+    ) as PaginatedResult<Project>;
   }
 
   async findById(
@@ -140,6 +144,12 @@ export class ProjectsService {
 
     // Only team owner can delete projects
     await this.assertTeamOwnerOrAdmin(userId, project.teamId, userRole);
+
+    // Cascade: delete tasks belonging to this project
+    const projectTasks = await this.taskRepository.findByProject(id);
+    for (const task of projectTasks) {
+      await this.taskRepository.delete(task.id);
+    }
 
     // Cascade: delete project members
     await this.projectMemberRepository.deleteByProject(id);
@@ -264,8 +274,7 @@ export class ProjectsService {
   // ────────────── Helpers ──────────────
 
   private async findMemberById(id: number): Promise<ProjectMember> {
-    const all = await this.projectMemberRepository.findAll();
-    const member = all.find((m) => m.id === id);
+    const member = await this.projectMemberRepository.findById(id);
     if (!member)
       throw new NotFoundException(`Участник проекта #${id} не найден`);
     return member;

@@ -58,9 +58,9 @@ export class TasksService {
     }
 
     return QueryHelper.apply(
-      tasks as unknown as Record<string, unknown>[],
+      tasks,
       { ...params, searchFields: params.searchFields ?? ['name', 'description'] },
-    ) as unknown as PaginatedResult<Task>;
+    ) as PaginatedResult<Task>;
   }
 
   async findById(

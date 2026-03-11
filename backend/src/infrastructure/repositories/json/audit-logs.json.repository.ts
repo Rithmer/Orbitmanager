@@ -19,6 +19,13 @@ export class AuditLogsJsonRepository implements IAuditLogRepository {
     return data.items.find((l) => l.id === id) ?? null;
   }
 
+  async findByEntity(entityType: string, entityId: number): Promise<AuditLog[]> {
+    const data = await this.jsonFileService.read<AuditLog>(this.entity);
+    return data.items.filter(
+      (l) => l.entityType === entityType && l.entityId === entityId,
+    );
+  }
+
   async create(log: Omit<AuditLog, 'id'>): Promise<AuditLog> {
     return this.jsonFileService.create<AuditLog>(this.entity, log);
   }

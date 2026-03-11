@@ -14,6 +14,11 @@ export class ProjectMembersJsonRepository implements IProjectMemberRepository {
     return data.items;
   }
 
+  async findById(id: number): Promise<ProjectMember | null> {
+    const data = await this.jsonFileService.read<ProjectMember>(this.entity);
+    return data.items.find((m) => m.id === id) ?? null;
+  }
+
   async findByProject(projectId: number): Promise<ProjectMember[]> {
     const data = await this.jsonFileService.read<ProjectMember>(this.entity);
     return data.items.filter((m) => m.projectId === projectId);

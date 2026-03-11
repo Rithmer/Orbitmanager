@@ -2,7 +2,6 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { join } from 'path';
 import { readFile, writeFile, rename, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
-import { tmpdir } from 'os';
 import { randomUUID } from 'crypto';
 
 export interface JsonFileMeta {
@@ -156,7 +155,7 @@ export class JsonFileService implements OnModuleInit {
     data: JsonFile<T>,
   ): Promise<void> {
     const filePath = this.getFilePath(entity);
-    const tmpPath = join(tmpdir(), `${entity}-${randomUUID()}.json.tmp`);
+    const tmpPath = join(this.dataDir, `${entity}-${randomUUID()}.json.tmp`);
     const json = JSON.stringify(data, null, 2);
 
     try {
