@@ -19,7 +19,10 @@ export class TasksPrismaRepository implements ITaskRepository {
   }
 
   async findByProject(projectId: number): Promise<Task[]> {
-    const rows = await this.prisma.task.findMany({ where: { projectId }, orderBy: { id: 'asc' } });
+    const rows = await this.prisma.task.findMany({
+      where: { projectId },
+      orderBy: { id: 'asc' },
+    });
     return rows.map(this.toDomain);
   }
 
@@ -39,20 +42,27 @@ export class TasksPrismaRepository implements ITaskRepository {
     return this.toDomain(row);
   }
 
+  /**
+   * Оптимизация: убран предварительный findUnique — экономия 1 запроса к БД.
+   * Prisma P2025 = запись не найдена → возвращаем null.
+   */
   async update(id: number, partial: Partial<Task>): Promise<Task | null> {
-    const exists = await this.prisma.task.findUnique({ where: { id } });
-    if (!exists) return null;
-
     const data: Record<string, unknown> = {};
-    if (partial.name !== undefined) data.name = partial.name;
-    if (partial.description !== undefined) data.description = partial.description;
-    if (partial.deadline !== undefined) data.deadline = new Date(partial.deadline);
-    if (partial.status !== undefined) data.status = partial.status;
-    if (partial.difficulty !== undefined) data.difficulty = partial.difficulty;
-    if (partial.assigneeId !== undefined) data.assigneeId = partial.assigneeId;
+    if (partial.name !== undefined) data['name'] = partial.name;
+    if (partial.description !== undefined) data['description'] = partial.description;
+    if (partial.deadline !== undefined) data['deadline'] = new Date(partial.deadline);
+    if (partial.status !== undefined) data['status'] = partial.status;
+    if (partial.difficulty !== undefined) data['difficulty'] = partial.difficulty;
+    if (partial.assigneeId !== undefined) data['assigneeId'] = partial.assigneeId;
 
-    const row = await this.prisma.task.update({ where: { id }, data });
-    return this.toDomain(row);
+    try {
+      const row = await this.prisma.task.update({ where: { id }, data });
+      return this.toDomain(row);
+    } catch (e: unknown) {
+      const prismaError = e as { code?: string };
+      if (prismaError.code === 'P2025') return null;
+      throw e;
+    }
   }
 
   async delete(id: number): Promise<boolean> {

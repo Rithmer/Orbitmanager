@@ -1,12 +1,11 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { WinstonModule } from 'nest-winston';
 import * as winston from 'winston';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
-import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 async function bootstrap() {
   const logLevel = process.env['LOG_LEVEL'] ?? 'info';
@@ -21,7 +20,7 @@ async function bootstrap() {
           : winston.format.combine(
               winston.format.colorize(),
               winston.format.printf(({ timestamp, level, message, context }) =>
-                `${timestamp} [${context ?? 'App'}] ${level}: ${message}`,
+                `${String(timestamp)} [${String(context ?? 'App')}] ${String(level)}: ${String(message)}`,
               ),
             ),
       ),
@@ -32,7 +31,7 @@ async function bootstrap() {
     winstonTransports.push(
       new winston.transports.File({
         filename: 'logs/app.log',
-        maxsize: 5 * 1024 * 1024,
+        maxsize: 5 * 1024 * 1024, // 5 МБ
         maxFiles: 5,
         format: winston.format.combine(
           winston.format.timestamp(),
@@ -51,7 +50,10 @@ async function bootstrap() {
 
   app.use(helmet());
   app.enableCors({
-    origin: process.env['CORS_ORIGIN']?.split(',') ?? ['http://localhost:5173', 'http://localhost:3000'],
+    origin: process.env['CORS_ORIGIN']?.split(',') ?? [
+      'http://localhost:5173',
+      'http://localhost:3000',
+    ],
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -67,11 +69,12 @@ async function bootstrap() {
 
   app.useGlobalFilters(new GlobalExceptionFilter());
 
-  app.useGlobalInterceptors(new LoggingInterceptor());
+  // LoggingInterceptor зарегистрирован через APP_INTERCEPTOR в app.module.ts,
+  // что позволяет использовать DI и корректно направлять логи в Winston
 
   const config = new DocumentBuilder()
     .setTitle('Task Management API')
-    .setDescription('Сервис управления проектами и задачами')
+    .setDescription('Сервис управления проектами и задачами — РТУ МИРЭА, ЭФБО-10-24')
     .setVersion('1.0')
     .addBearerAuth()
     .build();

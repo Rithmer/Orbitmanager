@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { AppController } from './app.controller';
@@ -13,6 +13,7 @@ import { ProjectsModule } from './modules/projects/projects.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { RiskModule } from './modules/risk/risk.module';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 @Module({
   imports: [
@@ -24,8 +25,10 @@ import { RiskModule } from './modules/risk/risk.module';
     ThrottlerModule.forRoot({
       throttlers: [
         {
+          // TTL в миллисекундах: 60000 = 60 секунд
           ttl: parseInt(process.env['THROTTLE_TTL'] ?? '60000', 10),
-          limit: parseInt(process.env['THROTTLE_LIMIT'] ?? '5', 10),
+          // Максимум запросов за TTL-период
+          limit: parseInt(process.env['THROTTLE_LIMIT'] ?? '60', 10),
         },
       ],
     }),
@@ -44,6 +47,12 @@ import { RiskModule } from './modules/risk/risk.module';
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    // Регистрация LoggingInterceptor через DI позволяет инжектировать
+    // NestJS Logger, который направляет вывод в Winston (настроенный в main.ts)
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: LoggingInterceptor,
     },
   ],
 })
