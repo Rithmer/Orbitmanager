@@ -4,6 +4,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
+RUN npx prisma generate
 RUN npm run build
 
 # Production stage
@@ -15,4 +16,4 @@ COPY --from=builder /app/package.json ./
 COPY --from=builder /app/scripts ./scripts
 RUN mkdir -p data logs models backups
 EXPOSE 3000
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/src/main.js"]
