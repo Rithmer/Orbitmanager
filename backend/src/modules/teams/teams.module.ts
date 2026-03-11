@@ -8,6 +8,10 @@ import { TEAM_MEMBER_REPOSITORY } from '../../domain/repositories/team-member.re
 import { TeamMembersJsonRepository } from '../../infrastructure/repositories/json/team-members.json.repository';
 import { USER_REPOSITORY } from '../../domain/repositories/user.repository';
 import { UsersJsonRepository } from '../../infrastructure/repositories/json/users.json.repository';
+import { PROJECT_REPOSITORY } from '../../domain/repositories/project.repository';
+import { ProjectsJsonRepository } from '../../infrastructure/repositories/json/projects.json.repository';
+import { PROJECT_MEMBER_REPOSITORY } from '../../domain/repositories/project-member.repository';
+import { ProjectMembersJsonRepository } from '../../infrastructure/repositories/json/project-members.json.repository';
 
 @Module({
   controllers: [TeamsController, TeamMembersController],
@@ -16,6 +20,8 @@ import { UsersJsonRepository } from '../../infrastructure/repositories/json/user
     { provide: TEAM_REPOSITORY, useClass: TeamsJsonRepository },
     { provide: TEAM_MEMBER_REPOSITORY, useClass: TeamMembersJsonRepository },
     { provide: USER_REPOSITORY, useClass: UsersJsonRepository },
+    { provide: PROJECT_REPOSITORY, useClass: ProjectsJsonRepository },
+    { provide: PROJECT_MEMBER_REPOSITORY, useClass: ProjectMembersJsonRepository },
   ],
   exports: [
     TeamsService,

@@ -299,41 +299,46 @@ src/common/guards/team-roles.guard.ts
 
 #### Модели
 
-- [ ] `Project` — `{ id, teamId, name, description, status, createdAt, updatedAt }`
-- [ ] `ProjectMember` — `{ id, projectId, userId, role, assignedAt }`
-- [ ] `Task` — `{ id, projectId, name, description, deadline, status, difficulty, assigneeId, createdById, createdAt, updatedAt }`
+- [x] `Project` — `{ id, teamId, name, description, status, createdAt, updatedAt }`
+- [x] `ProjectMember` — `{ id, projectId, userId, role, assignedAt }`
+  - ⚠️ **Примечание:** поле `role` типизировано через `ProjectRole` enum (ранее было `string`)
+- [x] `Task` — `{ id, projectId, name, description, deadline, status, difficulty, assigneeId, createdById, createdAt, updatedAt }`
 
 #### Enums
 
-- [ ] `ProjectStatus`: `active`, `on_hold`, `completed`, `archived`
-- [ ] `ProjectRole`: `team_lead`, `developer`, `observer`
-- [ ] `TaskStatus`: `new`, `in_progress`, `review`, `done`, `cancelled`
+- [x] `ProjectStatus`: `active`, `on_hold`, `completed`, `archived`
+- [x] `ProjectRole`: `team_lead`, `developer`, `observer`
+- [x] `TaskStatus`: `new`, `in_progress`, `review`, `done`, `cancelled`
+  - Включает `ALLOWED_TASK_TRANSITIONS` — карту допустимых переходов статусов
 
 #### Repository Interfaces + JSON Repositories
 
-- [ ] `IProjectRepository` + `ProjectsJsonRepository`
-- [ ] `IProjectMemberRepository` + `ProjectMembersJsonRepository`
-- [ ] `ITaskRepository` + `TasksJsonRepository`
+- [x] `IProjectRepository` + `ProjectsJsonRepository`
+  - Добавлен метод `findByTeam(teamId)` (не было в плане, нужен для фильтрации)
+- [x] `IProjectMemberRepository` + `ProjectMembersJsonRepository`
+  - Добавлены методы `deleteByProject(projectId)` и `deleteByUserAndProjects(userId, projectIds[])` для каскадного удаления
+- [x] `ITaskRepository` + `TasksJsonRepository`
+  - Добавлен метод `findByProject(projectId)`
 
 #### Модуль projects
 
-- [ ] CRUD-контроллер с DTO
-- [ ] Сервис:
+- [x] CRUD-контроллер с DTO
+- [x] Сервис:
   - Создание: только `owner`
   - Редактирование: `owner` или `team_lead` (своего проекта)
   - Удаление: только `owner`
   - Валидация: `teamId` существует
   - Фильтрация: `?teamId=`, `?status=`, `?search=`, `?page=`, `?limit=`, `?sort=`
   - Видимость: `member` видит все проекты команды; `observer` — только назначенные
-- [ ] Swagger-декораторы
+- [x] Swagger-декораторы
 
 #### Управление участниками проекта (в модуле projects)
 
-- [ ] `GET /projects/:projectId/members` — список участников проекта
-- [ ] `POST /projects/:projectId/members` — назначить в проект (только owner)
-- [ ] `PATCH /project-members/:id` — изменить проектную роль (только owner)
-- [ ] `DELETE /project-members/:id` — убрать из проекта (только owner)
-- [ ] Сервис:
+- [x] `GET /projects/:projectId/members` — список участников проекта
+- [x] `POST /projects/:projectId/members` — назначить в проект (только owner)
+- [x] `PATCH /project-members/:id` — изменить проектную роль (только owner)
+- [x] `DELETE /project-members/:id` — убрать из проекта (только owner)
+- [x] Сервис:
   - Валидация: `UNIQUE(projectId, userId)`
   - Валидация: пользователь — участник команды, которой принадлежит проект
   - Валидация: `member` команды → role = `team_lead` или `developer`
@@ -342,8 +347,8 @@ src/common/guards/team-roles.guard.ts
 
 #### Модуль tasks
 
-- [ ] CRUD-контроллер с DTO
-- [ ] Сервис:
+- [x] CRUD-контроллер с DTO
+- [x] Сервис:
   - Создание: `owner` или `team_lead` (своего проекта)
   - `deadline ≥ createdAt`
   - `difficulty` в диапазоне 1..5
@@ -351,12 +356,12 @@ src/common/guards/team-roles.guard.ts
   - `createdById` из JWT
   - `assigneeId` — если задан, проверка что пользователь — участник проекта (project_members)
   - Фильтрация: `?projectId=`, `?status=`, `?difficulty=`, `?assigneeId=`, `?search=`, `?page=`, `?limit=`, `?sort=`
-- [ ] Swagger-декораторы
+- [x] Swagger-декораторы
 
 #### ProjectRolesGuard
 
-- [ ] `ProjectRolesGuard` — проверяет роль пользователя в конкретном проекте (через project_members)
-- [ ] Логика:
+- [x] `ProjectRolesGuard` — проверяет роль пользователя в конкретном проекте (через project_members)
+- [x] Логика:
   - `owner` команды — автоматически проходит (не нужна запись в project_members)
   - `team_lead` — полный доступ к задачам и назначениям своего проекта
   - `developer` — видит все задачи проекта, меняет статус только своих
@@ -364,7 +369,7 @@ src/common/guards/team-roles.guard.ts
 
 #### Бизнес-процесс 1 — Создание задачи
 
-- [ ] Полный flow:
+- [x] Полный flow:
   1. Проверка прав (owner / team_lead своего проекта)
   2. Проверка существования проекта
   3. Валидация: `deadline > now`
@@ -379,17 +384,18 @@ CRUD проектов и задач, управление участниками
 
 ```
 src/domain/models/project.model.ts
-src/domain/models/project-member.model.ts
+src/domain/models/project-member.model.ts ← обновлён (role: string → ProjectRole)
 src/domain/models/task.model.ts
 src/domain/repositories/project.repository.ts
 src/domain/repositories/project-member.repository.ts
 src/domain/repositories/task.repository.ts
-src/infrastructure/repositories/projects.json.repository.ts
-src/infrastructure/repositories/project-members.json.repository.ts
-src/infrastructure/repositories/tasks.json.repository.ts
+src/infrastructure/repositories/json/projects.json.repository.ts
+src/infrastructure/repositories/json/project-members.json.repository.ts
+src/infrastructure/repositories/json/tasks.json.repository.ts
 src/modules/projects/** (controller, project-members.controller, service, module, dto/)
 src/modules/tasks/** (controller, service, module, dto/)
 src/common/guards/project-roles.guard.ts
+src/common/decorators/project-roles.decorator.ts
 src/common/enums/project-status.enum.ts
 src/common/enums/project-role.enum.ts
 src/common/enums/task-status.enum.ts
@@ -820,7 +826,7 @@ npx ts-node scripts/seed.ts
 | 9  | Генератор синтетических данных для ML создаёт ≥ 1000 записей   |    |
 | 10 | Интерфейс сохранения/загрузки модели из файла реализован       |    |
 | 11 | Seed-скрипт воссоздаёт начальное состояние                        |    |
-| 12 | Swagger доступен на `/api/docs` со всеми тегами и описаниями      | ⏳ частично (Этапы 1–4) |
+| 12 | Swagger доступен на `/api/docs` со всеми тегами и описаниями      | ⏳ частично (Этапы 1–5) |
 | 13 | Unit-тесты проходят (`npm test`)                                | ⏳ частично (62 теста, Этапы 1–4) |
 | 14 | e2e-тесты 3 БП проходят (`npm run test:e2e`)                    |    |
 | 15 | Резервное копирование и восстановление работают                  |    |
@@ -832,7 +838,7 @@ npx ts-node scripts/seed.ts
 
 ## 16. Отклонения от плана и дополнительные заметки
 
-> Зафиксировано на 11.03.2026 после code review Этапов 1–4.
+> Зафиксировано на 11.03.2026 после code review Этапов 1–4 и реализации Этапа 5.
 
 ### Текущий статус
 
@@ -842,7 +848,7 @@ npx ts-node scripts/seed.ts
 |  2   | ✅ Выполнен | Полностью соответствует плану |
 |  3   | ✅ Выполнен | Полностью соответствует плану |
 |  4   | ✅ Выполнен | С отклонениями по TeamRolesGuard и каскадному удалению |
-|  5   | ❌ Не начат | |
+|  5   | ✅ Выполнен | С отклонениями (см. ниже) |
 |  6   | ❌ Не начат | |
 |  7   | ❌ Не начат | |
 |  8   | ❌ Не начат | |
@@ -852,10 +858,14 @@ npx ts-node scripts/seed.ts
 | № | Этап | Описание | Влияние |
 | - | :--: | -------- | ------- |
 | 1 | 1 | **Логирование:** пакеты `nest-winston` и `winston` установлены как зависимости, но не настроены. Используется встроенный NestJS Logger. Вывод в файл `logs/app.log` не реализован. | Низкое — `LoggingInterceptor` логирует все HTTP-запросы в stdout. Файловый вывод добавить на Этапе 8. |
-| 2 | 4 | **TeamRolesGuard не используется:** Guard и декоратор `@TeamRoles()` созданы, но не применяются в контроллерах. Вместо этого права проверяются вручную в `TeamsService.assertOwnerOrAdmin()`. | Среднее — функционал работает, но архитектурно правильнее использовать guard. Исправить при реализации Этапа 5. |
-| 3 | 4 | **Прямой доступ к JsonFileService:** каскадное удаление `project_members` при удалении участника команды реализовано через `JsonFileService` напрямую, минуя репозиторий. | Среднее — нарушает паттерн DDD. Рефакторить при создании `IProjectMemberRepository` на Этапе 5. |
-| 4 | 4 | **ProjectMember модель создана досрочно:** файл `src/domain/models/project-member.model.ts` создан на Этапе 4 (планировался на Этапе 5), так как используется для типизации каскадного удаления. | Нет — модель соответствует плану, просто создана раньше. |
+| 2 | 4 | **TeamRolesGuard не используется:** Guard и декоратор `@TeamRoles()` созданы, но не применяются в контроллерах. Вместо этого права проверяются вручную в `TeamsService.assertOwnerOrAdmin()`. | Среднее — функционал работает, но архитектурно правильнее использовать guard. Аналогичный подход применён и в Этапе 5 (ProjectRolesGuard создан, но права проверяются в сервисах). |
+| 3 | 4→5 | **~~Прямой доступ к JsonFileService~~ — ИСПРАВЛЕНО на Этапе 5:** каскадное удаление `project_members` теперь использует `IProjectMemberRepository.deleteByProject()` и `deleteByUserAndProjects()`. `TeamsService` больше не зависит от `JsonFileService`. | ✅ Устранено. |
+| 4 | 4 | **ProjectMember модель создана досрочно:** файл `src/domain/models/project-member.model.ts` создан на Этапе 4 (планировался на Этапе 5), так как используется для типизации каскадного удаления. На Этапе 5 обновлён: `role: string` → `role: ProjectRole`. | Нет — модель соответствует плану, просто создана раньше. |
 | 5 | 2 | **Data-файлы созданы все сразу:** все 7 JSON-файлов (`projects.json`, `project_members.json`, `tasks.json`, `audit_logs.json`) созданы на Этапе 2, хотя модули для них появятся на Этапах 5–6. | Нет — пустые файлы не мешают, упрощают работу `JsonFileService`. |
+| 6 | 5 | **ProjectRolesGuard создан, но не применяется через декоратор:** Guard создан и работает, но проверка прав выполняется в `ProjectsService` и `TasksService` через вспомогательные методы (`assertCanManageProject`, `assertCanCreateTask`, `assertCanChangeStatus`). Аналогично подходу TeamRolesGuard (отклонение #2). | Низкое — функционал полный, проверка прав работает корректно. Декоратор `@ProjectRoles()` создан и готов к применению. |
+| 7 | 5 | **Audit-логи пишутся напрямую через `JsonFileService`:** на Этапе 5 запись в `audit_logs` реализована через `jsonFileService.create()` в `TasksService`, а не через `AuditService` (который появится на Этапе 6). | Низкое — будет рефакторизовано при создании `AuditService` на Этапе 6. |
+| 8 | 5 | **Валидация deadline:** при создании задачи проверяется `deadline > now` (как в плане), при обновлении — `deadline >= createdAt`, чтобы допустить корректировку в пределах разумного. | Нет — расширение поведения для удобства. |
+| 9 | 5 | **Путь JSON-репозиториев:** файлы размещены в `infrastructure/repositories/json/` (с подпапкой `json/`), что не совпадает с планом (`infrastructure/repositories/*.json.repository.ts`). Соответствует архитектуре, установленной на Этапе 4. | Нет — согласуется с уже установленной структурой. |
 
 ### Излишки кода (неиспользуемый код)
 
@@ -874,3 +884,13 @@ npx ts-node scripts/seed.ts
 | `json-file.service.ts` | `remove()` → `this.read()` (кэш) | `remove()` → `this.readFresh()` | Потенциальная потеря данных при конкурентной записи |
 | `app.module.ts` | `ThrottlerGuard` не применён | Добавлен `APP_GUARD` → `ThrottlerGuard` | Rate limiting не работал без глобального guard |
 | `.env.example` | Отсутствовал | Создан | WORKPLAN §2 требует наличия |
+
+### Исправления, внесённые при реализации Этапа 5
+
+| Файл | Было | Стало | Причина |
+| ---- | ---- | ----- | ------- |
+| `teams.service.ts` | Прямой `JsonFileService.read/remove` для каскадного удаления | `IProjectRepository` + `IProjectMemberRepository` через DI | Устранение отклонения #3 (нарушение DDD) |
+| `teams.module.ts` | Нет провайдеров `PROJECT_REPOSITORY`, `PROJECT_MEMBER_REPOSITORY` | Добавлены оба провайдера | Для поддержки рефакторинга сервиса |
+| `teams.service.spec.ts` | Мок `JsonFileService` | Моки `PROJECT_REPOSITORY`, `PROJECT_MEMBER_REPOSITORY` | Синхронизация с рефакторингом |
+| `project-member.model.ts` | `role: string` | `role: ProjectRole` | Строгая типизация через enum |
+| `common/enums/index.ts` | 2 экспорта | 5 экспортов (+ ProjectStatus, ProjectRole, TaskStatus) | Новые enum-ы |

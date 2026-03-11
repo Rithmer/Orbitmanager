@@ -11,6 +11,10 @@ import type { ITeamMemberRepository } from '../../domain/repositories/team-membe
 import { TEAM_MEMBER_REPOSITORY } from '../../domain/repositories/team-member.repository';
 import type { IUserRepository } from '../../domain/repositories/user.repository';
 import { USER_REPOSITORY } from '../../domain/repositories/user.repository';
+import type { IProjectRepository } from '../../domain/repositories/project.repository';
+import { PROJECT_REPOSITORY } from '../../domain/repositories/project.repository';
+import type { IProjectMemberRepository } from '../../domain/repositories/project-member.repository';
+import { PROJECT_MEMBER_REPOSITORY } from '../../domain/repositories/project-member.repository';
 import { Team } from '../../domain/models/team.model';
 import { TeamMember } from '../../domain/models/team-member.model';
 import { TeamRole } from '../../common/enums/team-role.enum';
@@ -24,8 +28,6 @@ import {
   QueryParams,
   PaginatedResult,
 } from '../../common/helpers/query.helper';
-import { JsonFileService } from '../../infrastructure/storage/json-file.service';
-import { ProjectMember } from '../../domain/models/project-member.model';
 
 @Injectable()
 export class TeamsService {
@@ -36,7 +38,10 @@ export class TeamsService {
     private readonly teamMemberRepository: ITeamMemberRepository,
     @Inject(USER_REPOSITORY)
     private readonly userRepository: IUserRepository,
-    private readonly jsonFileService: JsonFileService,
+    @Inject(PROJECT_REPOSITORY)
+    private readonly projectRepository: IProjectRepository,
+    @Inject(PROJECT_MEMBER_REPOSITORY)
+    private readonly projectMemberRepository: IProjectMemberRepository,
   ) {}
 
   async findAll(params: QueryParams): Promise<PaginatedResult<Team>> {
@@ -216,46 +221,21 @@ export class TeamsService {
     userId: number,
     teamId: number,
   ): Promise<void> {
-    const projectsData = await this.jsonFileService.read<{ id: number; teamId: number }>(
-      'projects',
-    );
-    const teamProjectIds = projectsData.items
-      .filter((p) => p.teamId === teamId)
-      .map((p) => p.id);
+    const teamProjects = await this.projectRepository.findByTeam(teamId);
+    const teamProjectIds = teamProjects.map((p) => p.id);
 
     if (teamProjectIds.length === 0) return;
 
-    const pmData = await this.jsonFileService.read<ProjectMember>(
-      'project_members',
-    );
-    const toDelete = pmData.items.filter(
-      (pm) => pm.userId === userId && teamProjectIds.includes(pm.projectId),
-    );
-    for (const pm of toDelete) {
-      await this.jsonFileService.remove<ProjectMember>('project_members', pm.id);
-    }
+    await this.projectMemberRepository.deleteByUserAndProjects(userId, teamProjectIds);
   }
 
   private async cascadeDeleteProjectMembersByTeam(
     teamId: number,
   ): Promise<void> {
-    const projectsData = await this.jsonFileService.read<{ id: number; teamId: number }>(
-      'projects',
-    );
-    const teamProjectIds = projectsData.items
-      .filter((p) => p.teamId === teamId)
-      .map((p) => p.id);
+    const teamProjects = await this.projectRepository.findByTeam(teamId);
 
-    if (teamProjectIds.length === 0) return;
-
-    const pmData = await this.jsonFileService.read<ProjectMember>(
-      'project_members',
-    );
-    const toDelete = pmData.items.filter((pm) =>
-      teamProjectIds.includes(pm.projectId),
-    );
-    for (const pm of toDelete) {
-      await this.jsonFileService.remove<ProjectMember>('project_members', pm.id);
+    for (const project of teamProjects) {
+      await this.projectMemberRepository.deleteByProject(project.id);
     }
   }
 }

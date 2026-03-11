@@ -8,7 +8,8 @@ import { TeamsService } from './teams.service';
 import { TEAM_REPOSITORY } from '../../domain/repositories/team.repository';
 import { TEAM_MEMBER_REPOSITORY } from '../../domain/repositories/team-member.repository';
 import { USER_REPOSITORY } from '../../domain/repositories/user.repository';
-import { JsonFileService } from '../../infrastructure/storage/json-file.service';
+import { PROJECT_REPOSITORY } from '../../domain/repositories/project.repository';
+import { PROJECT_MEMBER_REPOSITORY } from '../../domain/repositories/project-member.repository';
 import { TeamRole } from '../../common/enums/team-role.enum';
 import { AccountRole } from '../../common/enums/account-role.enum';
 import { Team } from '../../domain/models/team.model';
@@ -76,6 +77,27 @@ const mockJsonFileService = {
   remove: jest.fn().mockResolvedValue(true),
 };
 
+const mockProjectRepository = {
+  findAll: jest.fn().mockResolvedValue([]),
+  findById: jest.fn().mockResolvedValue(null),
+  findByTeam: jest.fn().mockResolvedValue([]),
+  create: jest.fn(),
+  update: jest.fn(),
+  delete: jest.fn(),
+};
+
+const mockProjectMemberRepository = {
+  findAll: jest.fn().mockResolvedValue([]),
+  findByProject: jest.fn().mockResolvedValue([]),
+  findByUser: jest.fn().mockResolvedValue([]),
+  findByUserAndProject: jest.fn().mockResolvedValue(null),
+  create: jest.fn(),
+  update: jest.fn(),
+  delete: jest.fn(),
+  deleteByProject: jest.fn().mockResolvedValue(0),
+  deleteByUserAndProjects: jest.fn().mockResolvedValue(0),
+};
+
 describe('TeamsService', () => {
   let service: TeamsService;
 
@@ -86,7 +108,8 @@ describe('TeamsService', () => {
         { provide: TEAM_REPOSITORY, useValue: mockTeamRepository },
         { provide: TEAM_MEMBER_REPOSITORY, useValue: mockTeamMemberRepository },
         { provide: USER_REPOSITORY, useValue: mockUserRepository },
-        { provide: JsonFileService, useValue: mockJsonFileService },
+        { provide: PROJECT_REPOSITORY, useValue: mockProjectRepository },
+        { provide: PROJECT_MEMBER_REPOSITORY, useValue: mockProjectMemberRepository },
       ],
     }).compile();
 
@@ -116,8 +139,9 @@ describe('TeamsService', () => {
     mockTeamMemberRepository.delete.mockResolvedValue(true);
 
     mockUserRepository.findById.mockResolvedValue({ id: 20, login: 'user20' });
-    mockJsonFileService.read.mockResolvedValue({ meta: { entity: 'projects', lastId: 0 }, items: [] });
-    mockJsonFileService.remove.mockResolvedValue(true);
+    mockProjectRepository.findByTeam.mockResolvedValue([]);
+    mockProjectMemberRepository.deleteByProject.mockResolvedValue(0);
+    mockProjectMemberRepository.deleteByUserAndProjects.mockResolvedValue(0);
   });
 
   describe('findAll', () => {
@@ -177,10 +201,7 @@ describe('TeamsService', () => {
     it('should allow owner to delete', async () => {
       mockTeamMemberRepository.findByUserAndTeam.mockResolvedValue(mockOwner);
       mockTeamMemberRepository.findByTeam.mockResolvedValue([mockOwner, mockMember]);
-      mockJsonFileService.read.mockResolvedValue({
-        meta: { entity: 'projects', lastId: 0 },
-        items: [],
-      });
+      mockProjectRepository.findByTeam.mockResolvedValue([]);
       await service.remove(1, 10, AccountRole.MEMBER);
       expect(mockTeamRepository.delete).toHaveBeenCalledWith(1);
     });
@@ -255,7 +276,7 @@ describe('TeamsService', () => {
     it('should remove a non-owner member', async () => {
       mockTeamMemberRepository.findAll.mockResolvedValueOnce([mockOwner, mockMember]);
       mockTeamMemberRepository.findByUserAndTeam.mockResolvedValueOnce(mockOwner);
-      mockJsonFileService.read.mockResolvedValueOnce({ meta: { entity: 'projects', lastId: 0 }, items: [] });
+      mockProjectRepository.findByTeam.mockResolvedValueOnce([]);
 
       await service.removeMember(2, 10, AccountRole.MEMBER);
       expect(mockTeamMemberRepository.delete).toHaveBeenCalledWith(2);
