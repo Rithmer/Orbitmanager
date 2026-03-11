@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import type { StringValue } from 'ms';
 import * as argon2 from 'argon2';
 import { UsersService } from '../users/users.service';
 import { AccountRole } from '../../common/enums/account-role.enum';
@@ -103,11 +104,11 @@ export class AuthService {
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(tokenPayload, {
         secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
-        expiresIn: accessExpiresIn as any,
+        expiresIn: accessExpiresIn as StringValue,
       }),
       this.jwtService.signAsync(tokenPayload, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-        expiresIn: refreshExpiresIn as any,
+        expiresIn: refreshExpiresIn as StringValue,
       }),
     ]);
 

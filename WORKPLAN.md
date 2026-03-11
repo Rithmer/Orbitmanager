@@ -48,10 +48,10 @@
 
 ### Задачи
 
-- [ ] Инициализация проекта: `nest new project-name`
-- [ ] Настройка `tsconfig.json` (strict mode)
-- [ ] Настройка переменных окружения (`@nestjs/config`, env.validation.ts)
-- [ ] Глобальный `ValidationPipe`:
+- [x] Инициализация проекта: `nest new project-name`
+- [x] Настройка `tsconfig.json` (strict mode)
+- [x] Настройка переменных окружения (`@nestjs/config`, env.validation.ts)
+- [x] Глобальный `ValidationPipe`:
   ```typescript
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
@@ -59,7 +59,7 @@
     transform: true,
   }));
   ```
-- [ ] Глобальный `GlobalExceptionFilter` — единый формат ошибок:
+- [x] Глобальный `GlobalExceptionFilter` — единый формат ошибок:
   ```json
   {
     "statusCode": 400,
@@ -69,7 +69,7 @@
     "timestamp": "..."
   }
   ```
-- [ ] Настройка Swagger/OpenAPI в `main.ts`:
+- [x] Настройка Swagger/OpenAPI в `main.ts`:
   ```typescript
   const config = new DocumentBuilder()
     .setTitle('Task Management API')
@@ -79,13 +79,14 @@
     .build();
   SwaggerModule.setup('api/docs', app, document);
   ```
-- [ ] Установка зависимостей: `helmet`, `@nestjs/throttler`, `cors`
-- [ ] Настройка Helmet и CORS
-- [ ] Настройка серверного логирования (Winston / NestJS Logger):
+- [x] Установка зависимостей: `helmet`, `@nestjs/throttler`, `cors`
+- [x] Настройка Helmet и CORS
+- [x] Настройка серверного логирования (Winston / NestJS Logger):
   - Уровни: `error`, `warn`, `info`, `debug`
   - `LoggingInterceptor` — лог каждого HTTP-запроса (method, url, status, время отклика)
   - Вывод: stdout (dev), JSON-файл `logs/app.log` (prod)
-- [ ] Создать `.env.example` с полным списком переменных окружения (включая DB_HOST, DB_PORT, STORAGE_MODE)
+  - ⚠️ **Отклонение:** `nest-winston` и `winston` установлены, но не настроены. Используется встроенный NestJS Logger. Вывод в файл `logs/app.log` не реализован.
+- [x] Создать `.env.example` с полным списком переменных окружения (включая DB_HOST, DB_PORT, STORAGE_MODE)
 
 ### Результат
 Приложение запускается, Swagger доступен на `/api/docs`, ошибки приходят в едином JSON-формате, логи пишутся.
@@ -111,19 +112,19 @@ src/common/interceptors/logging.interceptor.ts
 
 ### Задачи
 
-- [ ] Создать папку `data/` и пустые JSON-файлы (7 шт.) с форматом:
+- [x] Создать папку `data/` и пустые JSON-файлы (7 шт.) с форматом:
   ```json
   {
     "meta": { "entity": "...", "lastId": 0 },
     "items": []
   }
   ```
-- [ ] `JsonFileService` — чтение/запись JSON с in-memory кэшем:
+- [x] `JsonFileService` — чтение/запись JSON с in-memory кэшем:
   - `read<T>(entity): Promise<JsonFile<T>>` — читает из кэша или файла
   - `write<T>(entity, data): Promise<void>` — атомарная запись (tmp → rename), инвалидация кэша
   - Auto-increment `lastId` при создании записи
   - Async-очередь для последовательной записи нескольких файлов
-- [ ] `QueryHelper` — фильтрация, поиск и пагинация по in-memory массивам:
+- [x] `QueryHelper` — фильтрация, поиск и пагинация по in-memory массивам:
   ```typescript
   interface QueryParams {
     search?: string;
@@ -163,41 +164,41 @@ data/*.json (7 файлов)
 
 #### Модели (domain/models/)
 
-- [ ] `User` — `{ id, login, password, fullName, profession, accountStatus, accountRole, createdAt, updatedAt }`
+- [x] `User` — `{ id, login, password, fullName, profession, accountStatus, accountRole, createdAt, updatedAt }`
 
 #### Enums (common/enums/)
 
-- [ ] `AccountRole` enum: `admin`, `member`, `guest`
-- [ ] `TeamRole` enum: `owner`, `member`, `observer`
+- [x] `AccountRole` enum: `admin`, `member`, `guest`
+- [x] `TeamRole` enum: `owner`, `member`, `observer`
 
 #### Repository Interfaces (domain/repositories/)
 
-- [ ] `IUserRepository`: findAll, findById, findByLogin, create, update, delete
+- [x] `IUserRepository`: findAll, findById, findByLogin, create, update, delete
 
 #### JSON Repositories (infrastructure/repositories/)
 
-- [ ] `UsersJsonRepository` implements `IUserRepository`
+- [x] `UsersJsonRepository` implements `IUserRepository`
 
 #### Модуль users
 
-- [ ] CRUD-контроллер с DTO
-- [ ] Сервис: уникальность login, валидация accountRole через enum, хэширование пароля
-- [ ] Swagger-декораторы
+- [x] CRUD-контроллер с DTO
+- [x] Сервис: уникальность login, валидация accountRole через enum, хэширование пароля
+- [x] Swagger-декораторы
 
 #### Модуль auth
 
-- [ ] `POST /auth/register` — создание пользователя (guest → member)
-- [ ] `POST /auth/login` — проверка credentials, выдача access + refresh JWT
-- [ ] `POST /auth/refresh` — обновление токенов
-- [ ] Хэширование: argon2
-- [ ] JWT: access (15 мин) + refresh (7 дней)
+- [x] `POST /auth/register` — создание пользователя (guest → member)
+- [x] `POST /auth/login` — проверка credentials, выдача access + refresh JWT
+- [x] `POST /auth/refresh` — обновление токенов
+- [x] Хэширование: argon2
+- [x] JWT: access (15 мин) + refresh (7 дней)
 
 #### Guards
 
-- [ ] `JwtAuthGuard` — проверка валидности токена
-- [ ] `AccountRolesGuard` — проверка `admin` / `member` / `guest`
-- [ ] Декоратор `@Roles(AccountRole.ADMIN)` 
-- [ ] Декоратор `@CurrentUser()` — извлечение пользователя из JWT
+- [x] `JwtAuthGuard` — проверка валидности токена
+- [x] `AccountRolesGuard` — проверка `admin` / `member` / `guest`
+- [x] Декоратор `@Roles(AccountRole.ADMIN)` 
+- [x] Декоратор `@CurrentUser()` — извлечение пользователя из JWT
 
 ### Результат
 Работает auth (register, login, refresh), CRUD пользователей, JWT-защита endpoint-ов.
@@ -227,44 +228,46 @@ src/common/decorators/current-user.decorator.ts
 
 #### Модели
 
-- [ ] `Team` — `{ id, name, description, createdAt, createdById }`
-- [ ] `TeamMember` — `{ id, userId, teamId, teamRole }`
+- [x] `Team` — `{ id, name, description, createdAt, createdById }`
+- [x] `TeamMember` — `{ id, userId, teamId, teamRole }`
 
 #### Repository Interfaces
 
-- [ ] `ITeamRepository`: findAll, findById, create, update, delete
-- [ ] `ITeamMemberRepository`: findAll, findByTeam, findByUser, findByUserAndTeam, create, update, delete
+- [x] `ITeamRepository`: findAll, findById, create, update, delete
+- [x] `ITeamMemberRepository`: findAll, findByTeam, findByUser, findByUserAndTeam, create, update, delete
 
 #### JSON Repositories
 
-- [ ] `TeamsJsonRepository`
-- [ ] `TeamMembersJsonRepository`
+- [x] `TeamsJsonRepository`
+- [x] `TeamMembersJsonRepository`
 
 #### Модуль teams
 
-- [ ] CRUD-контроллер с DTO
-- [ ] Сервис:
+- [x] CRUD-контроллер с DTO
+- [x] Сервис:
   - При создании команды **автоматически** добавлять создателя как `owner` (team_members)
   - Удалять команду может только owner
   - Редактировать — только owner
-- [ ] Swagger-декораторы
+- [x] Swagger-декораторы
 
 #### Управление участниками (в модуле teams)
 
-- [ ] `GET /teams/:teamId/members` — список участников
-- [ ] `POST /teams/:teamId/members` — добавить участника (только owner)
-- [ ] `PATCH /team-members/:id` — изменить роль в команде (только owner)
-- [ ] `DELETE /team-members/:id` — удалить из команды (только owner)
-- [ ] Сервис:
+- [x] `GET /teams/:teamId/members` — список участников
+- [x] `POST /teams/:teamId/members` — добавить участника (только owner)
+- [x] `PATCH /team-members/:id` — изменить роль в команде (только owner)
+- [x] `DELETE /team-members/:id` — удалить из команды (только owner)
+- [x] Сервис:
   - Валидация: `UNIQUE(userId, teamId)`
   - Валидация: `teamRole` принадлежит TeamRole enum
   - Нельзя удалить единственного owner
   - При удалении из команды — каскадное удаление из project_members
+  - ⚠️ **Отклонение:** каскадное удаление `project_members` реализовано через прямой доступ к `JsonFileService`, обходя паттерн репозиториев (будет рефакторизовано при реализации Этапа 5)
 
 #### TeamRolesGuard
 
-- [ ] `TeamRolesGuard` — проверяет роль пользователя в конкретной команде
-- [ ] Логика:
+- [x] `TeamRolesGuard` — проверяет роль пользователя в конкретной команде
+  - ⚠️ **Отклонение:** Guard создан и работает, но не применяется декоратором `@TeamRoles()` в контроллерах. Права проверяются в `TeamsService.assertOwnerOrAdmin()`.
+- [x] Логика:
   - `owner`: полный доступ ко всей команде
   - `member`: видит все проекты, работает только в назначенных (через project_members)
   - `observer`: видит только назначенные проекты (через project_members)
@@ -817,10 +820,57 @@ npx ts-node scripts/seed.ts
 | 9  | Генератор синтетических данных для ML создаёт ≥ 1000 записей   |    |
 | 10 | Интерфейс сохранения/загрузки модели из файла реализован       |    |
 | 11 | Seed-скрипт воссоздаёт начальное состояние                        |    |
-| 12 | Swagger доступен на `/api/docs` со всеми тегами и описаниями      |    |
-| 13 | Unit-тесты проходят (`npm test`)                                |    |
+| 12 | Swagger доступен на `/api/docs` со всеми тегами и описаниями      | ⏳ частично (Этапы 1–4) |
+| 13 | Unit-тесты проходят (`npm test`)                                | ⏳ частично (62 теста, Этапы 1–4) |
 | 14 | e2e-тесты 3 БП проходят (`npm run test:e2e`)                    |    |
 | 15 | Резервное копирование и восстановление работают                  |    |
-| 16 | Серверные логи пишутся (ошибки, HTTP-запросы, ключевые события)|    |
+| 16 | Серверные логи пишутся (ошибки, HTTP-запросы, ключевые события)| ⏳ частично (LoggingInterceptor, без файлового вывода) |
 | 17 | Переход на PostgreSQL потребует только новых репозиториев + STORAGE_MODE=postgres |    |
 | 18 | Пользовательская инструкция в README                              |    |
+
+---
+
+## 16. Отклонения от плана и дополнительные заметки
+
+> Зафиксировано на 11.03.2026 после code review Этапов 1–4.
+
+### Текущий статус
+
+| Этап | Статус | Примечание |
+| :--: | ------ | ---------- |
+|  1   | ✅ Выполнен | С отклонениями по логированию |
+|  2   | ✅ Выполнен | Полностью соответствует плану |
+|  3   | ✅ Выполнен | Полностью соответствует плану |
+|  4   | ✅ Выполнен | С отклонениями по TeamRolesGuard и каскадному удалению |
+|  5   | ❌ Не начат | |
+|  6   | ❌ Не начат | |
+|  7   | ❌ Не начат | |
+|  8   | ❌ Не начат | |
+
+### Отклонения
+
+| № | Этап | Описание | Влияние |
+| - | :--: | -------- | ------- |
+| 1 | 1 | **Логирование:** пакеты `nest-winston` и `winston` установлены как зависимости, но не настроены. Используется встроенный NestJS Logger. Вывод в файл `logs/app.log` не реализован. | Низкое — `LoggingInterceptor` логирует все HTTP-запросы в stdout. Файловый вывод добавить на Этапе 8. |
+| 2 | 4 | **TeamRolesGuard не используется:** Guard и декоратор `@TeamRoles()` созданы, но не применяются в контроллерах. Вместо этого права проверяются вручную в `TeamsService.assertOwnerOrAdmin()`. | Среднее — функционал работает, но архитектурно правильнее использовать guard. Исправить при реализации Этапа 5. |
+| 3 | 4 | **Прямой доступ к JsonFileService:** каскадное удаление `project_members` при удалении участника команды реализовано через `JsonFileService` напрямую, минуя репозиторий. | Среднее — нарушает паттерн DDD. Рефакторить при создании `IProjectMemberRepository` на Этапе 5. |
+| 4 | 4 | **ProjectMember модель создана досрочно:** файл `src/domain/models/project-member.model.ts` создан на Этапе 4 (планировался на Этапе 5), так как используется для типизации каскадного удаления. | Нет — модель соответствует плану, просто создана раньше. |
+| 5 | 2 | **Data-файлы созданы все сразу:** все 7 JSON-файлов (`projects.json`, `project_members.json`, `tasks.json`, `audit_logs.json`) созданы на Этапе 2, хотя модули для них появятся на Этапах 5–6. | Нет — пустые файлы не мешают, упрощают работу `JsonFileService`. |
+
+### Излишки кода (неиспользуемый код)
+
+| Файл | Описание |
+| ---- | -------- |
+| `src/common/exceptions/business.exception.ts` | Класс `BusinessException` определён, но нигде не вызывается. Пригодится на следующих этапах. |
+| `src/app.controller.ts` + `src/app.service.ts` + `src/app.controller.spec.ts` | Шаблонный код NestJS (`Hello World`). Не нужен проекту, но не мешает. |
+
+### Исправления, внесённые при code review
+
+| Файл | Было | Стало | Причина |
+| ---- | ---- | ----- | ------- |
+| `register.dto.ts`, `create-user.dto.ts` | `@MinLength(6)` | `@MinLength(8)` | WORKPLAN §10 правило 2: «минимум 8 символов» |
+| `register.dto.ts`, `create-user.dto.ts` | Нет валидации спецсимволов | `@Matches(/^[a-zA-Z0-9_]+$/)` | WORKPLAN §10 правило 1: «без спецсимволов» |
+| `auth.service.ts` | `expiresIn: ... as any` | `expiresIn: ... as StringValue` | Убран небезопасный каст |
+| `json-file.service.ts` | `remove()` → `this.read()` (кэш) | `remove()` → `this.readFresh()` | Потенциальная потеря данных при конкурентной записи |
+| `app.module.ts` | `ThrottlerGuard` не применён | Добавлен `APP_GUARD` → `ThrottlerGuard` | Rate limiting не работал без глобального guard |
+| `.env.example` | Отсутствовал | Создан | WORKPLAN §2 требует наличия |

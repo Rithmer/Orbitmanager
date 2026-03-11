@@ -92,7 +92,7 @@ export class JsonFileService implements OnModuleInit {
     id: number,
   ): Promise<boolean> {
     return this.enqueue(entity, async () => {
-      const data = await this.read<T>(entity);
+      const data = await this.readFresh<T>(entity);
       const index = data.items.findIndex((item) => item.id === id);
       if (index === -1) return false;
 
