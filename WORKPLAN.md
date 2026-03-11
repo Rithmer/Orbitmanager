@@ -629,16 +629,19 @@ scripts/generate-training-data.ts
 - [x] Тома: `pgdata`, `./data`, `./logs`, `./backups`, `./models`
 - [x] `.dockerignore` (node_modules, dist, data/, logs/)
 
-#### Заглушки под PostgreSQL
+#### ~~Заглушки под~~ PostgreSQL — реализовано
 
 - [x] Переменная `STORAGE_MODE` (`json` | `postgres`):
   - `json` — используются `*JsonRepository`
-  - `postgres` — используются `*PrismaRepository` (через Prisma Client)
+  - `postgres` — используются `*PrismaRepository` (через Prisma Client + @prisma/adapter-pg)
 - [x] `StorageModule` — динамический модуль, регистрирующий нужные провайдеры по `STORAGE_MODE`
-- [x] `PrismaService` (extends PrismaClient, implements OnModuleInit) — 5 строк, подключение к БД
-- [x] `prisma/schema.prisma` — схема всех 7 сущностей (единая точка правды)
-- [ ] Начальная миграция: `npx prisma migrate dev --name init` *(требует запущенный PostgreSQL)*
-- [x] `prisma/seed.ts` — начальные данные через `prisma db seed`
+- [x] `PrismaService` (extends PrismaClient, implements OnModuleInit + OnModuleDestroy) — подключение через `@prisma/adapter-pg` + `pg.Pool`
+- [x] `prisma/schema.prisma` — схема всех 7 сущностей с каскадным удалением (единая точка правды)
+- [x] 7 Prisma-репозиториев: `users`, `teams`, `team-members`, `projects`, `project-members`, `tasks`, `audit-logs`
+  - Маппинг `Date` → ISO-строки (совместимость с доменными моделями)
+  - Все интерфейсы полностью реализованы: `findAll`, `findById`, `findByEntity`, `deleteByProject`, `deleteByUserAndProjects` и т.д.
+- [ ] Начальная миграция: `npm run db:migrate` *(требует запущенный PostgreSQL)*
+- [x] `prisma/seed.ts` — начальные данные через `prisma db seed` (обновлён для Prisma 7 adapter)
 
 #### Seed-скрипт
 
@@ -832,7 +835,7 @@ npx ts-node scripts/seed.ts
 | 14 | e2e-тесты 3 БП проходят (`npm run test:e2e`)                    |    |
 | 15 | Резервное копирование и восстановление работают                  |    |
 | 16 | Серверные логи пишутся (ошибки, HTTP-запросы, ключевые события)| ✅ Winston + LoggingInterceptor + файловый вывод |
-| 17 | Переход на PostgreSQL потребует только новых репозиториев + STORAGE_MODE=postgres |    |
+| 17 | Переход на PostgreSQL потребует только ~~новых репозиториев +~~ STORAGE_MODE=postgres |    |
 | 18 | Пользовательская инструкция в README                              |    |
 
 ---
@@ -852,7 +855,7 @@ npx ts-node scripts/seed.ts
 |  5   | ✅ Выполнен | С отклонениями (см. ниже) |
 |  6   | ✅ Выполнен | С отклонениями (см. ниже) |
 |  7   | ✅ Выполнен | С отклонениями (см. ниже) |
-|  8   | ❌ Не начат | |
+|  8   | 🔄 В процессе | PostgreSQL-слой реализован, ожидает миграции |
 
 ### Отклонения
 

@@ -1,0 +1,71 @@
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import type { IUserRepository } from '../../../domain/repositories/user.repository';
+import { User } from '../../../domain/models/user.model';
+import type { User as PrismaUser } from '@prisma/client';
+
+@Injectable()
+export class UsersPrismaRepository implements IUserRepository {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async findAll(): Promise<User[]> {
+    const rows = await this.prisma.user.findMany({ orderBy: { id: 'asc' } });
+    return rows.map(this.toDomain);
+  }
+
+  async findById(id: number): Promise<User | null> {
+    const row = await this.prisma.user.findUnique({ where: { id } });
+    return row ? this.toDomain(row) : null;
+  }
+
+  async findByLogin(login: string): Promise<User | null> {
+    const row = await this.prisma.user.findUnique({ where: { login } });
+    return row ? this.toDomain(row) : null;
+  }
+
+  async create(user: Omit<User, 'id'>): Promise<User> {
+    const row = await this.prisma.user.create({
+      data: {
+        login: user.login,
+        password: user.password,
+        fullName: user.fullName,
+        profession: user.profession,
+        accountStatus: user.accountStatus,
+        accountRole: user.accountRole,
+      },
+    });
+    return this.toDomain(row);
+  }
+
+  async update(id: number, partial: Partial<User>): Promise<User | null> {
+    const exists = await this.prisma.user.findUnique({ where: { id } });
+    if (!exists) return null;
+
+    const { id: _id, createdAt: _ca, updatedAt: _ua, ...data } = partial as Record<string, unknown>;
+    const row = await this.prisma.user.update({ where: { id }, data });
+    return this.toDomain(row);
+  }
+
+  async delete(id: number): Promise<boolean> {
+    try {
+      await this.prisma.user.delete({ where: { id } });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private toDomain(row: PrismaUser): User {
+    return {
+      id: row.id,
+      login: row.login,
+      password: row.password,
+      fullName: row.fullName,
+      profession: row.profession,
+      accountStatus: row.accountStatus as User['accountStatus'],
+      accountRole: row.accountRole as User['accountRole'],
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+}
