@@ -16,7 +16,7 @@ COPY --from=builder /app/package.json ./
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/scripts ./scripts
 RUN mkdir -p data logs models backups
-RUN chmod +x scripts/docker-entrypoint.sh
+RUN sed -i 's/\r//' scripts/docker-entrypoint.sh && chmod +x scripts/docker-entrypoint.sh
 EXPOSE 3000
 ENTRYPOINT ["scripts/docker-entrypoint.sh"]
 CMD ["node", "dist/main.js"]

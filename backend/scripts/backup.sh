@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# ──────────────────────────────────────────────
-# backup.sh — Резервное копирование данных
-# Поддерживает JSON-файлы и PostgreSQL (pg_dump)
+# в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+# backup.sh вЂ” Р РµР·РµСЂРІРЅРѕРµ РєРѕРїРёСЂРѕРІР°РЅРёРµ РґР°РЅРЅС‹С…
+# РџРѕРґРґРµСЂР¶РёРІР°РµС‚ JSON-С„Р°Р№Р»С‹ Рё PostgreSQL (pg_dump)
 #
-# Использование:
-#   ./scripts/backup.sh            # бэкап JSON
-#   ./scripts/backup.sh --postgres # бэкап PostgreSQL
-#   ./scripts/backup.sh --restore <dir>  # восстановление JSON
-# ──────────────────────────────────────────────
+# РСЃРїРѕР»СЊР·РѕРІР°РЅРёРµ:
+#   ./scripts/backup.sh            # Р±СЌРєР°Рї JSON
+#   ./scripts/backup.sh --postgres # Р±СЌРєР°Рї PostgreSQL
+#   ./scripts/backup.sh --restore <dir>  # РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµ JSON
+# в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
 set -euo pipefail
 
@@ -18,12 +18,12 @@ BACKUP_ROOT="$DATA_DIR/backups"
 
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 
-# ── JSON Backup ──
+# в”Ђв”Ђ JSON Backup в”Ђв”Ђ
 backup_json() {
   local BACKUP_DIR="$BACKUP_ROOT/$TIMESTAMP"
   mkdir -p "$BACKUP_DIR"
 
-  echo "Creating JSON backup → $BACKUP_DIR"
+  echo "Creating JSON backup в†’ $BACKUP_DIR"
 
   for f in "$DATA_DIR"/*.json; do
     [ -f "$f" ] && cp "$f" "$BACKUP_DIR/"
@@ -33,19 +33,19 @@ backup_json() {
   rotate_backups
 }
 
-# ── PostgreSQL Backup ──
+# в”Ђв”Ђ PostgreSQL Backup в”Ђв”Ђ
 backup_postgres() {
   local BACKUP_FILE="$BACKUP_ROOT/pg_${TIMESTAMP}.sql.gz"
   mkdir -p "$BACKUP_ROOT"
 
   DB_URL="${DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/task_manager}"
-  echo "Creating PostgreSQL backup → $BACKUP_FILE"
+  echo "Creating PostgreSQL backup в†’ $BACKUP_FILE"
 
   pg_dump "$DB_URL" | gzip > "$BACKUP_FILE"
   echo "PostgreSQL backup completed: $BACKUP_FILE"
 }
 
-# ── Restore JSON ──
+# в”Ђв”Ђ Restore JSON в”Ђв”Ђ
 restore_json() {
   local RESTORE_DIR="$1"
 
@@ -54,7 +54,7 @@ restore_json() {
     exit 1
   fi
 
-  echo "Restoring JSON from $RESTORE_DIR → $DATA_DIR"
+  echo "Restoring JSON from $RESTORE_DIR в†’ $DATA_DIR"
 
   for f in "$RESTORE_DIR"/*.json; do
     [ -f "$f" ] && cp "$f" "$DATA_DIR/"
@@ -63,7 +63,7 @@ restore_json() {
   echo "Restore completed."
 }
 
-# ── Rotation: 7 daily + 4 weekly ──
+# в”Ђв”Ђ Rotation: 7 daily + 4 weekly в”Ђв”Ђ
 rotate_backups() {
   if [ ! -d "$BACKUP_ROOT" ]; then
     return
@@ -96,7 +96,7 @@ rotate_backups() {
   done
 }
 
-# ── Main ──
+# в”Ђв”Ђ Main в”Ђв”Ђ
 case "${1:-}" in
   --postgres)
     backup_postgres
