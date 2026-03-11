@@ -29,6 +29,8 @@ import {
   QueryParams,
   PaginatedResult,
 } from '../../common/helpers/query.helper';
+import { AuditService } from '../audit-logs/audit.service';
+import { AuditAction } from '../../common/enums/audit-action.enum';
 
 @Injectable()
 export class ProjectsService {
@@ -41,6 +43,7 @@ export class ProjectsService {
     private readonly teamMemberRepository: ITeamMemberRepository,
     @Inject(TEAM_REPOSITORY)
     private readonly teamRepository: ITeamRepository,
+    private readonly auditService: AuditService,
   ) {}
 
   // ────────────── Projects CRUD ──────────────
@@ -99,6 +102,9 @@ export class ProjectsService {
       status: dto.status ?? ProjectStatus.ACTIVE,
       createdAt: now,
       updatedAt: now,
+    }).then(async (project) => {
+      await this.auditService.log(userId, AuditAction.CREATE, 'project', project.id, `Создан проект "${project.name}"`);
+      return project;
     });
   }
 
@@ -118,6 +124,9 @@ export class ProjectsService {
       updatedAt: new Date().toISOString(),
     });
     if (!updated) throw new NotFoundException(`Проект #${id} не найден`);
+
+    await this.auditService.log(userId, AuditAction.UPDATE, 'project', id, `Обновлён проект "${updated.name}"`);
+
     return updated;
   }
 
@@ -135,6 +144,8 @@ export class ProjectsService {
     await this.projectMemberRepository.deleteByProject(id);
 
     await this.projectRepository.delete(id);
+
+    await this.auditService.log(userId, AuditAction.DELETE, 'project', id, `Удалён проект "${project.name}"`);
   }
 
   // ────────────── Project Members ──────────────
@@ -195,6 +206,9 @@ export class ProjectsService {
       userId: dto.userId,
       role: dto.role,
       assignedAt: new Date().toISOString(),
+    }).then(async (member) => {
+      await this.auditService.log(userId, AuditAction.ASSIGN, 'project_member', member.id, `Пользователь #${dto.userId} добавлен в проект #${projectId} с ролью ${dto.role}`);
+      return member;
     });
   }
 
@@ -223,6 +237,9 @@ export class ProjectsService {
       role: dto.role,
     });
     if (!updated) throw new NotFoundException(`Участник проекта #${memberId} не найден`);
+
+    await this.auditService.log(userId, AuditAction.UPDATE, 'project_member', memberId, `Роль участника #${memberId} изменена на ${dto.role}`, member.role, dto.role);
+
     return updated;
   }
 
@@ -238,6 +255,8 @@ export class ProjectsService {
     await this.assertTeamOwnerOrAdmin(userId, project.teamId, userRole);
 
     await this.projectMemberRepository.delete(memberId);
+
+    await this.auditService.log(userId, AuditAction.DELETE, 'project_member', memberId, `Участник #${member.userId} удалён из проекта #${member.projectId}`);
   }
 
   // ────────────── Helpers ──────────────

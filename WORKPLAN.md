@@ -412,28 +412,28 @@ src/common/enums/task-status.enum.ts
 
 #### Модели
 
-- [ ] `AuditLog` — `{ id, userId, action, entityType, entityId, oldValue, newValue, timestamp, description }`
+- [x] `AuditLog` — `{ id, userId, action, entityType, entityId, oldValue, newValue, timestamp, description }`
 
 #### Enums
 
-- [ ] `AuditAction`: `create`, `update`, `delete`, `login`, `logout`, `assign`, `status_change`
+- [x] `AuditAction`: `create`, `update`, `delete`, `login`, `logout`, `assign`, `status_change`
 
 #### Repository Interfaces + JSON Repositories
 
-- [ ] `IAuditLogRepository` + `AuditLogsJsonRepository`
+- [x] `IAuditLogRepository` + `AuditLogsJsonRepository`
 
 #### Модуль audit-logs (только GET)
 
-- [ ] `GET /audit-logs` — с фильтрацией: `?userId=`, `?entityType=`, `?entityId=`, `?action=`, `?from=`, `?to=`
-- [ ] `AuditService` — универсальный сервис записи:
+- [x] `GET /audit-logs` — с фильтрацией: `?userId=`, `?entityType=`, `?entityId=`, `?action=`, `?from=`, `?to=`
+- [x] `AuditService` — универсальный сервис записи:
   ```typescript
   async log(userId: number, action: AuditAction, entityType: string, entityId: number | null, description?: string): Promise<void>
   ```
-- [ ] Доступ: только `admin`
+- [x] Доступ: только `admin`
 
 #### Бизнес-процесс 2 — Изменение статуса задачи
 
-- [ ] Полный flow:
+- [x] Полный flow:
   1. Проверка прав (owner / team_lead / developer если assigneeId = текущий пользователь)
   2. Проверка допустимого перехода статуса
   3. **Последовательная запись:**
@@ -849,7 +849,7 @@ npx ts-node scripts/seed.ts
 |  3   | ✅ Выполнен | Полностью соответствует плану |
 |  4   | ✅ Выполнен | С отклонениями по TeamRolesGuard и каскадному удалению |
 |  5   | ✅ Выполнен | С отклонениями (см. ниже) |
-|  6   | ❌ Не начат | |
+|  6   | ✅ Выполнен | С отклонениями (см. ниже) |
 |  7   | ❌ Не начат | |
 |  8   | ❌ Не начат | |
 
@@ -863,9 +863,12 @@ npx ts-node scripts/seed.ts
 | 4 | 4 | **ProjectMember модель создана досрочно:** файл `src/domain/models/project-member.model.ts` создан на Этапе 4 (планировался на Этапе 5), так как используется для типизации каскадного удаления. На Этапе 5 обновлён: `role: string` → `role: ProjectRole`. | Нет — модель соответствует плану, просто создана раньше. |
 | 5 | 2 | **Data-файлы созданы все сразу:** все 7 JSON-файлов (`projects.json`, `project_members.json`, `tasks.json`, `audit_logs.json`) созданы на Этапе 2, хотя модули для них появятся на Этапах 5–6. | Нет — пустые файлы не мешают, упрощают работу `JsonFileService`. |
 | 6 | 5 | **ProjectRolesGuard создан, но не применяется через декоратор:** Guard создан и работает, но проверка прав выполняется в `ProjectsService` и `TasksService` через вспомогательные методы (`assertCanManageProject`, `assertCanCreateTask`, `assertCanChangeStatus`). Аналогично подходу TeamRolesGuard (отклонение #2). | Низкое — функционал полный, проверка прав работает корректно. Декоратор `@ProjectRoles()` создан и готов к применению. |
-| 7 | 5 | **Audit-логи пишутся напрямую через `JsonFileService`:** на Этапе 5 запись в `audit_logs` реализована через `jsonFileService.create()` в `TasksService`, а не через `AuditService` (который появится на Этапе 6). | Низкое — будет рефакторизовано при создании `AuditService` на Этапе 6. |
+| 7 | 5→6 | **~~Audit-логи писались напрямую через `JsonFileService`~~ — ИСПРАВЛЕНО на Этапе 6:** `TasksService` теперь использует `AuditService` вместо `jsonFileService.create()`. `JsonFileService` удалён из зависимостей `TasksService`. | ✅ Устранено. |
 | 8 | 5 | **Валидация deadline:** при создании задачи проверяется `deadline > now` (как в плане), при обновлении — `deadline >= createdAt`, чтобы допустить корректировку в пределах разумного. | Нет — расширение поведения для удобства. |
 | 9 | 5 | **Путь JSON-репозиториев:** файлы размещены в `infrastructure/repositories/json/` (с подпапкой `json/`), что не совпадает с планом (`infrastructure/repositories/*.json.repository.ts`). Соответствует архитектуре, установленной на Этапе 4. | Нет — согласуется с уже установленной структурой. |
+| 10 | 6 | **`AuditService.log()` расширен параметрами `oldValue`/`newValue`:** план определял 5 параметров, реализовано 7 (добавлены `oldValue?`, `newValue?`). | Нет — необходимо для `status_change` и изменения ролей. |
+| 11 | 6 | **Вызов `riskService.assessTask()` отложен до Этапа 7:** план БП2 указывает шаг 4 «Вызов `riskService.assessTask()`», но `RiskService` ещё не создан. Будет интегрирован на Этапе 7. | Низкое — остальные 3 шага БП2 реализованы полностью. |
+| 12 | 6 | **`UsersService` CRUD получил опциональный `callerUserId`:** добавлен для корректной записи аудита. Контроллер передаёт ID текущего пользователя, `AuthService.register()` не передаёт (используется ID нового пользователя). | Нет — обратно совместимо (optional param). |
 
 ### Излишки кода (неиспользуемый код)
 
@@ -894,3 +897,25 @@ npx ts-node scripts/seed.ts
 | `teams.service.spec.ts` | Мок `JsonFileService` | Моки `PROJECT_REPOSITORY`, `PROJECT_MEMBER_REPOSITORY` | Синхронизация с рефакторингом |
 | `project-member.model.ts` | `role: string` | `role: ProjectRole` | Строгая типизация через enum |
 | `common/enums/index.ts` | 2 экспорта | 5 экспортов (+ ProjectStatus, ProjectRole, TaskStatus) | Новые enum-ы |
+
+### Исправления, внесённые при реализации Этапа 6
+
+| Файл | Было | Стало | Причина |
+| ---- | ---- | ----- | ------- |
+| `tasks.service.ts` | Прямые записи через `JsonFileService.create('audit_logs', ...)` | `AuditService.log()` через DI | Устранение отклонения #7 (нарушение DDD) |
+| `tasks.service.ts` | Зависимость от `JsonFileService` | Зависимость от `AuditService` | Рефакторинг аудита |
+| `tasks.module.ts` | Без imports | `imports: [AuditLogsModule]` | Для инъекции `AuditService` |
+| `auth.service.ts` | Нет аудита | `AuditService.log()` при login | Фиксация входов в систему |
+| `auth.module.ts` | Без AuditLogsModule | `imports: [..., AuditLogsModule]` | Для инъекции `AuditService` |
+| `projects.service.ts` | Нет аудита | `AuditService.log()` в create/update/remove/addMember/updateMember/removeMember | Полный аудит проектов |
+| `projects.module.ts` | Без imports | `imports: [AuditLogsModule]` | Для инъекции `AuditService` |
+| `teams.service.ts` | Нет аудита | `AuditService.log()` в create/update/remove/addMember/updateMember/removeMember | Полный аудит команд |
+| `teams.module.ts` | Без imports (для AuditLogs) | `imports: [AuditLogsModule]` | Для инъекции `AuditService` |
+| `users.service.ts` | Нет аудита, нет callerUserId | `AuditService.log()` в create/update/remove, optional `callerUserId` | Полный аудит пользователей |
+| `users.module.ts` | Без imports | `imports: [AuditLogsModule]` | Для инъекции `AuditService` |
+| `users.controller.ts` | Без `@CurrentUser` в CUD | Добавлен `@CurrentUser('id')` в create/update/remove | Передача callerUserId для аудита |
+| `app.module.ts` | Без AuditLogsModule | `imports: [..., AuditLogsModule]` | Регистрация модуля |
+| `common/enums/index.ts` | 5 экспортов | 6 экспортов (+ AuditAction) | Новый enum |
+| `auth.service.spec.ts` | Без AuditService | Мок `AuditService` | Синхронизация с рефакторингом |
+| `teams.service.spec.ts` | Без AuditService | Мок `AuditService` | Синхронизация с рефакторингом |
+| `users.service.spec.ts` | Без AuditService, тест remove через delete=false | Мок `AuditService`, тест remove через findById=null | Синхронизация с рефакторингом |

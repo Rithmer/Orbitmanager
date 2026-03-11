@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { USER_REPOSITORY } from '../../domain/repositories/user.repository';
+import { AuditService } from '../audit-logs/audit.service';
 import { AccountRole } from '../../common/enums/account-role.enum';
 import { User } from '../../domain/models/user.model';
 
@@ -30,6 +31,10 @@ const mockUserRepository = {
   delete: jest.fn().mockResolvedValue(true),
 };
 
+const mockAuditService = {
+  log: jest.fn().mockResolvedValue(undefined),
+};
+
 describe('UsersService', () => {
   let service: UsersService;
 
@@ -38,6 +43,7 @@ describe('UsersService', () => {
       providers: [
         UsersService,
         { provide: USER_REPOSITORY, useValue: mockUserRepository },
+        { provide: AuditService, useValue: mockAuditService },
       ],
     }).compile();
 
@@ -114,7 +120,7 @@ describe('UsersService', () => {
     });
 
     it('should throw NotFoundException if not found', async () => {
-      mockUserRepository.delete.mockResolvedValueOnce(false);
+      mockUserRepository.findById.mockResolvedValueOnce(null);
       await expect(service.remove(999)).rejects.toThrow(NotFoundException);
     });
   });

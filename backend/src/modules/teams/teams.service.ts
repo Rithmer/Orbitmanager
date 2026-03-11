@@ -28,6 +28,8 @@ import {
   QueryParams,
   PaginatedResult,
 } from '../../common/helpers/query.helper';
+import { AuditService } from '../audit-logs/audit.service';
+import { AuditAction } from '../../common/enums/audit-action.enum';
 
 @Injectable()
 export class TeamsService {
@@ -42,6 +44,7 @@ export class TeamsService {
     private readonly projectRepository: IProjectRepository,
     @Inject(PROJECT_MEMBER_REPOSITORY)
     private readonly projectMemberRepository: IProjectMemberRepository,
+    private readonly auditService: AuditService,
   ) {}
 
   async findAll(params: QueryParams): Promise<PaginatedResult<Team>> {
@@ -76,6 +79,8 @@ export class TeamsService {
       teamRole: TeamRole.OWNER,
     });
 
+    await this.auditService.log(userId, AuditAction.CREATE, 'team', team.id, `Создана команда "${team.name}"`);
+
     return team;
   }
 
@@ -92,6 +97,9 @@ export class TeamsService {
       ...dto,
     });
     if (!updated) throw new NotFoundException(`Команда #${id} не найдена`);
+
+    await this.auditService.log(userId, AuditAction.UPDATE, 'team', id, `Обновлена команда "${updated.name}"`);
+
     return updated;
   }
 
@@ -111,6 +119,8 @@ export class TeamsService {
     await this.cascadeDeleteProjectMembersByTeam(id);
 
     await this.teamRepository.delete(id);
+
+    await this.auditService.log(userId, AuditAction.DELETE, 'team', id, `Удалена команда #${id}`);
   }
 
   async findMembers(teamId: number): Promise<TeamMember[]> {
@@ -144,6 +154,9 @@ export class TeamsService {
       userId: dto.userId,
       teamId,
       teamRole: dto.teamRole,
+    }).then(async (member) => {
+      await this.auditService.log(userId, AuditAction.ASSIGN, 'team_member', member.id, `Пользователь #${dto.userId} добавлен в команду #${teamId} с ролью ${dto.teamRole}`);
+      return member;
     });
   }
 
@@ -161,6 +174,9 @@ export class TeamsService {
     });
     if (!updated)
       throw new NotFoundException(`Участник #${memberId} не найден`);
+
+    await this.auditService.log(userId, AuditAction.UPDATE, 'team_member', memberId, `Роль участника #${memberId} изменена на ${dto.teamRole}`, member.teamRole, dto.teamRole);
+
     return updated;
   }
 
@@ -190,6 +206,8 @@ export class TeamsService {
     );
 
     await this.teamMemberRepository.delete(memberId);
+
+    await this.auditService.log(userId, AuditAction.DELETE, 'team_member', memberId, `Участник #${member.userId} удалён из команды #${member.teamId}`);
   }
 
   private async findMemberById(id: number): Promise<TeamMember> {

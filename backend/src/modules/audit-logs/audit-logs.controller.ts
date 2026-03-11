@@ -1,0 +1,70 @@
+import {
+  Controller,
+  Get,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+} from '@nestjs/swagger';
+import { AuditService } from './audit.service';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { AccountRolesGuard } from '../../common/guards/account-roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { AccountRole } from '../../common/enums/account-role.enum';
+
+@ApiTags('Audit Logs')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, AccountRolesGuard)
+@Controller('audit-logs')
+export class AuditLogsController {
+  constructor(private readonly auditService: AuditService) {}
+
+  @Get()
+  @Roles(AccountRole.ADMIN)
+  @ApiOperation({ summary: 'Получить журнал аудита' })
+  @ApiQuery({ name: 'userId', required: false, type: Number })
+  @ApiQuery({ name: 'entityType', required: false })
+  @ApiQuery({ name: 'entityId', required: false, type: Number })
+  @ApiQuery({ name: 'action', required: false })
+  @ApiQuery({ name: 'from', required: false, description: 'ISO date from' })
+  @ApiQuery({ name: 'to', required: false, description: 'ISO date to' })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'sort', required: false })
+  @ApiResponse({ status: 200, description: 'Список записей аудита' })
+  findAll(
+    @Query('userId') userId?: string,
+    @Query('entityType') entityType?: string,
+    @Query('entityId') entityId?: string,
+    @Query('action') action?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('sort') sort?: string,
+  ) {
+    return this.auditService.findAll(
+      {
+        search,
+        page: page ? parseInt(page, 10) : undefined,
+        limit: limit ? parseInt(limit, 10) : undefined,
+        sort,
+      },
+      {
+        userId: userId ? parseInt(userId, 10) : undefined,
+        entityType,
+        entityId: entityId ? parseInt(entityId, 10) : undefined,
+        action,
+        from,
+        to,
+      },
+    );
+  }
+}

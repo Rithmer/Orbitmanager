@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { UnauthorizedException, ConflictException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
+import { AuditService } from '../audit-logs/audit.service';
 import { AccountRole } from '../../common/enums/account-role.enum';
 import { User } from '../../domain/models/user.model';
 import * as argon2 from 'argon2';
@@ -52,6 +53,10 @@ const mockConfigService = {
   }),
 };
 
+const mockAuditService = {
+  log: jest.fn().mockResolvedValue(undefined),
+};
+
 describe('AuthService', () => {
   let service: AuthService;
 
@@ -62,6 +67,7 @@ describe('AuthService', () => {
         { provide: UsersService, useValue: mockUsersService },
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfigService },
+        { provide: AuditService, useValue: mockAuditService },
       ],
     }).compile();
 

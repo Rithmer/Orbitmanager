@@ -9,8 +9,10 @@ import { PROJECT_MEMBER_REPOSITORY } from '../../domain/repositories/project-mem
 import { ProjectMembersJsonRepository } from '../../infrastructure/repositories/json/project-members.json.repository';
 import { TEAM_MEMBER_REPOSITORY } from '../../domain/repositories/team-member.repository';
 import { TeamMembersJsonRepository } from '../../infrastructure/repositories/json/team-members.json.repository';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
+  imports: [AuditLogsModule],
   controllers: [TasksController],
   providers: [
     TasksService,

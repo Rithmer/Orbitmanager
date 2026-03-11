@@ -8,7 +8,9 @@ import { ConfigService } from '@nestjs/config';
 import type { StringValue } from 'ms';
 import * as argon2 from 'argon2';
 import { UsersService } from '../users/users.service';
+import { AuditService } from '../audit-logs/audit.service';
 import { AccountRole } from '../../common/enums/account-role.enum';
+import { AuditAction } from '../../common/enums/audit-action.enum';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
@@ -29,6 +31,7 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly auditService: AuditService,
   ) {}
 
   async register(dto: RegisterDto): Promise<TokenPair> {
@@ -66,6 +69,8 @@ export class AuthService {
     if (!valid) {
       throw new UnauthorizedException('Неверный логин или пароль');
     }
+
+    await this.auditService.log(user.id, AuditAction.LOGIN, 'user', user.id, `Пользователь "${user.login}" вошёл в систему`);
 
     return this.generateTokens({
       sub: user.id,

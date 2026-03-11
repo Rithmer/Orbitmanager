@@ -11,6 +11,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { TeamsModule } from './modules/teams/teams.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { TasksModule } from './modules/tasks/tasks.module';
+import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { TasksModule } from './modules/tasks/tasks.module';
     TeamsModule,
     ProjectsModule,
     TasksModule,
+    AuditLogsModule,
   ],
   controllers: [AppController],
   providers: [

@@ -16,12 +16,15 @@ import {
   QueryParams,
   PaginatedResult,
 } from '../../common/helpers/query.helper';
+import { AuditService } from '../audit-logs/audit.service';
+import { AuditAction } from '../../common/enums/audit-action.enum';
 
 @Injectable()
 export class UsersService {
   constructor(
     @Inject(USER_REPOSITORY)
     private readonly userRepository: IUserRepository,
+    private readonly auditService: AuditService,
   ) {}
 
   async findAll(params: QueryParams): Promise<PaginatedResult<Omit<User, 'password'>>> {
@@ -43,7 +46,7 @@ export class UsersService {
     return this.userRepository.findByLogin(login);
   }
 
-  async create(dto: CreateUserDto): Promise<Omit<User, 'password'>> {
+  async create(dto: CreateUserDto, callerUserId?: number): Promise<Omit<User, 'password'>> {
     const existing = await this.userRepository.findByLogin(dto.login);
     if (existing) {
       throw new ConflictException(`Логин "${dto.login}" уже занят`);
@@ -63,12 +66,21 @@ export class UsersService {
       updatedAt: now,
     });
 
+    await this.auditService.log(
+      callerUserId ?? user.id,
+      AuditAction.CREATE,
+      'user',
+      user.id,
+      `Создан пользователь "${user.login}"`,
+    );
+
     return this.omitPassword(user);
   }
 
   async update(
     id: number,
     dto: UpdateUserDto,
+    callerUserId?: number,
   ): Promise<Omit<User, 'password'>> {
     const existing = await this.userRepository.findById(id);
     if (!existing) throw new NotFoundException(`Пользователь #${id} не найден`);
@@ -84,12 +96,31 @@ export class UsersService {
 
     const updated = await this.userRepository.update(id, partial);
     if (!updated) throw new NotFoundException(`Пользователь #${id} не найден`);
+
+    await this.auditService.log(
+      callerUserId ?? id,
+      AuditAction.UPDATE,
+      'user',
+      id,
+      `Обновлён пользователь "${updated.login}"`,
+    );
+
     return this.omitPassword(updated);
   }
 
-  async remove(id: number): Promise<void> {
-    const deleted = await this.userRepository.delete(id);
-    if (!deleted) throw new NotFoundException(`Пользователь #${id} не найден`);
+  async remove(id: number, callerUserId?: number): Promise<void> {
+    const user = await this.userRepository.findById(id);
+    if (!user) throw new NotFoundException(`Пользователь #${id} не найден`);
+
+    await this.userRepository.delete(id);
+
+    await this.auditService.log(
+      callerUserId ?? id,
+      AuditAction.DELETE,
+      'user',
+      id,
+      `Удалён пользователь "${user.login}"`,
+    );
   }
 
   private omitPassword(user: User): Omit<User, 'password'> {

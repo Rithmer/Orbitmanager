@@ -24,6 +24,7 @@ import { CreateUserDto, UpdateUserDto } from './dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AccountRolesGuard } from '../../common/guards/account-roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccountRole } from '../../common/enums/account-role.enum';
 
 @ApiTags('Users')
@@ -72,8 +73,11 @@ export class UsersController {
   @ApiOperation({ summary: 'Создать пользователя (только admin)' })
   @ApiResponse({ status: 201, description: 'Пользователь создан' })
   @ApiResponse({ status: 409, description: 'Логин уже занят' })
-  create(@Body() dto: CreateUserDto) {
-    return this.usersService.create(dto);
+  create(
+    @CurrentUser('id') callerId: number,
+    @Body() dto: CreateUserDto,
+  ) {
+    return this.usersService.create(dto, callerId);
   }
 
   @Patch(':id')
@@ -82,10 +86,11 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Пользователь обновлён' })
   @ApiResponse({ status: 404, description: 'Пользователь не найден' })
   update(
+    @CurrentUser('id') callerId: number,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateUserDto,
   ) {
-    return this.usersService.update(id, dto);
+    return this.usersService.update(id, dto, callerId);
   }
 
   @Delete(':id')
@@ -94,7 +99,10 @@ export class UsersController {
   @ApiOperation({ summary: 'Удалить пользователя (только admin)' })
   @ApiResponse({ status: 204, description: 'Пользователь удалён' })
   @ApiResponse({ status: 404, description: 'Пользователь не найден' })
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.usersService.remove(id);
+  remove(
+    @CurrentUser('id') callerId: number,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.usersService.remove(id, callerId);
   }
 }

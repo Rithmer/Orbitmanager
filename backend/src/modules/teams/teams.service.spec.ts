@@ -14,6 +14,7 @@ import { TeamRole } from '../../common/enums/team-role.enum';
 import { AccountRole } from '../../common/enums/account-role.enum';
 import { Team } from '../../domain/models/team.model';
 import { TeamMember } from '../../domain/models/team-member.model';
+import { AuditService } from '../audit-logs/audit.service';
 
 const mockTeam: Team = {
   id: 1,
@@ -98,6 +99,10 @@ const mockProjectMemberRepository = {
   deleteByUserAndProjects: jest.fn().mockResolvedValue(0),
 };
 
+const mockAuditService = {
+  log: jest.fn().mockResolvedValue(undefined),
+};
+
 describe('TeamsService', () => {
   let service: TeamsService;
 
@@ -110,6 +115,7 @@ describe('TeamsService', () => {
         { provide: USER_REPOSITORY, useValue: mockUserRepository },
         { provide: PROJECT_REPOSITORY, useValue: mockProjectRepository },
         { provide: PROJECT_MEMBER_REPOSITORY, useValue: mockProjectMemberRepository },
+        { provide: AuditService, useValue: mockAuditService },
       ],
     }).compile();
 

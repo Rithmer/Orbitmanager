@@ -12,8 +12,10 @@ import { PROJECT_REPOSITORY } from '../../domain/repositories/project.repository
 import { ProjectsJsonRepository } from '../../infrastructure/repositories/json/projects.json.repository';
 import { PROJECT_MEMBER_REPOSITORY } from '../../domain/repositories/project-member.repository';
 import { ProjectMembersJsonRepository } from '../../infrastructure/repositories/json/project-members.json.repository';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
+  imports: [AuditLogsModule],
   controllers: [TeamsController, TeamMembersController],
   providers: [
     TeamsService,

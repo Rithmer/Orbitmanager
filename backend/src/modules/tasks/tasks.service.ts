@@ -25,7 +25,8 @@ import {
   QueryParams,
   PaginatedResult,
 } from '../../common/helpers/query.helper';
-import { JsonFileService } from '../../infrastructure/storage/json-file.service';
+import { AuditService } from '../audit-logs/audit.service';
+import { AuditAction } from '../../common/enums/audit-action.enum';
 
 @Injectable()
 export class TasksService {
@@ -38,7 +39,7 @@ export class TasksService {
     private readonly projectMemberRepository: IProjectMemberRepository,
     @Inject(TEAM_MEMBER_REPOSITORY)
     private readonly teamMemberRepository: ITeamMemberRepository,
-    private readonly jsonFileService: JsonFileService,
+    private readonly auditService: AuditService,
   ) {}
 
   // ────────────── Tasks CRUD ──────────────
@@ -139,7 +140,7 @@ export class TasksService {
     });
 
     // Step 6: audit log
-    await this.writeAuditLog(userId, 'create', 'task', task.id, null, null, `Создана задача "${task.name}"`);
+    await this.auditService.log(userId, AuditAction.CREATE, 'task', task.id, `Создана задача "${task.name}"`);
 
     return task;
   }
@@ -195,14 +196,14 @@ export class TasksService {
 
     // Audit log for status change
     if (dto.status && dto.status !== oldStatus) {
-      await this.writeAuditLog(
+      await this.auditService.log(
         userId,
-        'status_change',
+        AuditAction.STATUS_CHANGE,
         'task',
         id,
+        `Статус задачи "${task.name}" изменён: ${oldStatus} → ${dto.status}`,
         oldStatus,
         dto.status,
-        `Статус задачи "${task.name}" изменён: ${oldStatus} → ${dto.status}`,
       );
     }
 
@@ -222,7 +223,7 @@ export class TasksService {
 
     await this.taskRepository.delete(id);
 
-    await this.writeAuditLog(userId, 'delete', 'task', id, null, null, `Удалена задача "${task.name}"`);
+    await this.auditService.log(userId, AuditAction.DELETE, 'task', id, `Удалена задача "${task.name}"`);
   }
 
   // ────────────── Helpers ──────────────
@@ -395,24 +396,4 @@ export class TasksService {
     }
   }
 
-  private async writeAuditLog(
-    userId: number,
-    action: string,
-    entityType: string,
-    entityId: number,
-    oldValue: string | null,
-    newValue: string | null,
-    description: string,
-  ): Promise<void> {
-    await this.jsonFileService.create('audit_logs', {
-      userId,
-      action,
-      entityType,
-      entityId,
-      oldValue,
-      newValue,
-      timestamp: new Date().toISOString(),
-      description,
-    });
-  }
 }
