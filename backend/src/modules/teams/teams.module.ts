@@ -12,6 +12,8 @@ import { PROJECT_REPOSITORY } from '../../domain/repositories/project.repository
 import { ProjectsJsonRepository } from '../../infrastructure/repositories/json/projects.json.repository';
 import { PROJECT_MEMBER_REPOSITORY } from '../../domain/repositories/project-member.repository';
 import { ProjectMembersJsonRepository } from '../../infrastructure/repositories/json/project-members.json.repository';
+import { TASK_REPOSITORY } from '../../domain/repositories/task.repository';
+import { TasksJsonRepository } from '../../infrastructure/repositories/json/tasks.json.repository';
 import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
@@ -24,6 +26,7 @@ import { AuditLogsModule } from '../audit-logs/audit-logs.module';
     { provide: USER_REPOSITORY, useClass: UsersJsonRepository },
     { provide: PROJECT_REPOSITORY, useClass: ProjectsJsonRepository },
     { provide: PROJECT_MEMBER_REPOSITORY, useClass: ProjectMembersJsonRepository },
+    { provide: TASK_REPOSITORY, useClass: TasksJsonRepository },
   ],
   exports: [
     TeamsService,

@@ -10,6 +10,7 @@ import { TEAM_MEMBER_REPOSITORY } from '../../domain/repositories/team-member.re
 import { USER_REPOSITORY } from '../../domain/repositories/user.repository';
 import { PROJECT_REPOSITORY } from '../../domain/repositories/project.repository';
 import { PROJECT_MEMBER_REPOSITORY } from '../../domain/repositories/project-member.repository';
+import { TASK_REPOSITORY } from '../../domain/repositories/task.repository';
 import { TeamRole } from '../../common/enums/team-role.enum';
 import { AccountRole } from '../../common/enums/account-role.enum';
 import { Team } from '../../domain/models/team.model';
@@ -99,6 +100,15 @@ const mockProjectMemberRepository = {
   deleteByUserAndProjects: jest.fn().mockResolvedValue(0),
 };
 
+const mockTaskRepository = {
+  findAll: jest.fn().mockResolvedValue([]),
+  findById: jest.fn().mockResolvedValue(null),
+  findByProject: jest.fn().mockResolvedValue([]),
+  create: jest.fn(),
+  update: jest.fn(),
+  delete: jest.fn().mockResolvedValue(true),
+};
+
 const mockAuditService = {
   log: jest.fn().mockResolvedValue(undefined),
 };
@@ -115,6 +125,7 @@ describe('TeamsService', () => {
         { provide: USER_REPOSITORY, useValue: mockUserRepository },
         { provide: PROJECT_REPOSITORY, useValue: mockProjectRepository },
         { provide: PROJECT_MEMBER_REPOSITORY, useValue: mockProjectMemberRepository },
+        { provide: TASK_REPOSITORY, useValue: mockTaskRepository },
         { provide: AuditService, useValue: mockAuditService },
       ],
     }).compile();
@@ -148,6 +159,8 @@ describe('TeamsService', () => {
     mockProjectRepository.findByTeam.mockResolvedValue([]);
     mockProjectMemberRepository.deleteByProject.mockResolvedValue(0);
     mockProjectMemberRepository.deleteByUserAndProjects.mockResolvedValue(0);
+    mockTaskRepository.findByProject.mockResolvedValue([]);
+    mockTaskRepository.delete.mockResolvedValue(true);
   });
 
   describe('findAll', () => {

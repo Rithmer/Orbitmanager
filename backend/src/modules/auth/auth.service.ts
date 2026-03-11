@@ -13,16 +13,11 @@ import { AccountRole } from '../../common/enums/account-role.enum';
 import { AuditAction } from '../../common/enums/audit-action.enum';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { JwtPayload } from './jwt.strategy';
 
 export interface TokenPair {
   accessToken: string;
   refreshToken: string;
-}
-
-interface JwtPayload {
-  sub: number;
-  login: string;
-  accountRole: string;
 }
 
 @Injectable()

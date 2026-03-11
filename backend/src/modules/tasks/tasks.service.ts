@@ -161,7 +161,7 @@ export class TasksService {
       this.validateStatusTransition(task.status, dto.status);
     } else {
       // For non-status changes: owner or team_lead can edit
-      await this.assertCanManageTask(project.teamId, task.projectId, userId, userRole);
+      await this.assertCanCreateTask(project.teamId, task.projectId, userId, userRole);
     }
 
     // Validate assigneeId if changing
@@ -219,7 +219,7 @@ export class TasksService {
     const project = await this.projectRepository.findById(task.projectId);
     if (!project) throw new NotFoundException(`Проект #${task.projectId} не найден`);
 
-    await this.assertCanManageTask(project.teamId, task.projectId, userId, userRole);
+    await this.assertCanCreateTask(project.teamId, task.projectId, userId, userRole);
 
     await this.taskRepository.delete(id);
 
@@ -333,16 +333,6 @@ export class TasksService {
     throw new ForbiddenException(
       'Только владелец команды или тимлид проекта может создавать задачи',
     );
-  }
-
-  private async assertCanManageTask(
-    teamId: number,
-    projectId: number,
-    userId: number,
-    accountRole: AccountRole,
-  ): Promise<void> {
-    // Same as create task permissions
-    await this.assertCanCreateTask(teamId, projectId, userId, accountRole);
   }
 
   private async assertCanChangeStatus(

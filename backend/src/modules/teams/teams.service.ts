@@ -15,6 +15,8 @@ import type { IProjectRepository } from '../../domain/repositories/project.repos
 import { PROJECT_REPOSITORY } from '../../domain/repositories/project.repository';
 import type { IProjectMemberRepository } from '../../domain/repositories/project-member.repository';
 import { PROJECT_MEMBER_REPOSITORY } from '../../domain/repositories/project-member.repository';
+import type { ITaskRepository } from '../../domain/repositories/task.repository';
+import { TASK_REPOSITORY } from '../../domain/repositories/task.repository';
 import { Team } from '../../domain/models/team.model';
 import { TeamMember } from '../../domain/models/team-member.model';
 import { TeamRole } from '../../common/enums/team-role.enum';
@@ -44,6 +46,8 @@ export class TeamsService {
     private readonly projectRepository: IProjectRepository,
     @Inject(PROJECT_MEMBER_REPOSITORY)
     private readonly projectMemberRepository: IProjectMemberRepository,
+    @Inject(TASK_REPOSITORY)
+    private readonly taskRepository: ITaskRepository,
     private readonly auditService: AuditService,
   ) {}
 
@@ -90,7 +94,7 @@ export class TeamsService {
     userId: number,
     userRole: AccountRole,
   ): Promise<Team> {
-    const team = await this.findById(id);
+    await this.findById(id);
     await this.assertOwnerOrAdmin(userId, id, userRole);
 
     const updated = await this.teamRepository.update(id, {
@@ -150,14 +154,15 @@ export class TeamsService {
       );
     }
 
-    return this.teamMemberRepository.create({
+    const member = await this.teamMemberRepository.create({
       userId: dto.userId,
       teamId,
       teamRole: dto.teamRole,
-    }).then(async (member) => {
-      await this.auditService.log(userId, AuditAction.ASSIGN, 'team_member', member.id, `Пользователь #${dto.userId} добавлен в команду #${teamId} с ролью ${dto.teamRole}`);
-      return member;
     });
+
+    await this.auditService.log(userId, AuditAction.ASSIGN, 'team_member', member.id, `Пользователь #${dto.userId} добавлен в команду #${teamId} с ролью ${dto.teamRole}`);
+
+    return member;
   }
 
   async updateMember(
@@ -253,7 +258,12 @@ export class TeamsService {
     const teamProjects = await this.projectRepository.findByTeam(teamId);
 
     for (const project of teamProjects) {
+      const tasks = await this.taskRepository.findByProject(project.id);
+      for (const task of tasks) {
+        await this.taskRepository.delete(task.id);
+      }
       await this.projectMemberRepository.deleteByProject(project.id);
+      await this.projectRepository.delete(project.id);
     }
   }
 }

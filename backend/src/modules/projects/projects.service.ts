@@ -95,17 +95,18 @@ export class ProjectsService {
     await this.assertTeamOwnerOrAdmin(userId, dto.teamId, userRole);
 
     const now = new Date().toISOString();
-    return this.projectRepository.create({
+    const project = await this.projectRepository.create({
       teamId: dto.teamId,
       name: dto.name,
       description: dto.description ?? '',
       status: dto.status ?? ProjectStatus.ACTIVE,
       createdAt: now,
       updatedAt: now,
-    }).then(async (project) => {
-      await this.auditService.log(userId, AuditAction.CREATE, 'project', project.id, `Создан проект "${project.name}"`);
-      return project;
     });
+
+    await this.auditService.log(userId, AuditAction.CREATE, 'project', project.id, `Создан проект "${project.name}"`);
+
+    return project;
   }
 
   async update(
@@ -201,15 +202,16 @@ export class ProjectsService {
       );
     }
 
-    return this.projectMemberRepository.create({
+    const member = await this.projectMemberRepository.create({
       projectId,
       userId: dto.userId,
       role: dto.role,
       assignedAt: new Date().toISOString(),
-    }).then(async (member) => {
-      await this.auditService.log(userId, AuditAction.ASSIGN, 'project_member', member.id, `Пользователь #${dto.userId} добавлен в проект #${projectId} с ролью ${dto.role}`);
-      return member;
     });
+
+    await this.auditService.log(userId, AuditAction.ASSIGN, 'project_member', member.id, `Пользователь #${dto.userId} добавлен в проект #${projectId} с ролью ${dto.role}`);
+
+    return member;
   }
 
   async updateMember(
