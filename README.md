@@ -1,8 +1,8 @@
 # Сервис управления проектами и задачами
 
-Fullstack-курсовой проект для управления командами, проектами и задачами. На текущем этапе основная реализованная часть системы находится в backend: NestJS API, PostgreSQL через Prisma, JWT-аутентификация, RBAC, аудит действий и базовая оценка рисков. Frontend присутствует в репозитории, но пока остаётся каркасом на React/Vite.
+Fullstack-курсовой и pet-проект для управления командами, проектами и задачами. Основная реализованная часть системы находится в backend: NestJS API, PostgreSQL через Prisma, JWT-аутентификация, RBAC, аудит действий и базовая оценка рисков. Frontend присутствует в репозитории, но пока остаётся каркасом на React/Vite.
 
-Полное техническое описание и расширенная документация вынесены в [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md). История замысла и этапов реализации сохранена в [WORKPLAN.md](WORKPLAN.md).
+Полное техническое описание и расширенная документация вынесены в [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md). История решений и эволюции проекта сохранена в [WORKPLAN.md](WORKPLAN.md).
 
 ## Текущий статус
 
@@ -10,13 +10,13 @@ Fullstack-курсовой проект для управления команд
 | --- | --- | --- |
 | Backend | Реализован | NestJS + Prisma + PostgreSQL, JWT auth, RBAC, audit, unit/e2e |
 | Frontend | Прототип / каркас | Vite + React, предметный UI пока не реализован |
-| Risk / AI | Stub | Есть API и встроенная логика оценки, `retrain` пока заглушка |
-| Infra / Docker | Реализовано | Docker Compose, migrations, seed, backup/restore |
+| Risk / AI | Stub | Есть API и rule-based логика оценки, `retrain` пока заглушка |
+| Infra / Docker | Реализовано | Docker Compose, migrations, auto-seed, backup/restore |
 
 ## Что есть сейчас
 
-- PostgreSQL — единственное runtime-хранилище backend.
-- Основной рабочий интерфейс на текущем этапе — Swagger и HTTP API.
+- PostgreSQL - единственное runtime-хранилище backend.
+- Основной рабочий интерфейс на текущем этапе - Swagger и HTTP API.
 - Поддерживаются пользователи, команды, проекты, задачи, аудит и risk endpoints.
 - Есть unit- и e2e-тесты backend.
 - Docker Compose поднимает `postgres`, `backend` и `frontend`.
@@ -42,33 +42,67 @@ PostgreSQL (Prisma)
 
 Структура репозитория:
 
-- [backend](backend) — основной API, Prisma, тесты и скрипты.
-- [frontend](frontend) — клиентский каркас на React/Vite.
-- [docker-compose.yml](docker-compose.yml) — основной инфраструктурный контур.
-- [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md) — полная документация и описание проекта.
-- [WORKPLAN.md](WORKPLAN.md) — история реализации и эволюции решений.
+- [backend](backend) - основной API, Prisma, тесты и скрипты.
+- [frontend](frontend) - клиентский каркас на React/Vite.
+- [docker-compose.yml](docker-compose.yml) - основной инфраструктурный контур.
+- [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md) - полная документация и описание проекта.
+- [WORKPLAN.md](WORKPLAN.md) - история реализации и эволюции решений.
 
-## Быстрый запуск
+## Запуск после `git clone`
 
-Рекомендуемый вариант — Docker Compose.
+### Самый быстрый вариант
 
-1. Создайте root `.env` рядом с [docker-compose.yml](docker-compose.yml).
-2. Создайте `backend/.env` из [backend/.env.example](backend/.env.example).
-3. Рекомендуемый хостовый порт PostgreSQL для проекта — `5433`.
-4. Запустите:
+Если нужен почти мгновенный старт после клонирования, достаточно Docker Desktop / Docker Engine с Compose plugin.
+
+Unix/macOS:
 
 ```bash
-docker compose up -d --build
-docker compose exec backend npm run db:migrate:deploy
-docker compose exec backend npm run seed
+sh scripts/bootstrap.sh
 ```
 
-После запуска:
+Windows:
+
+```bat
+scripts\bootstrap.cmd
+```
+
+Что делает bootstrap:
+
+- создаёт root `.env` из [.env.example](.env.example), если его ещё нет;
+- создаёт `backend/.env` из [backend/.env.example](backend/.env.example), если его ещё нет;
+- запускает `docker compose up -d --build`.
+
+После запуска автоматически выполняются:
+
+- миграции Prisma;
+- seed начальных данных;
+- старт backend и frontend.
+
+Доступные адреса:
 
 - Swagger: `http://localhost:3000/api/docs`
 - Frontend scaffold: `http://localhost:5173`
 
-Минимальный пример root `.env`:
+Seed-пользователь по умолчанию:
+
+- login: `admin`
+- password: `Admin123!`
+
+### Запуск без bootstrap-скрипта
+
+Если не хочется использовать скрипты, можно обойтись одной командой:
+
+```bash
+docker compose up -d --build
+```
+
+Это тоже работает, потому что в `docker-compose.yml` уже заданы dev-friendly значения по умолчанию.
+
+## Переменные окружения
+
+Root [.env.example](.env.example) нужен для `docker compose` и уже содержит рекомендуемые dev-настройки.
+
+Минимальный root `.env`:
 
 ```env
 DB_PORT=5433
@@ -84,13 +118,15 @@ THROTTLE_TTL=60000
 THROTTLE_LIMIT=60
 CORS_ORIGIN=http://localhost:5173,http://localhost:3000
 LOG_LEVEL=info
+AUTO_SEED=true
 ```
 
 Важно:
 
-- root `.env` используется `docker compose`;
-- `backend/.env` используется host-side командами backend и Prisma;
-- frontend сейчас не является главным рабочим интерфейсом системы.
+- root `.env` использует `docker compose`;
+- `backend/.env` используют host-side команды backend и Prisma;
+- по умолчанию для Docker рекомендуется `DB_PORT=5433`, чтобы не конфликтовать с локальными инсталляциями PostgreSQL;
+- если `.env` не создан, `docker-compose.yml` всё равно поднимет dev-контур через встроенные fallback-значения.
 
 ## Основные команды
 
@@ -116,7 +152,7 @@ npm run build
 
 ## API overview
 
-Источник правды по API — Swagger: `http://localhost:3000/api/docs`.
+Источник правды по API - Swagger: `http://localhost:3000/api/docs`.
 
 Основные группы endpoints:
 
@@ -136,7 +172,7 @@ npm run build
 
 ## Куда смотреть дальше
 
-- [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md) — полная документация и описание проекта.
-- [WORKPLAN.md](WORKPLAN.md) — что планировалось изначально и как проект реализовывался.
-- [backend/.env.example](backend/.env.example) — актуальный env-шаблон для backend.
-- [backend/prisma/schema.prisma](backend/prisma/schema.prisma) — текущая схема данных.
+- [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md) - полная документация и описание проекта.
+- [WORKPLAN.md](WORKPLAN.md) - что планировалось изначально и как проект развивался.
+- [backend/.env.example](backend/.env.example) - актуальный env-шаблон для backend.
+- [backend/prisma/schema.prisma](backend/prisma/schema.prisma) - текущая схема данных.

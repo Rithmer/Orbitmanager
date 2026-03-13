@@ -29,4 +29,4 @@ logs/
 
 # === Build ===
 dist/
-build/
+coverage/

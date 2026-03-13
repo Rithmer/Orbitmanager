@@ -1,40 +1,8 @@
-# === Logs ===
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-# === Dependencies ===
-node_modules/
-
-# === Build ===
-dist/
-dist-ssr/
-
-# === Environment (secrets!) ===
-.env
-.env.local
-.env.*.local
-*.local
-!.env.example
+# Shared workspace rules live in the repository root .gitignore.
 
 # === PostgreSQL backups (keep .gitkeep) ===
 backups/*
 !backups/.gitkeep
-
-# === IDE ===
-.vscode/*
-!.vscode/extensions.json
-.idea/
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
 
 # === ML models (large binary files) ===
 models/*.joblib

@@ -8,10 +8,9 @@ services:
       POSTGRES_USER: ${DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "${DB_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./backend/backups:/backups
     networks:
       - app-network
     healthcheck:
@@ -38,18 +37,23 @@ services:
       THROTTLE_LIMIT: ${THROTTLE_LIMIT:-60}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173,http://localhost:3000}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      AUTO_SEED: ${AUTO_SEED:-true}
     ports:
       - "${PORT:-3000}:3000"
     volumes:
-      - ./backend/data:/app/data
       - ./backend/logs:/app/logs
-      - ./backend/models:/app/models
       - ./backend/backups:/app/backups
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
 
   frontend:
     build:
@@ -60,7 +64,8 @@ services:
     ports:
       - "5173:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - app-network
 
