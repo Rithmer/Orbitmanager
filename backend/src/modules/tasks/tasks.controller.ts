@@ -103,7 +103,7 @@ export class TasksController {
   @Patch(':id')
   @ApiOperation({ summary: 'Обновить задачу / изменить статус (БП2)' })
   @ApiResponse({ status: 200, description: 'Задача обновлена' })
-  @ApiResponse({ status: 400, description: 'Недопустимый переход статуса' })
+  @ApiResponse({ status: 422, description: 'Недопустимый переход статуса' })
   @ApiResponse({ status: 403, description: 'Нет прав' })
   @ApiResponse({ status: 404, description: 'Задача не найдена' })
   update(

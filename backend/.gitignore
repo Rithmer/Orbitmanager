@@ -16,14 +16,14 @@ dist-ssr/
 
 # === Environment (secrets!) ===
 .env
-.env.example
 .env.local
 .env.*.local
 *.local
+!.env.example
 
-# === Data backups (keep .gitkeep) ===
-data/backups/*
-!data/backups/.gitkeep
+# === PostgreSQL backups (keep .gitkeep) ===
+backups/*
+!backups/.gitkeep
 
 # === IDE ===
 .vscode/*

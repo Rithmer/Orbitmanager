@@ -5,6 +5,11 @@ export interface ITaskRepository {
   findById(id: number): Promise<Task | null>;
   findByProject(projectId: number): Promise<Task[]>;
   findByProjects(projectIds: number[]): Promise<Task[]>;
+  findByCreator(userId: number): Promise<Task[]>;
+  clearAssigneeByUserAndProjects(
+    userId: number,
+    projectIds: number[],
+  ): Promise<number>;
   create(task: Omit<Task, 'id'>): Promise<Task>;
   update(id: number, partial: Partial<Task>): Promise<Task | null>;
   delete(id: number): Promise<boolean>;

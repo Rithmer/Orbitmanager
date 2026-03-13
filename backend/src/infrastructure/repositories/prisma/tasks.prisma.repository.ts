@@ -34,6 +34,35 @@ export class TasksPrismaRepository implements ITaskRepository {
     return rows.map(this.toDomain);
   }
 
+  async findByCreator(userId: number): Promise<Task[]> {
+    const rows = await this.prisma.task.findMany({
+      where: { createdById: userId },
+      orderBy: { id: 'asc' },
+    });
+    return rows.map(this.toDomain);
+  }
+
+  async clearAssigneeByUserAndProjects(
+    userId: number,
+    projectIds: number[],
+  ): Promise<number> {
+    if (projectIds.length === 0) {
+      return 0;
+    }
+
+    const result = await this.prisma.task.updateMany({
+      where: {
+        assigneeId: userId,
+        projectId: { in: projectIds },
+      },
+      data: {
+        assigneeId: null,
+      },
+    });
+
+    return result.count;
+  }
+
   async create(task: Omit<Task, 'id'>): Promise<Task> {
     const row = await this.prisma.task.create({
       data: {
@@ -77,8 +106,10 @@ export class TasksPrismaRepository implements ITaskRepository {
     try {
       await this.prisma.task.delete({ where: { id } });
       return true;
-    } catch {
-      return false;
+    } catch (e: unknown) {
+      const prismaError = e as { code?: string };
+      if (prismaError.code === 'P2025') return false;
+      throw e;
     }
   }
 

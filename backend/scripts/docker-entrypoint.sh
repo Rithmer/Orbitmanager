@@ -1,11 +1,13 @@
 #!/bin/sh
 set -e
 
-# Apply Prisma migrations if running in postgres mode
-if [ "$STORAGE_MODE" = "postgres" ] && [ -n "$DATABASE_URL" ]; then
-  echo "Applying database migrations..."
-  npx prisma migrate deploy --config ./prisma/prisma.config.ts
-  echo "Migrations applied."
+if [ -z "$DATABASE_URL" ]; then
+  echo "DATABASE_URL is required."
+  exit 1
 fi
+
+echo "Applying database migrations..."
+npx prisma migrate deploy --config ./prisma/prisma.config.ts
+echo "Migrations applied."
 
 exec "$@"

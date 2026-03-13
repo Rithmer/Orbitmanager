@@ -1,10 +1,27 @@
 # План работ — Backend (NestJS + TypeScript)
 
 > **Проект:** Сервис управления проектами и задачами  
-> **Стек:** NestJS + TypeScript, JSON-файлы (с заглушками под PostgreSQL)  
-> **Версия плана:** v3
+> **Стек:** NestJS + TypeScript, PostgreSQL + Prisma  
+> **Версия плана:** v4
 
 ---
+
+## Current Runtime Status
+
+- Backend runtime is PostgreSQL-only.
+- `StorageModule` is now statically bound to Prisma repositories.
+- `backend/.env.example` remains the supported env contract.
+- `scripts/seed.ts`, `JsonFileService`, JSON repositories, and file-based e2e reset were removed.
+- Historical JSON-related sections below remain as implementation history, not as the current runtime contract.
+
+## Current Remediation Status
+
+- `AuthService.refresh()` повторно загружает пользователя по `JWT sub` и возвращает `401` для удалённого или `blocked` пользователя.
+- `UsersService.remove()` выполняет dependency-check и возвращает `409`, если пользователь связан с `teams.createdById`, `tasks.createdById` или `audit_logs.userId`.
+- Удаление участника проекта/команды автоматически очищает `tasks.assigneeId`; перевод роли команды в `observer` синхронизирует роли пользователя в `project_members`.
+- Prisma `delete()`-методы возвращают `false` только для `P2025`; constraint/FK ошибки больше не маскируются.
+- Канонический статус нарушения бизнес-правила перехода статуса задачи — `422`.
+- Актуальная матрица проверки зелёная: `npm run build`, `npm test -- --runInBand`, `npm run test:e2e -- --runInBand`.
 
 ## Оглавление
 

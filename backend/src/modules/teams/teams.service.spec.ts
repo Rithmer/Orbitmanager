@@ -13,6 +13,7 @@ import { PROJECT_MEMBER_REPOSITORY } from '../../domain/repositories/project-mem
 import { TASK_REPOSITORY } from '../../domain/repositories/task.repository';
 import { TeamRole } from '../../common/enums/team-role.enum';
 import { AccountRole } from '../../common/enums/account-role.enum';
+import { ProjectRole } from '../../common/enums/project-role.enum';
 import { Team } from '../../domain/models/team.model';
 import { TeamMember } from '../../domain/models/team-member.model';
 import { AuditService } from '../audit-logs/audit.service';
@@ -100,6 +101,9 @@ const mockTaskRepository = {
   findAll: jest.fn().mockResolvedValue([]),
   findById: jest.fn().mockResolvedValue(null),
   findByProject: jest.fn().mockResolvedValue([]),
+  findByProjects: jest.fn().mockResolvedValue([]),
+  findByCreator: jest.fn().mockResolvedValue([]),
+  clearAssigneeByUserAndProjects: jest.fn().mockResolvedValue(0),
   create: jest.fn(),
   update: jest.fn(),
   delete: jest.fn().mockResolvedValue(true),
@@ -188,6 +192,39 @@ describe('TeamsService', () => {
     });
   });
 
+  describe('updateMember', () => {
+    it('should downgrade project roles to observer when team role becomes observer', async () => {
+      mockTeamMemberRepository.findById.mockResolvedValueOnce(mockMember);
+      mockProjectRepository.findByTeam.mockResolvedValueOnce([
+        {
+          id: 100,
+          teamId: 1,
+          name: 'Project',
+        },
+      ]);
+      mockProjectMemberRepository.findByUser.mockResolvedValueOnce([
+        {
+          id: 77,
+          projectId: 100,
+          userId: mockMember.userId,
+          role: ProjectRole.DEVELOPER,
+          assignedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ]);
+
+      await service.updateMember(
+        mockMember.id,
+        { teamRole: TeamRole.OBSERVER },
+        mockOwner.userId,
+        AccountRole.MEMBER,
+      );
+
+      expect(mockProjectMemberRepository.update).toHaveBeenCalledWith(77, {
+        role: ProjectRole.OBSERVER,
+      });
+    });
+  });
+
   // ─── remove ───
 
   describe('remove', () => {
@@ -200,6 +237,40 @@ describe('TeamsService', () => {
       await expect(service.remove(999, 10, AccountRole.MEMBER)).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('removeMember', () => {
+    it('should clear assignee and delete project memberships before removing team member', async () => {
+      mockTeamMemberRepository.findById.mockResolvedValueOnce(mockMember);
+      mockProjectRepository.findByTeam.mockResolvedValueOnce([
+        {
+          id: 100,
+          teamId: 1,
+          name: 'Project',
+        },
+      ]);
+      mockProjectMemberRepository.findByUser.mockResolvedValueOnce([
+        {
+          id: 77,
+          projectId: 100,
+          userId: mockMember.userId,
+          role: ProjectRole.DEVELOPER,
+          assignedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ]);
+
+      await service.removeMember(mockMember.id, mockOwner.userId, AccountRole.MEMBER);
+
+      expect(mockTaskRepository.clearAssigneeByUserAndProjects).toHaveBeenCalledWith(
+        mockMember.userId,
+        [100],
+      );
+      expect(mockProjectMemberRepository.deleteByUserAndProjects).toHaveBeenCalledWith(
+        mockMember.userId,
+        [100],
+      );
+      expect(mockTeamMemberRepository.delete).toHaveBeenCalledWith(mockMember.id);
     });
   });
 

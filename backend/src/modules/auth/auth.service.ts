@@ -84,15 +84,19 @@ export class AuthService {
       throw new UnauthorizedException('Невалидный refresh-токен');
     }
 
-    const user = await this.usersService.findByLogin(payload.login);
+    const user = await this.usersService.findEntityById(payload.sub);
     if (!user) {
       throw new UnauthorizedException('Пользователь не найден');
     }
 
+    if (user.accountStatus === 'blocked') {
+      throw new UnauthorizedException('Аккаунт заблокирован');
+    }
+
     return this.generateTokens({
-      sub: payload.sub,
-      login: payload.login,
-      accountRole: payload.accountRole,
+      sub: user.id,
+      login: user.login,
+      accountRole: user.accountRole,
     });
   }
 

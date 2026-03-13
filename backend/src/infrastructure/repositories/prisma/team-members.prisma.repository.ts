@@ -66,8 +66,10 @@ export class TeamMembersPrismaRepository implements ITeamMemberRepository {
     try {
       await this.prisma.teamMember.delete({ where: { id } });
       return true;
-    } catch {
-      return false;
+    } catch (e: unknown) {
+      const prismaError = e as { code?: string };
+      if (prismaError.code === 'P2025') return false;
+      throw e;
     }
   }
 

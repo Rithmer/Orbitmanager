@@ -4,8 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  // DATABASE_URL пример: postgresql://user:password@localhost:5432/taskmanager
-  url      = env("DATABASE_URL")
 }
 
 model User {

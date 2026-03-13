@@ -60,6 +60,7 @@ const mockProjectRepository = {
 
 const mockProjectMemberRepository = {
   findAll: jest.fn().mockResolvedValue([mockProjectMember]),
+  findById: jest.fn().mockResolvedValue(mockProjectMember),
   findByProject: jest.fn().mockResolvedValue([mockProjectMember]),
   findByUser: jest.fn().mockResolvedValue([mockProjectMember]),
   findByUserAndProject: jest.fn().mockResolvedValue(mockProjectMember),
@@ -89,6 +90,8 @@ const mockTaskRepository = {
   findById: jest.fn().mockResolvedValue(null),
   findByProject: jest.fn().mockResolvedValue([]),
   findByProjects: jest.fn().mockResolvedValue([]),
+  findByCreator: jest.fn().mockResolvedValue([]),
+  clearAssigneeByUserAndProjects: jest.fn().mockResolvedValue(0),
   create: jest.fn(),
   update: jest.fn(),
   delete: jest.fn().mockResolvedValue(true),
@@ -286,6 +289,22 @@ describe('ProjectsService', () => {
       await expect(
         service.addMember(1, { userId: 99, role: ProjectRole.DEVELOPER }, 10, AccountRole.MEMBER),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('removeMember', () => {
+    it('should clear assignee before removing a project member', async () => {
+      await expect(
+        service.removeMember(mockProjectMember.id, 10, AccountRole.MEMBER),
+      ).resolves.not.toThrow();
+
+      expect(mockTaskRepository.clearAssigneeByUserAndProjects).toHaveBeenCalledWith(
+        mockProjectMember.userId,
+        [mockProjectMember.projectId],
+      );
+      expect(mockProjectMemberRepository.delete).toHaveBeenCalledWith(
+        mockProjectMember.id,
+      );
     });
   });
 });

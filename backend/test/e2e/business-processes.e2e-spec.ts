@@ -1,108 +1,148 @@
 /**
- * E2E-тесты: три сквозных бизнес-процесса.
+ * E2E tests for the core business processes.
  *
- * БП1: register → login → create team → create project → assign → create task → audit
- * БП2: login → create task → assign → статусы → audit
- * БП3: login → проект + задачи → GET /projects/:id/risk
+ * BP1: register -> login -> create team -> create project -> assign -> create task -> audit
+ * BP2: login -> create task -> assign -> statuses -> audit
+ * BP3: login -> project + tasks -> GET /projects/:id/risk
  */
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import * as fs from 'fs';
-import * as path from 'path';
 import * as argon2 from 'argon2';
+import { Client } from 'pg';
 import { AppModule } from '../../src/app.module';
 import { GlobalExceptionFilter } from '../../src/common/filters/global-exception.filter';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
-const BACKUP_DIR = path.join(DATA_DIR, '_e2e_backup');
-const JSON_FILES = [
-  'users.json',
-  'teams.json',
-  'team_members.json',
-  'projects.json',
-  'project_members.json',
-  'tasks.json',
-  'audit_logs.json',
+const TABLES = [
+  'audit_logs',
+  'project_members',
+  'team_members',
+  'tasks',
+  'projects',
+  'teams',
+  'users',
 ];
 
 const ADMIN_LOGIN = 'e2e_admin';
 const ADMIN_PASSWORD = 'AdminE2E1!';
 
-function emptyJsonFile(entity: string): string {
-  return JSON.stringify(
-    { meta: { entity, lastId: 0 }, items: [] },
-    null,
-    2,
-  );
+function getDatabaseUrl(): string {
+  const databaseUrl = process.env['DATABASE_URL'];
+  if (!databaseUrl) {
+    throw new Error('DATABASE_URL is required for postgres-only e2e tests');
+  }
+
+  return databaseUrl;
 }
 
-function backupData(): void {
-  if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
-  for (const f of JSON_FILES) {
-    const src = path.join(DATA_DIR, f);
-    if (fs.existsSync(src)) {
-      fs.copyFileSync(src, path.join(BACKUP_DIR, f));
-    }
+async function withDatabaseClient<T>(
+  operation: (client: Client) => Promise<T>,
+): Promise<T> {
+  const client = new Client({ connectionString: getDatabaseUrl() });
+  try {
+    await client.connect();
+    return await operation(client);
+  } finally {
+    await client.end();
   }
 }
 
-function restoreData(): void {
-  for (const f of JSON_FILES) {
-    const bk = path.join(BACKUP_DIR, f);
-    if (fs.existsSync(bk)) {
-      fs.copyFileSync(bk, path.join(DATA_DIR, f));
-    }
-  }
-  fs.rmSync(BACKUP_DIR, { recursive: true, force: true });
-}
+async function resetDatabase(): Promise<void> {
+  const databaseUrl = getDatabaseUrl();
 
-async function resetData(): Promise<void> {
-  const hashedPassword = await argon2.hash(ADMIN_PASSWORD);
+  try {
+    await withDatabaseClient(async (client) => {
+      await client.query(
+        `TRUNCATE TABLE ${TABLES.map((table) => `"${table}"`).join(', ')} RESTART IDENTITY CASCADE`,
+      );
 
-  // Pre-seed admin user (id=1) for audit log access
-  fs.writeFileSync(
-    path.join(DATA_DIR, 'users.json'),
-    JSON.stringify({
-      meta: { entity: 'users', lastId: 1 },
-      items: [
-        {
-          id: 1,
-          login: ADMIN_LOGIN,
-          password: hashedPassword,
-          fullName: 'E2E Admin',
-          profession: 'Admin',
-          accountStatus: 'active',
-          accountRole: 'admin',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      ],
-    }, null, 2),
-    'utf-8',
-  );
-
-  for (const f of JSON_FILES) {
-    if (f === 'users.json') continue;
-    const entity = f.replace('.json', '');
-    fs.writeFileSync(path.join(DATA_DIR, f), emptyJsonFile(entity), 'utf-8');
+      const hashedPassword = await argon2.hash(ADMIN_PASSWORD);
+      await client.query(
+        `
+          INSERT INTO users (
+            login,
+            password,
+            full_name,
+            profession,
+            account_status,
+            account_role,
+            created_at,
+            updated_at
+          )
+          VALUES ($1, $2, $3, $4, 'active', 'admin', NOW(), NOW())
+        `,
+        [ADMIN_LOGIN, hashedPassword, 'E2E Admin', 'Admin'],
+      );
+    });
+  } catch (error) {
+    throw new Error(
+      `Unable to connect to PostgreSQL for e2e reset (${databaseUrl}): ${String(error)}`,
+    );
   }
 }
 
-/** Декодируем JWT payload без верификации (для тестов) */
 function decodeJwtPayload(token: string): { sub: number; login: string; accountRole: string } {
   const base64 = token.split('.')[1];
   return JSON.parse(Buffer.from(base64, 'base64').toString('utf-8'));
+}
+
+async function updateUserStatus(userId: number, status: 'active' | 'blocked') {
+  await withDatabaseClient(async (client) => {
+    await client.query(
+      `
+        UPDATE users
+        SET account_status = $2,
+            updated_at = NOW()
+        WHERE id = $1
+      `,
+      [userId, status],
+    );
+  });
+}
+
+async function clearUserAuditLogs(userId: number) {
+  await withDatabaseClient(async (client) => {
+    await client.query('DELETE FROM audit_logs WHERE user_id = $1', [userId]);
+  });
+}
+
+async function insertRawUser(
+  login: string,
+  password: string,
+  fullName: string,
+): Promise<number> {
+  const hashedPassword = await argon2.hash(password);
+
+  return withDatabaseClient(async (client) => {
+    const result = await client.query<{ id: number }>(
+      `
+        INSERT INTO users (
+          login,
+          password,
+          full_name,
+          profession,
+          account_status,
+          account_role,
+          created_at,
+          updated_at
+        )
+        VALUES ($1, $2, $3, $4, 'active', 'member', NOW(), NOW())
+        RETURNING id
+      `,
+      [login, hashedPassword, fullName, 'Developer'],
+    );
+
+    return result.rows[0]!.id;
+  });
 }
 
 describe('Business Processes (e2e)', () => {
   let app: INestApplication<App>;
 
   beforeAll(async () => {
-    backupData();
-    await resetData();
+    await resetDatabase();
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -124,19 +164,14 @@ describe('Business Processes (e2e)', () => {
   });
 
   afterAll(async () => {
-    await app.close();
-    restoreData();
+    if (app) {
+      await app.close();
+    }
   });
-
-  // ─── Helpers ───
 
   const server = () => request(app.getHttpServer());
 
-  async function registerUser(
-    login: string,
-    password: string,
-    fullName: string,
-  ) {
+  async function registerUser(login: string, password: string, fullName: string) {
     const res = await server()
       .post('/auth/register')
       .send({ login, password, fullName, profession: 'Developer' })
@@ -156,42 +191,38 @@ describe('Business Processes (e2e)', () => {
     return { ...body, userId: payload.sub };
   }
 
-  // ─── БП1: Полный цикл создания ───
-
-  describe('БП1: register → login → team → project → assign → task → audit', () => {
+  describe('BP1: register -> login -> team -> project -> assign -> task -> audit', () => {
     let token: string;
     let userId: number;
     let secondUserId: number;
-    let secondToken: string;
     let teamId: number;
     let projectId: number;
 
-    it('Шаг 1: Регистрация пользователя owner1', async () => {
-      const result = await registerUser('owner1', 'Owner1Pass!', 'Владелец Один');
+    it('Step 1: register owner1', async () => {
+      const result = await registerUser('owner1', 'Owner1Pass!', 'Owner One');
       token = result.accessToken;
       userId = result.userId;
       expect(userId).toBeDefined();
       expect(token).toBeDefined();
     });
 
-    it('Шаг 2: Регистрация второго пользователя dev1', async () => {
-      const result = await registerUser('dev1', 'Dev1Pass!!', 'Разработчик Один');
-      secondToken = result.accessToken;
+    it('Step 2: register dev1', async () => {
+      const result = await registerUser('dev1', 'Dev1Pass!!', 'Developer One');
       secondUserId = result.userId;
       expect(secondUserId).toBeDefined();
     });
 
-    it('Шаг 3: Повторный вход owner1', async () => {
+    it('Step 3: login owner1 again', async () => {
       const result = await loginUser('owner1', 'Owner1Pass!');
       token = result.accessToken;
       expect(result.userId).toBe(userId);
     });
 
-    it('Шаг 4: Создание команды', async () => {
+    it('Step 4: create team', async () => {
       const res = await server()
         .post('/teams')
         .set('Authorization', `Bearer ${token}`)
-        .send({ name: 'Alpha Team', description: 'Команда проекта' })
+        .send({ name: 'Alpha Team', description: 'Project team' })
         .expect(201);
 
       teamId = res.body.id;
@@ -199,7 +230,7 @@ describe('Business Processes (e2e)', () => {
       expect(res.body.name).toBe('Alpha Team');
     });
 
-    it('Шаг 5: Добавление dev1 в команду', async () => {
+    it('Step 5: add dev1 to the team', async () => {
       const res = await server()
         .post(`/teams/${teamId}/members`)
         .set('Authorization', `Bearer ${token}`)
@@ -210,11 +241,11 @@ describe('Business Processes (e2e)', () => {
       expect(res.body.teamRole).toBe('member');
     });
 
-    it('Шаг 6: Создание проекта', async () => {
+    it('Step 6: create project', async () => {
       const res = await server()
         .post('/projects')
         .set('Authorization', `Bearer ${token}`)
-        .send({ teamId, name: 'MVP Project', description: 'Минимальный продукт' })
+        .send({ teamId, name: 'MVP Project', description: 'Minimum viable product' })
         .expect(201);
 
       projectId = res.body.id;
@@ -222,7 +253,7 @@ describe('Business Processes (e2e)', () => {
       expect(res.body.name).toBe('MVP Project');
     });
 
-    it('Шаг 7: Назначение dev1 в проект', async () => {
+    it('Step 7: assign dev1 to the project', async () => {
       const res = await server()
         .post(`/projects/${projectId}/members`)
         .set('Authorization', `Bearer ${token}`)
@@ -233,7 +264,7 @@ describe('Business Processes (e2e)', () => {
       expect(res.body.role).toBe('developer');
     });
 
-    it('Шаг 8: Создание задачи с назначением на dev1', async () => {
+    it('Step 8: create task assigned to dev1', async () => {
       const deadline = new Date();
       deadline.setDate(deadline.getDate() + 14);
 
@@ -242,7 +273,7 @@ describe('Business Processes (e2e)', () => {
         .set('Authorization', `Bearer ${token}`)
         .send({
           projectId,
-          name: 'Реализовать авторизацию',
+          name: 'Implement authentication',
           description: 'JWT access + refresh',
           deadline: deadline.toISOString(),
           difficulty: 3,
@@ -251,11 +282,11 @@ describe('Business Processes (e2e)', () => {
         .expect(201);
 
       expect(res.body.id).toBeDefined();
-      expect(res.body.name).toBe('Реализовать авторизацию');
+      expect(res.body.name).toBe('Implement authentication');
       expect(res.body.assigneeId).toBe(secondUserId);
     });
 
-    it('Шаг 9: Проверка записей аудита (admin role required)', async () => {
+    it('Step 9: verify audit entries with admin account', async () => {
       const adminLogin = await loginUser(ADMIN_LOGIN, ADMIN_PASSWORD);
 
       const res = await server()
@@ -265,37 +296,31 @@ describe('Business Processes (e2e)', () => {
 
       expect(res.body.items.length).toBeGreaterThan(0);
 
-      // Verify at least one audit entry has entityType 'task'
       const taskAudit = res.body.items.find(
-        (l: { entityType: string }) => l.entityType === 'task',
+        (entry: { entityType: string }) => entry.entityType === 'task',
       );
       expect(taskAudit).toBeDefined();
     });
   });
 
-  // ─── БП2: Жизненный цикл задачи ───
-
-  describe('БП2: login → task → assign → status changes → audit', () => {
+  describe('BP2: login -> task -> assign -> status changes -> audit', () => {
     let ownerToken: string;
-    let ownerId: number;
     let devToken: string;
     let devId: number;
     let teamId: number;
     let projectId: number;
     let taskId: number;
 
-    it('Шаг 1: Регистрация owner & dev', async () => {
+    it('Step 1: register owner and dev', async () => {
       const owner = await registerUser('bp2_owner', 'Owner2Pass!', 'BP2 Owner');
       ownerToken = owner.accessToken;
-      ownerId = owner.userId;
 
       const dev = await registerUser('bp2_dev', 'Dev2Pass!!!', 'BP2 Dev');
       devToken = dev.accessToken;
       devId = dev.userId;
     });
 
-    it('Шаг 2: Создание команды и проекта', async () => {
-      // Create team
+    it('Step 2: create team and project', async () => {
       let res = await server()
         .post('/teams')
         .set('Authorization', `Bearer ${ownerToken}`)
@@ -303,14 +328,12 @@ describe('Business Processes (e2e)', () => {
         .expect(201);
       teamId = res.body.id;
 
-      // Add dev to team
       await server()
         .post(`/teams/${teamId}/members`)
         .set('Authorization', `Bearer ${ownerToken}`)
         .send({ userId: devId, teamRole: 'member' })
         .expect(201);
 
-      // Create project
       res = await server()
         .post('/projects')
         .set('Authorization', `Bearer ${ownerToken}`)
@@ -318,7 +341,6 @@ describe('Business Processes (e2e)', () => {
         .expect(201);
       projectId = res.body.id;
 
-      // Add dev to project
       await server()
         .post(`/projects/${projectId}/members`)
         .set('Authorization', `Bearer ${ownerToken}`)
@@ -326,7 +348,7 @@ describe('Business Processes (e2e)', () => {
         .expect(201);
     });
 
-    it('Шаг 3: Создание задачи', async () => {
+    it('Step 3: create task', async () => {
       const deadline = new Date();
       deadline.setDate(deadline.getDate() + 7);
 
@@ -335,7 +357,7 @@ describe('Business Processes (e2e)', () => {
         .set('Authorization', `Bearer ${ownerToken}`)
         .send({
           projectId,
-          name: 'Тестовая задача BP2',
+          name: 'BP2 test task',
           deadline: deadline.toISOString(),
           difficulty: 2,
         })
@@ -345,7 +367,7 @@ describe('Business Processes (e2e)', () => {
       expect(res.body.status).toBe('new');
     });
 
-    it('Шаг 4: Назначение исполнителя', async () => {
+    it('Step 4: assign task to dev', async () => {
       const res = await server()
         .patch(`/tasks/${taskId}`)
         .set('Authorization', `Bearer ${ownerToken}`)
@@ -355,7 +377,7 @@ describe('Business Processes (e2e)', () => {
       expect(res.body.assigneeId).toBe(devId);
     });
 
-    it('Шаг 5: Смена статуса new → in_progress (исполнитель)', async () => {
+    it('Step 5: move status new -> in_progress', async () => {
       const res = await server()
         .patch(`/tasks/${taskId}`)
         .set('Authorization', `Bearer ${devToken}`)
@@ -365,7 +387,7 @@ describe('Business Processes (e2e)', () => {
       expect(res.body.status).toBe('in_progress');
     });
 
-    it('Шаг 6: Смена статуса in_progress → review', async () => {
+    it('Step 6: move status in_progress -> review', async () => {
       const res = await server()
         .patch(`/tasks/${taskId}`)
         .set('Authorization', `Bearer ${devToken}`)
@@ -375,7 +397,7 @@ describe('Business Processes (e2e)', () => {
       expect(res.body.status).toBe('review');
     });
 
-    it('Шаг 7: Смена статуса review → done (owner)', async () => {
+    it('Step 7: move status review -> done', async () => {
       const res = await server()
         .patch(`/tasks/${taskId}`)
         .set('Authorization', `Bearer ${ownerToken}`)
@@ -385,15 +407,15 @@ describe('Business Processes (e2e)', () => {
       expect(res.body.status).toBe('done');
     });
 
-    it('Шаг 8: Недопустимый переход done → in_progress', async () => {
+    it('Step 8: reject invalid status transition done -> in_progress', async () => {
       await server()
         .patch(`/tasks/${taskId}`)
         .set('Authorization', `Bearer ${ownerToken}`)
         .send({ status: 'in_progress' })
-        .expect(400);
+        .expect(422);
     });
 
-    it('Шаг 9: Проверка аудита статусных переходов', async () => {
+    it('Step 9: verify audit log for status changes', async () => {
       const adminLogin = await loginUser(ADMIN_LOGIN, ADMIN_PASSWORD);
 
       const res = await server()
@@ -403,26 +425,21 @@ describe('Business Processes (e2e)', () => {
         .expect(200);
 
       const statusChanges = res.body.items.filter(
-        (l: { action: string }) => l.action === 'status_change',
+        (entry: { action: string }) => entry.action === 'status_change',
       );
       expect(statusChanges.length).toBeGreaterThanOrEqual(3);
     });
   });
 
-  // ─── БП3: Оценка рисков проекта ───
-
-  describe('БП3: login → project + tasks → GET /projects/:id/risk', () => {
+  describe('BP3: login -> project + tasks -> GET /projects/:id/risk', () => {
     let ownerToken: string;
-    let ownerId: number;
     let teamId: number;
     let projectId: number;
 
-    it('Шаг 1: Регистрация и настройка', async () => {
+    it('Step 1: register and set up project', async () => {
       const owner = await registerUser('bp3_owner', 'Owner3Pass!', 'BP3 Owner');
       ownerToken = owner.accessToken;
-      ownerId = owner.userId;
 
-      // Create team
       const teamRes = await server()
         .post('/teams')
         .set('Authorization', `Bearer ${ownerToken}`)
@@ -430,26 +447,24 @@ describe('Business Processes (e2e)', () => {
         .expect(201);
       teamId = teamRes.body.id;
 
-      // Create project
-      const projRes = await server()
+      const projectRes = await server()
         .post('/projects')
         .set('Authorization', `Bearer ${ownerToken}`)
         .send({ teamId, name: 'Risk Demo Project' })
         .expect(201);
-      projectId = projRes.body.id;
+      projectId = projectRes.body.id;
     });
 
-    it('Шаг 2: Создание задач с разной сложностью', async () => {
+    it('Step 2: create tasks with different risk profiles', async () => {
       const deadline = new Date();
-      deadline.setDate(deadline.getDate() + 3); // Tight deadline
+      deadline.setDate(deadline.getDate() + 3);
 
-      // High-difficulty task with tight deadline
       await server()
         .post('/tasks')
         .set('Authorization', `Bearer ${ownerToken}`)
         .send({
           projectId,
-          name: 'Сложная задача',
+          name: 'Complex task',
           deadline: deadline.toISOString(),
           difficulty: 5,
         })
@@ -458,20 +473,19 @@ describe('Business Processes (e2e)', () => {
       const farDeadline = new Date();
       farDeadline.setDate(farDeadline.getDate() + 90);
 
-      // Easy task
       await server()
         .post('/tasks')
         .set('Authorization', `Bearer ${ownerToken}`)
         .send({
           projectId,
-          name: 'Простая задача',
+          name: 'Simple task',
           deadline: farDeadline.toISOString(),
           difficulty: 1,
         })
         .expect(201);
     });
 
-    it('Шаг 3: GET /projects/:id/risk — оценка рисков', async () => {
+    it('Step 3: fetch project risk assessment', async () => {
       const res = await server()
         .get(`/projects/${projectId}/risk`)
         .set('Authorization', `Bearer ${ownerToken}`)
@@ -486,8 +500,7 @@ describe('Business Processes (e2e)', () => {
       expect(Array.isArray(res.body.tasksAtRisk)).toBe(true);
     });
 
-    it('Шаг 4: GET /tasks/:id/risk — оценка рисков конкретной задачи', async () => {
-      // Get list of tasks for this project
+    it('Step 4: fetch single task risk assessment', async () => {
       const tasksRes = await server()
         .get('/tasks')
         .set('Authorization', `Bearer ${ownerToken}`)
@@ -508,6 +521,135 @@ describe('Business Processes (e2e)', () => {
       expect(res.body).toHaveProperty('recommendation');
       expect(['low', 'medium', 'high']).toContain(res.body.riskLevel);
       expect(typeof res.body.delayProbability).toBe('number');
+    });
+  });
+
+  describe('Remediation regressions', () => {
+    it('returns 401 on refresh for blocked user', async () => {
+      const blocked = await registerUser(
+        'refresh_blocked_user',
+        'Blocked1Pass!',
+        'Blocked User',
+      );
+
+      await updateUserStatus(blocked.userId, 'blocked');
+
+      await server()
+        .post('/auth/refresh')
+        .send({ refreshToken: blocked.refreshToken })
+        .expect(401);
+    });
+
+    it('returns 401 on refresh for deleted user', async () => {
+      const rawUserId = await insertRawUser(
+        'refresh_deleted_user',
+        'Deleted1Pass!',
+        'Deleted User',
+      );
+      const login = await loginUser('refresh_deleted_user', 'Deleted1Pass!');
+      const admin = await loginUser(ADMIN_LOGIN, ADMIN_PASSWORD);
+
+      await clearUserAuditLogs(rawUserId);
+
+      await server()
+        .delete(`/users/${rawUserId}`)
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .expect(204);
+
+      await server()
+        .post('/auth/refresh')
+        .send({ refreshToken: login.refreshToken })
+        .expect(401);
+    });
+
+    it('returns 409 when deleting a user with dependencies', async () => {
+      const dependentUser = await registerUser(
+        'delete_conflict_user',
+        'Conflict1Pass!',
+        'Conflict User',
+      );
+      const admin = await loginUser(ADMIN_LOGIN, ADMIN_PASSWORD);
+
+      await server()
+        .delete(`/users/${dependentUser.userId}`)
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .expect(409);
+    });
+
+    it('clears assignee after removing project member', async () => {
+      const owner = await registerUser(
+        'pm_owner_cleanup',
+        'Owner4Pass!',
+        'Cleanup Owner',
+      );
+      const developer = await registerUser(
+        'pm_dev_cleanup',
+        'Dev4Pass!!!',
+        'Cleanup Dev',
+      );
+
+      const teamRes = await server()
+        .post('/teams')
+        .set('Authorization', `Bearer ${owner.accessToken}`)
+        .send({ name: 'Cleanup Team' })
+        .expect(201);
+      const teamId = teamRes.body.id as number;
+
+      await server()
+        .post(`/teams/${teamId}/members`)
+        .set('Authorization', `Bearer ${owner.accessToken}`)
+        .send({ userId: developer.userId, teamRole: 'member' })
+        .expect(201);
+
+      const projectRes = await server()
+        .post('/projects')
+        .set('Authorization', `Bearer ${owner.accessToken}`)
+        .send({ teamId, name: 'Cleanup Project' })
+        .expect(201);
+      const projectId = projectRes.body.id as number;
+
+      await server()
+        .post(`/projects/${projectId}/members`)
+        .set('Authorization', `Bearer ${owner.accessToken}`)
+        .send({ userId: developer.userId, role: 'developer' })
+        .expect(201);
+
+      const deadline = new Date();
+      deadline.setDate(deadline.getDate() + 10);
+
+      const taskRes = await server()
+        .post('/tasks')
+        .set('Authorization', `Bearer ${owner.accessToken}`)
+        .send({
+          projectId,
+          name: 'Cleanup task',
+          deadline: deadline.toISOString(),
+          difficulty: 2,
+          assigneeId: developer.userId,
+        })
+        .expect(201);
+      const taskId = taskRes.body.id as number;
+
+      const membersRes = await server()
+        .get(`/projects/${projectId}/members`)
+        .set('Authorization', `Bearer ${owner.accessToken}`)
+        .expect(200);
+      const membership = membersRes.body.find(
+        (item: { userId: number }) => item.userId === developer.userId,
+      );
+      expect(membership).toBeDefined();
+
+      await server()
+        .delete(`/project-members/${membership.id}`)
+        .set('Authorization', `Bearer ${owner.accessToken}`)
+        .expect(204);
+
+      const updatedTask = await server()
+        .get(`/tasks/${taskId}`)
+        .set('Authorization', `Bearer ${owner.accessToken}`)
+        .expect(200);
+
+      expect(updatedTask.body.assigneeId).toBeNull();
     });
   });
 });

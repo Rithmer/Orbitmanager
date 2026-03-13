@@ -96,6 +96,7 @@ export class UsersController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Удалить пользователя (только admin)' })
   @ApiResponse({ status: 204, description: 'Пользователь удалён' })
+  @ApiResponse({ status: 409, description: 'Пользователь имеет зависимые записи' })
   @ApiResponse({ status: 404, description: 'Пользователь не найден' })
   remove(
     @CurrentUser('id') callerId: number,

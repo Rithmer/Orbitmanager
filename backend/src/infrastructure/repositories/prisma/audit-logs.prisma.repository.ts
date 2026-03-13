@@ -26,6 +26,14 @@ export class AuditLogsPrismaRepository implements IAuditLogRepository {
     return rows.map(this.toDomain);
   }
 
+  async findByUser(userId: number): Promise<AuditLog[]> {
+    const rows = await this.prisma.auditLog.findMany({
+      where: { userId },
+      orderBy: { id: 'asc' },
+    });
+    return rows.map(this.toDomain);
+  }
+
   async create(log: Omit<AuditLog, 'id'>): Promise<AuditLog> {
     const row = await this.prisma.auditLog.create({
       data: {

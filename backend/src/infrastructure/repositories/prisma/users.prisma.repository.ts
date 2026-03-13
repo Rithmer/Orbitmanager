@@ -57,8 +57,10 @@ export class UsersPrismaRepository implements IUserRepository {
     try {
       await this.prisma.user.delete({ where: { id } });
       return true;
-    } catch {
-      return false;
+    } catch (e: unknown) {
+      const prismaError = e as { code?: string };
+      if (prismaError.code === 'P2025') return false;
+      throw e;
     }
   }
 

@@ -25,6 +25,7 @@ const mockUser: User = {
 
 const mockUsersService = {
   findByLogin: jest.fn(),
+  findEntityById: jest.fn(),
   create: jest.fn().mockResolvedValue({
     id: 1,
     login: 'newuser',
@@ -167,12 +168,51 @@ describe('AuthService', () => {
 
   describe('refresh', () => {
     it('should return new token pair', async () => {
-      mockUsersService.findByLogin.mockResolvedValueOnce(mockUser);
+      mockUsersService.findEntityById.mockResolvedValueOnce(mockUser);
       mockJwtService.signAsync.mockResolvedValue('new-token');
 
       const result = await service.refresh('valid-refresh-token');
       expect(result.accessToken).toBe('new-token');
       expect(result.refreshToken).toBe('new-token');
+    });
+
+    it('should use the current role from the database when issuing new tokens', async () => {
+      mockUsersService.findEntityById.mockResolvedValueOnce({
+        ...mockUser,
+        accountRole: AccountRole.ADMIN,
+      });
+      mockJwtService.signAsync.mockResolvedValue('new-token');
+
+      await service.refresh('valid-refresh-token');
+
+      expect(mockJwtService.signAsync).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          sub: mockUser.id,
+          login: mockUser.login,
+          accountRole: AccountRole.ADMIN,
+        }),
+        expect.any(Object),
+      );
+    });
+
+    it('should throw UnauthorizedException for blocked user', async () => {
+      mockUsersService.findEntityById.mockResolvedValueOnce({
+        ...mockUser,
+        accountStatus: 'blocked',
+      });
+
+      await expect(service.refresh('valid-refresh-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+
+    it('should throw UnauthorizedException for deleted user', async () => {
+      mockUsersService.findEntityById.mockResolvedValueOnce(null);
+
+      await expect(service.refresh('valid-refresh-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('should throw UnauthorizedException for invalid token', async () => {

@@ -32,7 +32,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
         },
       ],
     }),
-    StorageModule.register(),
+    StorageModule,
     UsersModule,
     AuthModule,
     TeamsModule,

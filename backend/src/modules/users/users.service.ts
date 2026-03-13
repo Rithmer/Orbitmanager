@@ -7,6 +7,12 @@ import {
 import * as argon2 from 'argon2';
 import type { IUserRepository } from '../../domain/repositories/user.repository';
 import { USER_REPOSITORY } from '../../domain/repositories/user.repository';
+import type { ITeamRepository } from '../../domain/repositories/team.repository';
+import { TEAM_REPOSITORY } from '../../domain/repositories/team.repository';
+import type { ITaskRepository } from '../../domain/repositories/task.repository';
+import { TASK_REPOSITORY } from '../../domain/repositories/task.repository';
+import type { IAuditLogRepository } from '../../domain/repositories/audit-log.repository';
+import { AUDIT_LOG_REPOSITORY } from '../../domain/repositories/audit-log.repository';
 import { User } from '../../domain/models/user.model';
 import { AccountRole } from '../../common/enums/account-role.enum';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -24,6 +30,12 @@ export class UsersService {
   constructor(
     @Inject(USER_REPOSITORY)
     private readonly userRepository: IUserRepository,
+    @Inject(TEAM_REPOSITORY)
+    private readonly teamRepository: ITeamRepository,
+    @Inject(TASK_REPOSITORY)
+    private readonly taskRepository: ITaskRepository,
+    @Inject(AUDIT_LOG_REPOSITORY)
+    private readonly auditLogRepository: IAuditLogRepository,
     private readonly auditService: AuditService,
   ) {}
 
@@ -37,13 +49,17 @@ export class UsersService {
   }
 
   async findById(id: number): Promise<Omit<User, 'password'>> {
-    const user = await this.userRepository.findById(id);
+    const user = await this.findEntityById(id);
     if (!user) throw new NotFoundException(`Пользователь #${id} не найден`);
     return this.omitPassword(user);
   }
 
   async findByLogin(login: string): Promise<User | null> {
     return this.userRepository.findByLogin(login);
+  }
+
+  async findEntityById(id: number): Promise<User | null> {
+    return this.userRepository.findById(id);
   }
 
   async create(dto: CreateUserDto, callerUserId?: number): Promise<Omit<User, 'password'>> {
@@ -109,10 +125,31 @@ export class UsersService {
   }
 
   async remove(id: number, callerUserId?: number): Promise<void> {
-    const user = await this.userRepository.findById(id);
+    const user = await this.findEntityById(id);
     if (!user) throw new NotFoundException(`Пользователь #${id} не найден`);
 
-    await this.userRepository.delete(id);
+    const [createdTeams, createdTasks, auditLogs] = await Promise.all([
+      this.teamRepository.findByCreator(id),
+      this.taskRepository.findByCreator(id),
+      this.auditLogRepository.findByUser(id),
+    ]);
+
+    const blockingDependencies = [
+      createdTeams.length > 0 ? `команды: ${createdTeams.length}` : null,
+      createdTasks.length > 0 ? `задачи: ${createdTasks.length}` : null,
+      auditLogs.length > 0 ? `аудит: ${auditLogs.length}` : null,
+    ].filter(Boolean);
+
+    if (blockingDependencies.length > 0) {
+      throw new ConflictException(
+        `Нельзя удалить пользователя #${id}: есть связанные данные (${blockingDependencies.join(', ')})`,
+      );
+    }
+
+    const deleted = await this.userRepository.delete(id);
+    if (!deleted) {
+      throw new NotFoundException(`Пользователь #${id} не найден`);
+    }
 
     await this.auditService.log(
       callerUserId ?? id,

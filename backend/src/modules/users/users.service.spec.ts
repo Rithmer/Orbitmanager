@@ -1,7 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { USER_REPOSITORY } from '../../domain/repositories/user.repository';
+import { TEAM_REPOSITORY } from '../../domain/repositories/team.repository';
+import { TASK_REPOSITORY } from '../../domain/repositories/task.repository';
+import { AUDIT_LOG_REPOSITORY } from '../../domain/repositories/audit-log.repository';
 import { AuditService } from '../audit-logs/audit.service';
 import { AccountRole } from '../../common/enums/account-role.enum';
 import { User } from '../../domain/models/user.model';
@@ -31,6 +37,35 @@ const mockUserRepository = {
   delete: jest.fn().mockResolvedValue(true),
 };
 
+const mockTeamRepository = {
+  findAll: jest.fn().mockResolvedValue([]),
+  findById: jest.fn().mockResolvedValue(null),
+  findByCreator: jest.fn().mockResolvedValue([]),
+  create: jest.fn(),
+  update: jest.fn(),
+  delete: jest.fn(),
+};
+
+const mockTaskRepository = {
+  findAll: jest.fn().mockResolvedValue([]),
+  findById: jest.fn().mockResolvedValue(null),
+  findByProject: jest.fn().mockResolvedValue([]),
+  findByProjects: jest.fn().mockResolvedValue([]),
+  findByCreator: jest.fn().mockResolvedValue([]),
+  clearAssigneeByUserAndProjects: jest.fn().mockResolvedValue(0),
+  create: jest.fn(),
+  update: jest.fn(),
+  delete: jest.fn(),
+};
+
+const mockAuditLogRepository = {
+  findAll: jest.fn().mockResolvedValue([]),
+  findById: jest.fn().mockResolvedValue(null),
+  findByEntity: jest.fn().mockResolvedValue([]),
+  findByUser: jest.fn().mockResolvedValue([]),
+  create: jest.fn(),
+};
+
 const mockAuditService = {
   log: jest.fn().mockResolvedValue(undefined),
 };
@@ -43,6 +78,9 @@ describe('UsersService', () => {
       providers: [
         UsersService,
         { provide: USER_REPOSITORY, useValue: mockUserRepository },
+        { provide: TEAM_REPOSITORY, useValue: mockTeamRepository },
+        { provide: TASK_REPOSITORY, useValue: mockTaskRepository },
+        { provide: AUDIT_LOG_REPOSITORY, useValue: mockAuditLogRepository },
         { provide: AuditService, useValue: mockAuditService },
       ],
     }).compile();
@@ -69,6 +107,13 @@ describe('UsersService', () => {
     it('should throw NotFoundException for missing user', async () => {
       mockUserRepository.findById.mockResolvedValueOnce(null);
       await expect(service.findById(999)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('findEntityById', () => {
+    it('should return entity with password for internal flows', async () => {
+      const result = await service.findEntityById(1);
+      expect(result).toEqual(mockUser);
     });
   });
 
@@ -114,14 +159,52 @@ describe('UsersService', () => {
   });
 
   describe('remove', () => {
-    it('should delete user', async () => {
+    it('should delete user when there are no blocking dependencies', async () => {
       await service.remove(1);
       expect(mockUserRepository.delete).toHaveBeenCalledWith(1);
+      expect(mockAuditService.log).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException if not found', async () => {
       mockUserRepository.findById.mockResolvedValueOnce(null);
       await expect(service.remove(999)).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ConflictException when user created teams', async () => {
+      mockTeamRepository.findByCreator.mockResolvedValueOnce([
+        { id: 5, name: 'Blocked team' },
+      ]);
+
+      await expect(service.remove(1)).rejects.toThrow(ConflictException);
+      expect(mockUserRepository.delete).not.toHaveBeenCalled();
+      expect(mockAuditService.log).not.toHaveBeenCalled();
+    });
+
+    it('should throw ConflictException when user created tasks', async () => {
+      mockTaskRepository.findByCreator.mockResolvedValueOnce([
+        { id: 10, name: 'Blocked task' },
+      ]);
+
+      await expect(service.remove(1)).rejects.toThrow(ConflictException);
+      expect(mockUserRepository.delete).not.toHaveBeenCalled();
+      expect(mockAuditService.log).not.toHaveBeenCalled();
+    });
+
+    it('should throw ConflictException when user has audit logs', async () => {
+      mockAuditLogRepository.findByUser.mockResolvedValueOnce([
+        { id: 7, userId: 1, action: 'login' },
+      ]);
+
+      await expect(service.remove(1)).rejects.toThrow(ConflictException);
+      expect(mockUserRepository.delete).not.toHaveBeenCalled();
+      expect(mockAuditService.log).not.toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException if delete lost the race', async () => {
+      mockUserRepository.delete.mockResolvedValueOnce(false);
+
+      await expect(service.remove(1)).rejects.toThrow(NotFoundException);
+      expect(mockAuditService.log).not.toHaveBeenCalled();
     });
   });
 });

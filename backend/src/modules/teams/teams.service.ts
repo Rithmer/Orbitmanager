@@ -20,6 +20,7 @@ import { TASK_REPOSITORY } from '../../domain/repositories/task.repository';
 import { Team } from '../../domain/models/team.model';
 import { TeamMember } from '../../domain/models/team-member.model';
 import { TeamRole } from '../../common/enums/team-role.enum';
+import { ProjectRole } from '../../common/enums/project-role.enum';
 import { AccountRole } from '../../common/enums/account-role.enum';
 import { CreateTeamDto } from './dto/create-team.dto';
 import { UpdateTeamDto } from './dto/update-team.dto';
@@ -174,6 +175,13 @@ export class TeamsService {
     const member = await this.findMemberById(memberId);
     await this.assertOwnerOrAdmin(userId, member.teamId, userRole);
 
+    if (
+      dto.teamRole === TeamRole.OBSERVER &&
+      member.teamRole !== TeamRole.OBSERVER
+    ) {
+      await this.syncProjectRolesForObserver(member.userId, member.teamId, userId);
+    }
+
     const updated = await this.teamMemberRepository.update(memberId, {
       teamRole: dto.teamRole,
     });
@@ -205,9 +213,10 @@ export class TeamsService {
       }
     }
 
-    await this.cascadeDeleteProjectMembersByUser(
+    await this.detachUserFromTeamProjects(
       member.userId,
       member.teamId,
+      userId,
     );
 
     await this.teamMemberRepository.delete(memberId);
@@ -239,16 +248,31 @@ export class TeamsService {
     }
   }
 
-  private async cascadeDeleteProjectMembersByUser(
+  private async detachUserFromTeamProjects(
     userId: number,
     teamId: number,
+    actorUserId: number,
   ): Promise<void> {
-    const teamProjects = await this.projectRepository.findByTeam(teamId);
-    const teamProjectIds = teamProjects.map((p) => p.id);
+    const teamProjectIds = await this.getTeamProjectIds(teamId);
 
     if (teamProjectIds.length === 0) return;
 
+    await this.taskRepository.clearAssigneeByUserAndProjects(userId, teamProjectIds);
+
+    const projectMemberships = (await this.projectMemberRepository.findByUser(userId))
+      .filter((membership) => teamProjectIds.includes(membership.projectId));
+
     await this.projectMemberRepository.deleteByUserAndProjects(userId, teamProjectIds);
+
+    for (const membership of projectMemberships) {
+      await this.auditService.log(
+        actorUserId,
+        AuditAction.DELETE,
+        'project_member',
+        membership.id,
+        `Участник #${userId} автоматически удалён из проекта #${membership.projectId} после удаления из команды #${teamId}`,
+      );
+    }
   }
 
   private async cascadeDeleteProjectMembersByTeam(
@@ -264,5 +288,44 @@ export class TeamsService {
       await this.projectMemberRepository.deleteByProject(project.id);
       await this.projectRepository.delete(project.id);
     }
+  }
+
+  private async syncProjectRolesForObserver(
+    userId: number,
+    teamId: number,
+    actorUserId: number,
+  ): Promise<void> {
+    const teamProjectIds = await this.getTeamProjectIds(teamId);
+    if (teamProjectIds.length === 0) return;
+
+    const memberships = (await this.projectMemberRepository.findByUser(userId))
+      .filter(
+        (membership) =>
+          teamProjectIds.includes(membership.projectId) &&
+          membership.role !== ProjectRole.OBSERVER,
+      );
+
+    for (const membership of memberships) {
+      const updated = await this.projectMemberRepository.update(membership.id, {
+        role: ProjectRole.OBSERVER,
+      });
+
+      if (!updated) continue;
+
+      await this.auditService.log(
+        actorUserId,
+        AuditAction.UPDATE,
+        'project_member',
+        membership.id,
+        `Роль участника #${membership.id} автоматически изменена на observer после перевода в observer в команде #${teamId}`,
+        membership.role,
+        ProjectRole.OBSERVER,
+      );
+    }
+  }
+
+  private async getTeamProjectIds(teamId: number): Promise<number[]> {
+    const teamProjects = await this.projectRepository.findByTeam(teamId);
+    return teamProjects.map((project) => project.id);
   }
 }

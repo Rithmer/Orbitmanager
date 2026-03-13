@@ -266,6 +266,10 @@ export class ProjectsService {
     // Only team owner can remove from project
     await this.assertTeamOwnerOrAdmin(userId, project.teamId, userRole);
 
+    await this.taskRepository.clearAssigneeByUserAndProjects(member.userId, [
+      member.projectId,
+    ]);
+
     await this.projectMemberRepository.delete(memberId);
 
     await this.auditService.log(userId, AuditAction.DELETE, 'project_member', memberId, `Участник #${member.userId} удалён из проекта #${member.projectId}`);

@@ -18,6 +18,14 @@ export class TeamsPrismaRepository implements ITeamRepository {
     return row ? this.toDomain(row) : null;
   }
 
+  async findByCreator(userId: number): Promise<Team[]> {
+    const rows = await this.prisma.team.findMany({
+      where: { createdById: userId },
+      orderBy: { id: 'asc' },
+    });
+    return rows.map(this.toDomain);
+  }
+
   async create(team: Omit<Team, 'id'>): Promise<Team> {
     const row = await this.prisma.team.create({
       data: {
@@ -50,8 +58,10 @@ export class TeamsPrismaRepository implements ITeamRepository {
     try {
       await this.prisma.team.delete({ where: { id } });
       return true;
-    } catch {
-      return false;
+    } catch (e: unknown) {
+      const prismaError = e as { code?: string };
+      if (prismaError.code === 'P2025') return false;
+      throw e;
     }
   }
 
