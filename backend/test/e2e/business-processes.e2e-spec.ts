@@ -34,7 +34,30 @@ function getDatabaseUrl(): string {
     throw new Error('DATABASE_URL is required for postgres-only e2e tests');
   }
 
+  assertSafeE2eDatabase(databaseUrl);
   return databaseUrl;
+}
+
+function assertSafeE2eDatabase(databaseUrl: string): void {
+  if (process.env['NODE_ENV'] !== 'test') {
+    throw new Error(
+      `Refusing to run destructive e2e reset outside NODE_ENV=test (got "${process.env['NODE_ENV'] ?? 'undefined'}")`,
+    );
+  }
+
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(databaseUrl);
+  } catch {
+    throw new Error(`Invalid DATABASE_URL for e2e tests: ${databaseUrl}`);
+  }
+
+  const databaseName = parsedUrl.pathname.replace(/^\/+/, '');
+  if (!databaseName.endsWith('_e2e')) {
+    throw new Error(
+      `Refusing to reset non-e2e database "${databaseName || '<unknown>'}". Expected a database name ending with "_e2e".`,
+    );
+  }
 }
 
 async function withDatabaseClient<T>(

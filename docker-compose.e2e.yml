@@ -1,0 +1,28 @@
+services:
+  postgres-e2e:
+    image: postgres:16-alpine
+    container_name: taskmanager-db-e2e
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${E2E_DB_NAME:-task_manager_e2e}
+      POSTGRES_USER: ${E2E_DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${E2E_DB_PASSWORD:-postgres}
+    ports:
+      - "${E2E_DB_PORT:-5434}:5432"
+    volumes:
+      - pgdata_e2e:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${E2E_DB_USERNAME:-postgres} -d ${E2E_DB_NAME:-task_manager_e2e}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata_e2e:
+    driver: local

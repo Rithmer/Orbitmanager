@@ -16,6 +16,11 @@ if [ ! -f "backend/.env" ] && [ -f "backend/.env.example" ]; then
   echo "Created backend/.env from backend/.env.example"
 fi
 
+if [ ! -f "backend/.env.test" ] && [ -f "backend/.env.test.example" ]; then
+  cp "backend/.env.test.example" "backend/.env.test"
+  echo "Created backend/.env.test from backend/.env.test.example"
+fi
+
 docker compose up -d --build
 
 echo

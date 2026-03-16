@@ -13,6 +13,11 @@ if not exist "backend\.env" if exist "backend\.env.example" (
   echo Created backend\.env from backend/.env.example
 )
 
+if not exist "backend\.env.test" if exist "backend\.env.test.example" (
+  copy /Y "backend\.env.test.example" "backend\.env.test" >nul
+  echo Created backend\.env.test from backend/.env.test.example
+)
+
 docker compose up -d --build
 if errorlevel 1 exit /b %errorlevel%
 
