@@ -6,6 +6,11 @@ import {
   Inject,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import {
+  AuthenticatedRequest,
+  getAuthenticatedUser,
+  getRouteParamAsNumber,
+} from '@/common/http/authenticated-request';
 import { ProjectRole } from '../enums/project-role.enum';
 import { TeamRole } from '../enums/team-role.enum';
 import { AccountRole } from '../enums/account-role.enum';
@@ -39,10 +44,8 @@ export class ProjectRolesGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest();
-    const user = request.user as
-      | { id: number; accountRole: AccountRole }
-      | undefined;
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const user = getAuthenticatedUser(request);
 
     if (!user) {
       throw new ForbiddenException('Доступ запрещён');
@@ -53,10 +56,8 @@ export class ProjectRolesGuard implements CanActivate {
       return true;
     }
 
-    const projectId = Number(
-      request.params.projectId ?? request.params.id,
-    );
-    if (!projectId || isNaN(projectId)) {
+    const projectId = getRouteParamAsNumber(request, 'projectId', 'id');
+    if (!projectId) {
       throw new ForbiddenException('Не указан ID проекта');
     }
 
@@ -86,7 +87,7 @@ export class ProjectRolesGuard implements CanActivate {
       throw new ForbiddenException('Вы не являетесь участником этого проекта');
     }
 
-    if (!requiredRoles.includes(projectMembership.role as ProjectRole)) {
+    if (!requiredRoles.includes(projectMembership.role)) {
       throw new ForbiddenException(
         `Требуется проектная роль: ${requiredRoles.join(', ')}`,
       );

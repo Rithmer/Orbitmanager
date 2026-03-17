@@ -5,6 +5,10 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import {
+  AuthenticatedRequest,
+  getAuthenticatedUser,
+} from '@/common/http/authenticated-request';
 import { AccountRole } from '../enums/account-role.enum';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 
@@ -22,8 +26,8 @@ export class AccountRolesGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest();
-    const user = request.user as { accountRole?: AccountRole } | undefined;
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const user = getAuthenticatedUser(request);
 
     if (!user || !user.accountRole) {
       throw new ForbiddenException('Доступ запрещён');

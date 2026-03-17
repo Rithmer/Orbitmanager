@@ -6,6 +6,11 @@ import {
   Inject,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import {
+  AuthenticatedRequest,
+  getAuthenticatedUser,
+  getRouteParamAsNumber,
+} from '@/common/http/authenticated-request';
 import { TeamRole } from '../enums/team-role.enum';
 import { TEAM_ROLES_KEY } from '../decorators/team-roles.decorator';
 import type { ITeamMemberRepository } from '@/domain/repositories/team-member.repository';
@@ -30,10 +35,8 @@ export class TeamRolesGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest();
-    const user = request.user as
-      | { id: number; accountRole: AccountRole }
-      | undefined;
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const user = getAuthenticatedUser(request);
 
     if (!user) {
       throw new ForbiddenException('Доступ запрещён');
@@ -43,8 +46,8 @@ export class TeamRolesGuard implements CanActivate {
       return true;
     }
 
-    const teamId = Number(request.params.teamId ?? request.params.id);
-    if (!teamId || isNaN(teamId)) {
+    const teamId = getRouteParamAsNumber(request, 'teamId', 'id');
+    if (!teamId) {
       throw new ForbiddenException('Не указан ID команды');
     }
 

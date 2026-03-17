@@ -57,7 +57,7 @@ export class TeamsService {
     return QueryHelper.apply(teams, {
       ...params,
       searchFields: params.searchFields ?? ['name', 'description'],
-    }) as PaginatedResult<Team>;
+    });
   }
 
   async findById(id: number): Promise<Team> {
@@ -115,13 +115,6 @@ export class TeamsService {
   ): Promise<void> {
     await this.findById(id);
     await this.assertOwnerOrAdmin(userId, id, userRole);
-
-    const members = await this.teamMemberRepository.findByTeam(id);
-    for (const m of members) {
-      await this.teamMemberRepository.delete(m.id);
-    }
-
-    await this.cascadeDeleteProjectMembersByTeam(id);
 
     await this.teamRepository.delete(id);
 
@@ -272,21 +265,6 @@ export class TeamsService {
         membership.id,
         `Участник #${userId} автоматически удалён из проекта #${membership.projectId} после удаления из команды #${teamId}`,
       );
-    }
-  }
-
-  private async cascadeDeleteProjectMembersByTeam(
-    teamId: number,
-  ): Promise<void> {
-    const teamProjects = await this.projectRepository.findByTeam(teamId);
-
-    for (const project of teamProjects) {
-      const tasks = await this.taskRepository.findByProject(project.id);
-      for (const task of tasks) {
-        await this.taskRepository.delete(task.id);
-      }
-      await this.projectMemberRepository.deleteByProject(project.id);
-      await this.projectRepository.delete(project.id);
     }
   }
 

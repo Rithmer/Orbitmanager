@@ -72,6 +72,6 @@ export class AuditService {
     return QueryHelper.apply(
       logs,
       { ...params, searchFields: params.searchFields ?? ['description', 'entityType', 'action'] },
-    ) as PaginatedResult<AuditLog>;
+    );
   }
 }

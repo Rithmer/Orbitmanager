@@ -45,7 +45,7 @@ export class UsersService {
     return QueryHelper.apply(safe, {
       ...params,
       searchFields: params.searchFields ?? ['login', 'fullName', 'profession'],
-    }) as PaginatedResult<Omit<User, 'password'>>;
+    });
   }
 
   async findById(id: number): Promise<Omit<User, 'password'>> {
@@ -161,7 +161,8 @@ export class UsersService {
   }
 
   private omitPassword(user: User): Omit<User, 'password'> {
-    const { password: _, ...safe } = user;
+    const { password: _password, ...safe } = user;
+    void _password;
     return safe;
   }
 }
