@@ -31,3 +31,4 @@ logs/
 # === Build ===
 dist/
 coverage/
+documentation_archive/
