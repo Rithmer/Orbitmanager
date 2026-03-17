@@ -7,7 +7,7 @@ import {
   IsEnum,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ProjectStatus } from '../../../common/enums/project-status.enum';
+import { ProjectStatus } from '@/common/enums/project-status.enum';
 
 export class CreateProjectDto {
   @ApiProperty({ example: 1, description: 'ID команды-владельца проекта' })

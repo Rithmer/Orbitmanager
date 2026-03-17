@@ -5,25 +5,25 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
-import type { IUserRepository } from '../../domain/repositories/user.repository';
-import { USER_REPOSITORY } from '../../domain/repositories/user.repository';
-import type { ITeamRepository } from '../../domain/repositories/team.repository';
-import { TEAM_REPOSITORY } from '../../domain/repositories/team.repository';
-import type { ITaskRepository } from '../../domain/repositories/task.repository';
-import { TASK_REPOSITORY } from '../../domain/repositories/task.repository';
-import type { IAuditLogRepository } from '../../domain/repositories/audit-log.repository';
-import { AUDIT_LOG_REPOSITORY } from '../../domain/repositories/audit-log.repository';
-import { User } from '../../domain/models/user.model';
-import { AccountRole } from '../../common/enums/account-role.enum';
+import type { IUserRepository } from '@/domain/repositories/user.repository';
+import { USER_REPOSITORY } from '@/domain/repositories/user.repository';
+import type { ITeamRepository } from '@/domain/repositories/team.repository';
+import { TEAM_REPOSITORY } from '@/domain/repositories/team.repository';
+import type { ITaskRepository } from '@/domain/repositories/task.repository';
+import { TASK_REPOSITORY } from '@/domain/repositories/task.repository';
+import type { IAuditLogRepository } from '@/domain/repositories/audit-log.repository';
+import { AUDIT_LOG_REPOSITORY } from '@/domain/repositories/audit-log.repository';
+import { User } from '@/domain/models/user.model';
+import { AccountRole } from '@/common/enums/account-role.enum';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import {
   QueryHelper,
   QueryParams,
   PaginatedResult,
-} from '../../common/helpers/query.helper';
+} from '@/common/helpers/query.helper';
 import { AuditService } from '../audit-logs/audit.service';
-import { AuditAction } from '../../common/enums/audit-action.enum';
+import { AuditAction } from '@/common/enums/audit-action.enum';
 
 @Injectable()
 export class UsersService {

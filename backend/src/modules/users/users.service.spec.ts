@@ -4,13 +4,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { USER_REPOSITORY } from '../../domain/repositories/user.repository';
-import { TEAM_REPOSITORY } from '../../domain/repositories/team.repository';
-import { TASK_REPOSITORY } from '../../domain/repositories/task.repository';
-import { AUDIT_LOG_REPOSITORY } from '../../domain/repositories/audit-log.repository';
+import { USER_REPOSITORY } from '@/domain/repositories/user.repository';
+import { TEAM_REPOSITORY } from '@/domain/repositories/team.repository';
+import { TASK_REPOSITORY } from '@/domain/repositories/task.repository';
+import { AUDIT_LOG_REPOSITORY } from '@/domain/repositories/audit-log.repository';
 import { AuditService } from '../audit-logs/audit.service';
-import { AccountRole } from '../../common/enums/account-role.enum';
-import { User } from '../../domain/models/user.model';
+import { AccountRole } from '@/common/enums/account-role.enum';
+import { User } from '@/domain/models/user.model';
 
 const mockUser: User = {
   id: 1,

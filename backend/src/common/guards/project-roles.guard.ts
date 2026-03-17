@@ -10,12 +10,12 @@ import { ProjectRole } from '../enums/project-role.enum';
 import { TeamRole } from '../enums/team-role.enum';
 import { AccountRole } from '../enums/account-role.enum';
 import { PROJECT_ROLES_KEY } from '../decorators/project-roles.decorator';
-import type { IProjectMemberRepository } from '../../domain/repositories/project-member.repository';
-import { PROJECT_MEMBER_REPOSITORY } from '../../domain/repositories/project-member.repository';
-import type { ITeamMemberRepository } from '../../domain/repositories/team-member.repository';
-import { TEAM_MEMBER_REPOSITORY } from '../../domain/repositories/team-member.repository';
-import type { IProjectRepository } from '../../domain/repositories/project.repository';
-import { PROJECT_REPOSITORY } from '../../domain/repositories/project.repository';
+import type { IProjectMemberRepository } from '@/domain/repositories/project-member.repository';
+import { PROJECT_MEMBER_REPOSITORY } from '@/domain/repositories/project-member.repository';
+import type { ITeamMemberRepository } from '@/domain/repositories/team-member.repository';
+import { TEAM_MEMBER_REPOSITORY } from '@/domain/repositories/team-member.repository';
+import type { IProjectRepository } from '@/domain/repositories/project.repository';
+import { PROJECT_REPOSITORY } from '@/domain/repositories/project.repository';
 
 @Injectable()
 export class ProjectRolesGuard implements CanActivate {

@@ -6,22 +6,22 @@ import {
   ConflictException,
   BadRequestException,
 } from '@nestjs/common';
-import type { IProjectRepository } from '../../domain/repositories/project.repository';
-import { PROJECT_REPOSITORY } from '../../domain/repositories/project.repository';
-import type { IProjectMemberRepository } from '../../domain/repositories/project-member.repository';
-import { PROJECT_MEMBER_REPOSITORY } from '../../domain/repositories/project-member.repository';
-import type { ITeamMemberRepository } from '../../domain/repositories/team-member.repository';
-import { TEAM_MEMBER_REPOSITORY } from '../../domain/repositories/team-member.repository';
-import type { ITaskRepository } from '../../domain/repositories/task.repository';
-import { TASK_REPOSITORY } from '../../domain/repositories/task.repository';
-import type { ITeamRepository } from '../../domain/repositories/team.repository';
-import { TEAM_REPOSITORY } from '../../domain/repositories/team.repository';
-import { Project } from '../../domain/models/project.model';
-import { ProjectMember } from '../../domain/models/project-member.model';
-import { ProjectStatus } from '../../common/enums/project-status.enum';
-import { ProjectRole } from '../../common/enums/project-role.enum';
-import { TeamRole } from '../../common/enums/team-role.enum';
-import { AccountRole } from '../../common/enums/account-role.enum';
+import type { IProjectRepository } from '@/domain/repositories/project.repository';
+import { PROJECT_REPOSITORY } from '@/domain/repositories/project.repository';
+import type { IProjectMemberRepository } from '@/domain/repositories/project-member.repository';
+import { PROJECT_MEMBER_REPOSITORY } from '@/domain/repositories/project-member.repository';
+import type { ITeamMemberRepository } from '@/domain/repositories/team-member.repository';
+import { TEAM_MEMBER_REPOSITORY } from '@/domain/repositories/team-member.repository';
+import type { ITaskRepository } from '@/domain/repositories/task.repository';
+import { TASK_REPOSITORY } from '@/domain/repositories/task.repository';
+import type { ITeamRepository } from '@/domain/repositories/team.repository';
+import { TEAM_REPOSITORY } from '@/domain/repositories/team.repository';
+import { Project } from '@/domain/models/project.model';
+import { ProjectMember } from '@/domain/models/project-member.model';
+import { ProjectStatus } from '@/common/enums/project-status.enum';
+import { ProjectRole } from '@/common/enums/project-role.enum';
+import { TeamRole } from '@/common/enums/team-role.enum';
+import { AccountRole } from '@/common/enums/account-role.enum';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { AddProjectMemberDto } from './dto/add-project-member.dto';
@@ -30,9 +30,9 @@ import {
   QueryHelper,
   QueryParams,
   PaginatedResult,
-} from '../../common/helpers/query.helper';
+} from '@/common/helpers/query.helper';
 import { AuditService } from '../audit-logs/audit.service';
-import { AuditAction } from '../../common/enums/audit-action.enum';
+import { AuditAction } from '@/common/enums/audit-action.enum';
 
 @Injectable()
 export class ProjectsService {

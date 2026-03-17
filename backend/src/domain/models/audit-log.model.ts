@@ -1,4 +1,4 @@
-import { AuditAction } from '../../common/enums/audit-action.enum';
+import { AuditAction } from '@/common/enums/audit-action.enum';
 
 export interface AuditLog {
   id: number;

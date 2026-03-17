@@ -1,0 +1,120 @@
+@startuml
+' ============================================================
+' ДИАГРАММА 2б — Регистрация и авторизация
+' ============================================================
+title Диаграмма активности 2б\nРегистрация и авторизация пользователя
+
+start
+
+:Пользователь открывает экран\nвхода/регистрации;
+
+if (Есть аккаунт?) then (нет)
+
+  ' === РЕГИСТРАЦИЯ ===
+  partition "Регистрация" #E8F5E9 {
+    :Заполнить форму регистрации:\nlogin, password, fullName, profession;
+
+    :Отправить **POST /auth/register**;
+
+    :ValidationPipe проверяет DTO;
+    if (DTO валиден?) then (нет)
+      :Вернуть **400 Validation Error**\nс описанием ошибок;
+      stop
+    else (да)
+    endif
+
+    :Проверить уникальность login\nв users.json;
+    if (Login уже занят?) then (да)
+      :Вернуть **409 Conflict**\n"Login already exists";
+      stop
+    else (нет)
+    endif
+
+    :Хэшировать пароль (argon2);
+
+    :Создать запись user:
+    - accountRoleId = member
+    - accountStatus = active
+    - createdAt = now();
+
+    :Записать в users.json (atomic);
+
+    :Записать в audit_logs:
+    - action = create
+    - entityType = user;
+
+    :Вернуть **201 Created** + userId;
+  }
+
+else (да)
+endif
+
+' === АВТОРИЗАЦИЯ ===
+partition "Авторизация" #E3F2FD {
+  :Заполнить форму входа:\nlogin, password;
+
+  :Отправить **POST /auth/login**;
+
+  :Throttler проверяет лимит\n(5 попыток / мин);
+  if (Лимит превышен?) then (да)
+    :Вернуть **429 Too Many Requests**;
+    stop
+  else (нет)
+  endif
+
+  :Найти пользователя по login\nв users.json;
+  if (Пользователь найден?) then (нет)
+    :Вернуть **401 Unauthorized**\n"Invalid credentials";
+    stop
+  else (да)
+  endif
+
+  :Проверить статус аккаунта;
+  if (accountStatus = active?) then (нет)
+    :Вернуть **403 Forbidden**\n"Account is blocked";
+    stop
+  else (да)
+  endif
+
+  :Сравнить пароль\n(argon2.verify);
+  if (Пароль совпадает?) then (нет)
+    :Вернуть **401 Unauthorized**\n"Invalid credentials";
+    stop
+  else (да)
+  endif
+
+  :Сгенерировать **access JWT** (15 мин)
+  с payload: {userId, login, accountRoleId};
+
+  :Сгенерировать **refresh JWT** (7 дней);
+
+  :Записать в audit_logs:
+  - action = login
+  - entityType = user;
+
+  :Вернуть **200 OK** +
+  {accessToken, refreshToken};
+}
+
+' === РАБОТА С ТОКЕНАМИ ===
+partition "Обновление токена" #FFF3E0 {
+  :Пользователь работает в системе...;
+
+  if (Access-токен истёк?) then (да)
+    :Отправить **POST /auth/refresh**\nс refreshToken;
+
+    if (Refresh-токен валиден?) then (нет)
+      :Вернуть **401 Unauthorized**\n→ перенаправить на вход;
+      stop
+    else (да)
+      :Сгенерировать новую пару\naccess + refresh JWT;
+      :Вернуть **200 OK**\n+ новые токены;
+    endif
+  else (нет)
+    :Продолжить работу;
+  endif
+}
+
+stop
+
+@enduml

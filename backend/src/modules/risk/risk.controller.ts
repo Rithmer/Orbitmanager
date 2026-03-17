@@ -15,25 +15,25 @@ import {
   ApiOperation,
   ApiResponse,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { AccountRolesGuard } from '../../common/guards/account-roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { AccountRole } from '../../common/enums/account-role.enum';
-import { TeamRole } from '../../common/enums/team-role.enum';
-import { AuditAction } from '../../common/enums/audit-action.enum';
-import type { IRiskAssessmentService } from '../../domain/services/risk-assessment.interface';
-import { RISK_ASSESSMENT_SERVICE } from '../../domain/services/risk-assessment.interface';
-import type { ITaskRepository } from '../../domain/repositories/task.repository';
-import { TASK_REPOSITORY } from '../../domain/repositories/task.repository';
-import type { IProjectRepository } from '../../domain/repositories/project.repository';
-import { PROJECT_REPOSITORY } from '../../domain/repositories/project.repository';
-import type { IProjectMemberRepository } from '../../domain/repositories/project-member.repository';
-import { PROJECT_MEMBER_REPOSITORY } from '../../domain/repositories/project-member.repository';
-import type { ITeamMemberRepository } from '../../domain/repositories/team-member.repository';
-import { TEAM_MEMBER_REPOSITORY } from '../../domain/repositories/team-member.repository';
-import type { IAuditLogRepository } from '../../domain/repositories/audit-log.repository';
-import { AUDIT_LOG_REPOSITORY } from '../../domain/repositories/audit-log.repository';
+import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
+import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
+import { Roles } from '@/common/decorators/roles.decorator';
+import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import { AccountRole } from '@/common/enums/account-role.enum';
+import { TeamRole } from '@/common/enums/team-role.enum';
+import { AuditAction } from '@/common/enums/audit-action.enum';
+import type { IRiskAssessmentService } from '@/domain/services/risk-assessment.interface';
+import { RISK_ASSESSMENT_SERVICE } from '@/domain/services/risk-assessment.interface';
+import type { ITaskRepository } from '@/domain/repositories/task.repository';
+import { TASK_REPOSITORY } from '@/domain/repositories/task.repository';
+import type { IProjectRepository } from '@/domain/repositories/project.repository';
+import { PROJECT_REPOSITORY } from '@/domain/repositories/project.repository';
+import type { IProjectMemberRepository } from '@/domain/repositories/project-member.repository';
+import { PROJECT_MEMBER_REPOSITORY } from '@/domain/repositories/project-member.repository';
+import type { ITeamMemberRepository } from '@/domain/repositories/team-member.repository';
+import { TEAM_MEMBER_REPOSITORY } from '@/domain/repositories/team-member.repository';
+import type { IAuditLogRepository } from '@/domain/repositories/audit-log.repository';
+import { AUDIT_LOG_REPOSITORY } from '@/domain/repositories/audit-log.repository';
 import { TaskRiskOutputDto, ProjectRiskOutputDto } from './dto';
 import { buildTaskRiskInput } from './helpers/build-task-risk-input';
 

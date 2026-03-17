@@ -5,17 +5,17 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { TeamsService } from './teams.service';
-import { TEAM_REPOSITORY } from '../../domain/repositories/team.repository';
-import { TEAM_MEMBER_REPOSITORY } from '../../domain/repositories/team-member.repository';
-import { USER_REPOSITORY } from '../../domain/repositories/user.repository';
-import { PROJECT_REPOSITORY } from '../../domain/repositories/project.repository';
-import { PROJECT_MEMBER_REPOSITORY } from '../../domain/repositories/project-member.repository';
-import { TASK_REPOSITORY } from '../../domain/repositories/task.repository';
-import { TeamRole } from '../../common/enums/team-role.enum';
-import { AccountRole } from '../../common/enums/account-role.enum';
-import { ProjectRole } from '../../common/enums/project-role.enum';
-import { Team } from '../../domain/models/team.model';
-import { TeamMember } from '../../domain/models/team-member.model';
+import { TEAM_REPOSITORY } from '@/domain/repositories/team.repository';
+import { TEAM_MEMBER_REPOSITORY } from '@/domain/repositories/team-member.repository';
+import { USER_REPOSITORY } from '@/domain/repositories/user.repository';
+import { PROJECT_REPOSITORY } from '@/domain/repositories/project.repository';
+import { PROJECT_MEMBER_REPOSITORY } from '@/domain/repositories/project-member.repository';
+import { TASK_REPOSITORY } from '@/domain/repositories/task.repository';
+import { TeamRole } from '@/common/enums/team-role.enum';
+import { AccountRole } from '@/common/enums/account-role.enum';
+import { ProjectRole } from '@/common/enums/project-role.enum';
+import { Team } from '@/domain/models/team.model';
+import { TeamMember } from '@/domain/models/team-member.model';
 import { AuditService } from '../audit-logs/audit.service';
 
 const mockTeam: Team = {

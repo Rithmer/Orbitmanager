@@ -1,0 +1,97 @@
+@startuml
+' ============================================================
+' Диаграмма 2. Диаграммы активности
+' Содержит две диаграммы:
+'   2а — БП2: Выполнение и изменение статуса задачи
+'   2б — Регистрация и авторизация
+' ============================================================
+
+' ============================================================
+' ДИАГРАММА 2а — БП2: Изменение статуса задачи
+' ============================================================
+title Диаграмма активности 2а\nБП2: Выполнение и изменение статуса задачи
+
+start
+
+:Пользователь отправляет запрос
+**PATCH /tasks/:id**
+с полем {newStatus, comment?};
+
+partition "Аутентификация" {
+  :JwtAuthGuard проверяет токен;
+  if (Токен валиден?) then (нет)
+    :Вернуть **401 Unauthorized**;
+    stop
+  else (да)
+    :Извлечь userId и роль из JWT;
+  endif
+}
+
+partition "Авторизация (RBAC)" {
+  :Определить роль пользователя\nв команде проекта задачи;
+  if (Роль: owner / team_lead\n(своего проекта) / developer\n(назначен на задачу)?) then (нет)
+    :Вернуть **403 Forbidden**;
+    stop
+  else (да)
+  endif
+}
+
+partition "Бизнес-валидация" {
+  :Получить задачу из tasks.json;
+  if (Задача существует?) then (нет)
+    :Вернуть **404 Not Found**;
+    stop
+  else (да)
+  endif
+
+  :Проверить допустимый переход\nstatus: oldStatus → newStatus;
+
+  note right
+    Допустимые переходы:
+    new → in_progress, cancelled
+    in_progress → review, cancelled
+    review → done, in_progress
+    cancelled → new
+    done → (финальный)
+  end note
+
+  if (Переход допустим?) then (нет)
+    :Вернуть **400 Bad Request**\n"Переход статуса запрещён";
+    stop
+  else (да)
+  endif
+}
+
+partition "Транзакция (atomic)" #LightGreen {
+  :Захватить lock на файлы:\ntasks, task_history, audit_logs;
+
+  :Обновить task.status\nи task.updatedAt;
+
+  :Создать запись в **task_history**:
+  - oldStatus
+  - newStatus
+  - userId
+  - changedAt
+  - comment;
+
+  :Создать запись в **audit_logs**:
+  - action = status_change
+  - entityType = task
+  - entityId = taskId;
+
+  :Записать все файлы (tmp → rename);
+  :Освободить lock;
+}
+
+partition "Пересчёт рисков" {
+  :Вызвать **riskService.assessTask()**;
+  :Получить delayProbability, riskLevel;
+}
+
+:Вернуть **200 OK**
++ обновлённая задача
++ riskLevel;
+
+stop
+
+@enduml

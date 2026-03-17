@@ -6,17 +6,17 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
-import { PROJECT_REPOSITORY } from '../../domain/repositories/project.repository';
-import { PROJECT_MEMBER_REPOSITORY } from '../../domain/repositories/project-member.repository';
-import { TEAM_MEMBER_REPOSITORY } from '../../domain/repositories/team-member.repository';
-import { TASK_REPOSITORY } from '../../domain/repositories/task.repository';
-import { TEAM_REPOSITORY } from '../../domain/repositories/team.repository';
-import { AccountRole } from '../../common/enums/account-role.enum';
-import { TeamRole } from '../../common/enums/team-role.enum';
-import { ProjectRole } from '../../common/enums/project-role.enum';
-import { ProjectStatus } from '../../common/enums/project-status.enum';
-import { Project } from '../../domain/models/project.model';
-import { ProjectMember } from '../../domain/models/project-member.model';
+import { PROJECT_REPOSITORY } from '@/domain/repositories/project.repository';
+import { PROJECT_MEMBER_REPOSITORY } from '@/domain/repositories/project-member.repository';
+import { TEAM_MEMBER_REPOSITORY } from '@/domain/repositories/team-member.repository';
+import { TASK_REPOSITORY } from '@/domain/repositories/task.repository';
+import { TEAM_REPOSITORY } from '@/domain/repositories/team.repository';
+import { AccountRole } from '@/common/enums/account-role.enum';
+import { TeamRole } from '@/common/enums/team-role.enum';
+import { ProjectRole } from '@/common/enums/project-role.enum';
+import { ProjectStatus } from '@/common/enums/project-status.enum';
+import { Project } from '@/domain/models/project.model';
+import { ProjectMember } from '@/domain/models/project-member.model';
 import { AuditService } from '../audit-logs/audit.service';
 
 const mockProject: Project = {

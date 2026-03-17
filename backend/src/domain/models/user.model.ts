@@ -1,4 +1,4 @@
-import { AccountRole } from '../../common/enums/account-role.enum';
+import { AccountRole } from '@/common/enums/account-role.enum';
 
 export interface User {
   id: number;

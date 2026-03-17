@@ -1,0 +1,150 @@
+@startuml
+' ============================================================
+' Диаграмма 4. Диаграмма классов
+' Часть А — Доменная модель (сущности и связи)
+' Часть Б — Архитектурные классы и паттерны
+' ============================================================
+
+' ============================================================
+' ЧАСТЬ А: ДОМЕННАЯ МОДЕЛЬ
+' ============================================================
+
+title Диаграмма классов — Часть А: Доменная модель\n(10 сущностей и их связи)
+
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+  ArrowColor #555555
+}
+skinparam linetype ortho
+
+package "Справочники" #F5F5F5 {
+
+  class AccountRole <<entity>> {
+    +id: number {PK}
+    +name: string {UNIQUE}
+    --
+    «admin» | «member» | «guest»
+  }
+
+  class TeamRole <<entity>> {
+    +id: number {PK}
+    +name: string {UNIQUE}
+    --
+    «owner» | «team_lead»
+    | «developer» | «observer»
+  }
+}
+
+package "Пользователи и команды" #E8F5E9 {
+
+  class User <<entity>> {
+    +id: number {PK}
+    +login: string {UNIQUE, 3..50}
+    +password: string {argon2 hash}
+    +fullName: string
+    +profession: string?
+    +accountStatus: string
+    +accountRoleId: number {FK}
+    +createdAt: datetime
+    +updatedAt: datetime
+  }
+
+  class Team <<entity>> {
+    +id: number {PK}
+    +name: string
+    +description: string?
+    +createdAt: datetime
+    +createdById: number {FK}
+  }
+
+  class TeamMember <<entity>> {
+    +id: number {PK}
+    +userId: number {FK}
+    +teamId: number {FK}
+    +teamRoleId: number {FK}
+    +projectId: number? {FK}
+    --
+    UNIQUE(userId, teamId, projectId)
+  }
+}
+
+package "Проекты и задачи" #E3F2FD {
+
+  class Project <<entity>> {
+    +id: number {PK}
+    +teamId: number {FK}
+    +name: string
+    +description: string?
+    +status: ProjectStatus
+    +createdAt: datetime
+    +updatedAt: datetime
+  }
+
+  class Task <<entity>> {
+    +id: number {PK}
+    +projectId: number {FK}
+    +name: string
+    +description: string?
+    +deadline: datetime
+    +status: TaskStatus
+    +difficulty: number {1..5}
+    +createdById: number {FK}
+    +createdAt: datetime
+    +updatedAt: datetime
+  }
+
+  class TaskAssignment <<entity>> {
+    +id: number {PK}
+    +taskId: number {FK}
+    +userId: number {FK}
+    +assignedAt: datetime
+    +status: AssignmentStatus
+  }
+}
+
+package "История и аудит" #FFF3E0 {
+
+  class TaskHistory <<entity>> {
+    +id: number {PK}
+    +taskId: number {FK}
+    +userId: number {FK}
+    +oldStatus: string
+    +newStatus: string
+    +changedAt: datetime
+    +comment: string?
+  }
+
+  class AuditLog <<entity>> {
+    +id: number {PK}
+    +userId: number {FK}
+    +action: AuditAction
+    +entityType: string
+    +entityId: number?
+    +timestamp: datetime
+    +description: string?
+  }
+}
+
+' --- Связи ---
+AccountRole "1" --o "0..*" User : accountRoleId
+TeamRole "1" --o "0..*" TeamMember : teamRoleId
+
+User "1" --o "0..*" Team : createdById (создатель)
+User "1" --o "0..*" TeamMember : userId
+Team "1" --o "0..*" TeamMember : teamId
+Team "1" --o "0..*" Project : teamId
+
+Project "1" --o "0..*" Task : projectId
+Project "1" --o "0..*" TeamMember : projectId (scope)
+
+User "1" --o "0..*" Task : createdById (постановщик)
+Task "1" --o "0..*" TaskAssignment : taskId
+User "1" --o "0..*" TaskAssignment : userId (исполнитель)
+
+Task "1" --o "0..*" TaskHistory : taskId
+User "1" --o "0..*" TaskHistory : userId (кто изменил)
+
+User "1" --o "0..*" AuditLog : userId (инициатор)
+
+@enduml

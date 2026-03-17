@@ -1,0 +1,210 @@
+@startuml
+' ============================================================
+' Диаграмма 4. Диаграмма классов
+' Часть Б — Архитектурные классы и паттерны
+'
+' Паттерны:
+'  1. MVC (Model-View-Controller)
+'  2. Repository Pattern
+'  3. Strategy Pattern (Risk Assessment)
+' ============================================================
+
+title Диаграмма классов — Часть Б: Архитектурные паттерны\nMVC + Repository + Strategy
+
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam linetype ortho
+
+' ============================================================
+' ПАТТЕРН 1: MVC (Model-View-Controller)
+' ============================================================
+
+package "Паттерн MVC" #E8EAF6 {
+
+  note as N1
+    **Model-View-Controller**
+    Controller → принимает HTTP-запрос
+    Service → бизнес-логика (роль Model)
+    View → JSON-ответ клиенту (React)
+  end note
+
+  class TasksController <<Controller>> {
+    -tasksService: TasksService
+    -auditService: AuditService
+    --
+    +create(dto: CreateTaskDto): Task
+    +findAll(query: QueryParams): PaginatedResult<Task>
+    +findOne(id: number): Task
+    +update(id: number, dto: UpdateTaskDto): Task
+    +delete(id: number): void
+  }
+
+  class TasksService <<Service / Model>> {
+    -taskRepo: ITaskRepository
+    -projectRepo: IProjectRepository
+    -teamMemberRepo: ITeamMemberRepository
+    -historyRepo: ITaskHistoryRepository
+    -riskService: IRiskAssessmentService
+    --
+    +create(dto, userId): Task
+    +findAll(query): PaginatedResult<Task>
+    +findOne(id): Task
+    +updateStatus(id, newStatus, userId): Task
+    +delete(id, userId): void
+    -validateTransition(from, to): void
+  }
+
+  class "React Frontend" as View <<View>> {
+    Отображает данные
+    из JSON-ответов API
+  }
+
+  TasksController --> TasksService : делегирует\nбизнес-логику
+  View ..> TasksController : HTTP запросы\n(REST API)
+  TasksController ..> View : JSON-ответы
+}
+
+' ============================================================
+' ПАТТЕРН 2: Repository Pattern
+' ============================================================
+
+package "Паттерн Repository" #E8F5E9 {
+
+  note as N2
+    **Repository Pattern**
+    Абстрагирует доступ к данным.
+    Позволяет заменить JSON на PostgreSQL
+    без изменения бизнес-логики.
+  end note
+
+  interface ITaskRepository <<interface>> {
+    +findAll(): Task[]
+    +findById(id: number): Task | null
+    +findByProject(projectId: number): Task[]
+    +create(data: Partial<Task>): Task
+    +update(id: number, data: Partial<Task>): Task
+    +delete(id: number): void
+  }
+
+  class TasksJsonRepository <<JSON>> {
+    -jsonFileService: JsonFileService
+    -fileLockService: FileLockService
+    --
+    +findAll(): Task[]
+    +findById(id: number): Task | null
+    +findByProject(projectId: number): Task[]
+    +create(data): Task
+    +update(id, data): Task
+    +delete(id): void
+  }
+
+  class "TasksPostgresRepository\n(будущее)" as TasksPgRepo <<PostgreSQL>> #F5F5F5 {
+    -dataSource: DataSource
+    --
+    +findAll(): Task[]
+    +findById(id: number): Task | null
+    +findByProject(projectId: number): Task[]
+    +create(data): Task
+    +update(id, data): Task
+    +delete(id): void
+  }
+
+  class JsonFileService <<Infrastructure>> {
+    -cache: Map<string, JsonFile>
+    --
+    +read<T>(entity: string): JsonFile<T>
+    +write<T>(entity: string, data: JsonFile<T>): void
+  }
+
+  class FileLockService <<Infrastructure>> {
+    -locks: Map<string, Mutex>
+    --
+    +acquire(entity: string): Release
+  }
+
+  ITaskRepository <|.. TasksJsonRepository : implements
+  ITaskRepository <|.. TasksPgRepo : implements\n(будущее)
+  TasksService --> ITaskRepository : использует\nинтерфейс
+  TasksJsonRepository --> JsonFileService : читает/пишет\nJSON-файлы
+  TasksJsonRepository --> FileLockService : блокировка\nна запись
+}
+
+' ============================================================
+' ПАТТЕРН 3: Strategy Pattern (Risk Assessment)
+' ============================================================
+
+package "Паттерн Strategy" #FFF3E0 {
+
+  note as N3
+    **Strategy Pattern**
+    Позволяет подменить алгоритм
+    оценки рисков через DI
+    без изменения клиентского кода.
+  end note
+
+  interface IRiskAssessmentService <<interface>> {
+    +assessTask(input: TaskRiskInput): TaskRiskOutput
+    +assessProject(projectId: number): ProjectRiskOutput
+  }
+
+  class RiskStubService <<Strategy: Rule-based>> {
+    Текущая реализация:
+    набор правил (if/else)
+    --
+    +assessTask(input): TaskRiskOutput
+    +assessProject(projectId): ProjectRiskOutput
+  }
+
+  class "RiskMlService\n(будущее)" as RiskMlService <<Strategy: ML>> #F5F5F5 {
+    Будущая реализация:
+    регрессия + классификация
+    --
+    +assessTask(input): TaskRiskOutput
+    +assessProject(projectId): ProjectRiskOutput
+  }
+
+  class RiskController <<Controller>> {
+    -riskService: IRiskAssessmentService
+    --
+    +getProjectRisk(projectId: number): ProjectRiskOutput
+    +getTaskRisk(taskId: number): TaskRiskOutput
+  }
+
+  IRiskAssessmentService <|.. RiskStubService : implements
+  IRiskAssessmentService <|.. RiskMlService : implements\n(будущее)
+  RiskController --> IRiskAssessmentService : Strategy\n(через DI)
+  TasksService --> IRiskAssessmentService : вызывает\nпри смене статуса
+}
+
+' ============================================================
+' Guards (сквозная функциональность)
+' ============================================================
+
+package "Guards & Decorators" #FCE4EC {
+
+  class JwtAuthGuard <<Guard>> {
+    +canActivate(context): boolean
+    Проверяет JWT-токен
+  }
+
+  class AccountRolesGuard <<Guard>> {
+    +canActivate(context): boolean
+    Проверяет роль аккаунта
+    (admin / member / guest)
+  }
+
+  class TeamRolesGuard <<Guard>> {
+    +canActivate(context): boolean
+    Проверяет роль в команде
+    (owner / team_lead / developer / observer)
+    + scope по projectId
+  }
+
+  TasksController ..> JwtAuthGuard : @UseGuards
+  TasksController ..> AccountRolesGuard : @UseGuards
+  TasksController ..> TeamRolesGuard : @UseGuards
+}
+
+@enduml

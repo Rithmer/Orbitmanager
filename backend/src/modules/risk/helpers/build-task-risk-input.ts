@@ -1,5 +1,5 @@
-import { Task } from '../../../domain/models/task.model';
-import { TaskRiskInput } from '../../../domain/services/risk-assessment.interface';
+import { Task } from '@/domain/models/task.model';
+import { TaskRiskInput } from '@/domain/services/risk-assessment.interface';
 
 export function buildTaskRiskInput(
   task: Task,

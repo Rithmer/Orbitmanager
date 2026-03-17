@@ -1,4 +1,4 @@
-import { TaskStatus } from '../../common/enums/task-status.enum';
+import { TaskStatus } from '@/common/enums/task-status.enum';
 
 export interface Task {
   id: number;

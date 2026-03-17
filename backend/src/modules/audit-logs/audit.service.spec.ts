@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuditService } from './audit.service';
-import { AUDIT_LOG_REPOSITORY } from '../../domain/repositories/audit-log.repository';
-import { AuditAction } from '../../common/enums/audit-action.enum';
-import { AuditLog } from '../../domain/models/audit-log.model';
+import { AUDIT_LOG_REPOSITORY } from '@/domain/repositories/audit-log.repository';
+import { AuditAction } from '@/common/enums/audit-action.enum';
+import { AuditLog } from '@/domain/models/audit-log.model';
 
 const makeLog = (overrides: Partial<AuditLog> = {}): AuditLog => ({
   id: 1,

@@ -1,13 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { RiskStubService } from './risk-stub.service';
-import { TASK_REPOSITORY } from '../../domain/repositories/task.repository';
-import { PROJECT_REPOSITORY } from '../../domain/repositories/project.repository';
-import { AUDIT_LOG_REPOSITORY } from '../../domain/repositories/audit-log.repository';
-import { TaskStatus } from '../../common/enums/task-status.enum';
-import { AuditAction } from '../../common/enums/audit-action.enum';
-import type { TaskRiskInput } from '../../domain/services/risk-assessment.interface';
-import type { Task } from '../../domain/models/task.model';
+import { TASK_REPOSITORY } from '@/domain/repositories/task.repository';
+import { PROJECT_REPOSITORY } from '@/domain/repositories/project.repository';
+import { AUDIT_LOG_REPOSITORY } from '@/domain/repositories/audit-log.repository';
+import { TaskStatus } from '@/common/enums/task-status.enum';
+import { AuditAction } from '@/common/enums/audit-action.enum';
+import type { TaskRiskInput } from '@/domain/services/risk-assessment.interface';
+import type { Task } from '@/domain/models/task.model';
 
 const now = new Date();
 const isoNow = now.toISOString();

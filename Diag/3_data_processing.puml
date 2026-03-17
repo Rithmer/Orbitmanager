@@ -1,0 +1,176 @@
+@startuml
+' ============================================================
+' Диаграмма 3. Процесс обработки данных
+' БП1: Создание и планирование задачи
+' Цепочка: ввод → проверки → операция → запись в БД → ответ
+' ============================================================
+
+skinparam activity {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+
+title Диаграмма процесса обработки данных\nБП1: Создание задачи\n(ввод → проверки → операция → запись в БД → ответ)
+
+|Клиент (Frontend)|
+start
+:Пользователь заполняет форму создания задачи;
+
+:Клиентская валидация формы;
+note right
+  Обязательные поля:
+  • name (название)
+  • projectId (проект)
+  • deadline (срок)
+  • difficulty (1–5)
+  Опциональные:
+  • description
+end note
+
+:Отправить **POST /tasks**
+с JSON-телом (DTO);
+
+|Серверная часть (NestJS)|
+
+' --- Слой Controller ---
+partition "Controller Layer" #E8EAF6 {
+  :TasksController.create()
+  получает HTTP-запрос;
+
+  :ValidationPipe проверяет DTO:
+  - whitelist: true
+  - forbidNonWhitelisted: true
+  - transform: true;
+
+  if (DTO проходит валидацию?) then (нет)
+    |Клиент (Frontend)|
+    :Получить **400 Bad Request**
+    {statusCode, error, message, details[]};
+    stop
+  else (да)
+    |Серверная часть (NestJS)|
+  endif
+}
+
+' --- Слой Guards ---
+partition "Auth & RBAC Guards" #E0F2F1 {
+  :JwtAuthGuard: извлечь и проверить JWT;
+  if (Токен валиден?) then (нет)
+    |Клиент (Frontend)|
+    :Получить **401 Unauthorized**;
+    stop
+  else (да)
+    |Серверная часть (NestJS)|
+  endif
+
+  :AccountRolesGuard: проверить
+  accountRole ∈ {admin, member};
+  if (Роль аккаунта допустима?) then (нет)
+    |Клиент (Frontend)|
+    :Получить **403 Forbidden**;
+    stop
+  else (да)
+    |Серверная часть (NestJS)|
+  endif
+}
+
+' --- Слой Service ---
+partition "Service Layer (бизнес-логика)" #FFF3E0 {
+  :TasksService.create(dto, userId);
+
+  :Проверка FK: projectId существует\nв projects.json;
+  if (Проект найден?) then (нет)
+    |Клиент (Frontend)|
+    :Получить **404 Not Found**\n"Project not found";
+    stop
+  else (да)
+    |Серверная часть (NestJS)|
+  endif
+
+  :Определить teamId из проекта;
+
+  :TeamRolesGuard: проверить роль\nв команде (owner / team_lead);
+  if (Есть право\nсоздавать задачи?) then (нет)
+    |Клиент (Frontend)|
+    :Получить **403 Forbidden**\n"Insufficient team role";
+    stop
+  else (да)
+    |Серверная часть (NestJS)|
+  endif
+
+  :Валидация: deadline ≥ текущая дата;
+  if (Дедлайн корректен?) then (нет)
+    |Клиент (Frontend)|
+    :Получить **400 Bad Request**\n"Deadline must be in the future";
+    stop
+  else (да)
+    |Серверная часть (NestJS)|
+  endif
+
+  :Валидация: difficulty ∈ [1..5];
+  if (Сложность в допустимом диапазоне?) then (нет)
+    |Клиент (Frontend)|
+    :Получить **400 Bad Request**;
+    stop
+  else (да)
+    |Серверная часть (NestJS)|
+  endif
+}
+
+' --- Слой Repository (запись в БД) ---
+|Хранилище данных (JSON / PostgreSQL)|
+
+partition "Repository Layer (запись в хранилище)" #E8F5E9 {
+  :FileLockService.acquire('tasks');
+
+  :JsonFileService.read('tasks'):
+  прочитать из кэша или файла;
+
+  :Сгенерировать новый ID:
+  meta.lastId + 1;
+
+  :Сформировать объект task:
+  {id, projectId, name, description,
+   deadline, status='new', difficulty,
+   createdById=userId,
+   createdAt=now(), updatedAt=now()};
+
+  :Добавить в items[];
+
+  :JsonFileService.write('tasks'):
+  записать в tasks.tmp → rename
+  в tasks.json (атомарно);
+
+  :Инвалидировать кэш;
+
+  :FileLockService.release('tasks');
+}
+
+|Серверная часть (NestJS)|
+
+partition "Аудит" #E3F2FD {
+  :AuditService.log():
+  - userId = текущий пользователь
+  - action = 'create'
+  - entityType = 'task'
+  - entityId = task.id
+  - description = "Создана задача: {name}";
+
+  |Хранилище данных (JSON / PostgreSQL)|
+  :Записать в audit_logs.json (атомарно);
+}
+
+|Серверная часть (NestJS)|
+
+:Сформировать HTTP-ответ;
+
+|Клиент (Frontend)|
+:Получить **201 Created**
++ JSON с созданной задачей
+{id, name, status, projectId, ...};
+
+:Обновить UI: задача появляется\nв списке задач проекта;
+
+stop
+
+@enduml

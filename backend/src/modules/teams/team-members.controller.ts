@@ -19,12 +19,12 @@ import {
 } from '@nestjs/swagger';
 import { TeamsService } from './teams.service';
 import { AddTeamMemberDto, UpdateTeamMemberDto } from './dto';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { TeamRolesGuard } from '../../common/guards/team-roles.guard';
-import { TeamRoles } from '../../common/decorators/team-roles.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { AccountRole } from '../../common/enums/account-role.enum';
-import { TeamRole } from '../../common/enums/team-role.enum';
+import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
+import { TeamRolesGuard } from '@/common/guards/team-roles.guard';
+import { TeamRoles } from '@/common/decorators/team-roles.decorator';
+import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import { AccountRole } from '@/common/enums/account-role.enum';
+import { TeamRole } from '@/common/enums/team-role.enum';
 
 @ApiTags('Team Members')
 @ApiBearerAuth()

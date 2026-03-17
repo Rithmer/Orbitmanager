@@ -1,4 +1,4 @@
-import { TeamRole } from '../../common/enums/team-role.enum';
+import { TeamRole } from '@/common/enums/team-role.enum';
 
 export interface TeamMember {
   id: number;

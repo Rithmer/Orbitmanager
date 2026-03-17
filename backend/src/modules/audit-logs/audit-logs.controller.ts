@@ -12,10 +12,10 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { AuditService } from './audit.service';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { AccountRolesGuard } from '../../common/guards/account-roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { AccountRole } from '../../common/enums/account-role.enum';
+import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
+import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
+import { Roles } from '@/common/decorators/roles.decorator';
+import { AccountRole } from '@/common/enums/account-role.enum';
 
 @ApiTags('Audit Logs')
 @ApiBearerAuth()

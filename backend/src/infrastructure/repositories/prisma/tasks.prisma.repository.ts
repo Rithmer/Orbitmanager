@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
-import type { ITaskRepository } from '../../../domain/repositories/task.repository';
-import { Task } from '../../../domain/models/task.model';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service';
+import type { ITaskRepository } from '@/domain/repositories/task.repository';
+import { Task } from '@/domain/models/task.model';
 import type { Task as PrismaTask } from '@prisma/client';
 
 @Injectable()

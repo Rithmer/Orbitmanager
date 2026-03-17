@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
-import type { ITeamRepository } from '../../../domain/repositories/team.repository';
-import { Team } from '../../../domain/models/team.model';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service';
+import type { ITeamRepository } from '@/domain/repositories/team.repository';
+import { Team } from '@/domain/models/team.model';
 import type { Team as PrismaTeam } from '@prisma/client';
 
 @Injectable()

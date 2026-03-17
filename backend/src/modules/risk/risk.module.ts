@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { RiskController } from './risk.controller';
 import { RiskStubService } from './risk-stub.service';
-import { RISK_ASSESSMENT_SERVICE } from '../../domain/services/risk-assessment.interface';
+import { RISK_ASSESSMENT_SERVICE } from '@/domain/services/risk-assessment.interface';
 
 @Module({
   controllers: [RiskController],

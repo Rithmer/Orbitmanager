@@ -8,7 +8,7 @@ import {
   Matches,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { AccountRole } from '../../../common/enums/account-role.enum';
+import { AccountRole } from '@/common/enums/account-role.enum';
 
 export class CreateUserDto {
   @ApiProperty({ example: 'john_doe', description: 'Уникальный логин (3-50 символов, без спецсимволов)' })

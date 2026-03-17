@@ -19,11 +19,11 @@ import {
 } from '@nestjs/swagger';
 import { ProjectsService } from './projects.service';
 import { AddProjectMemberDto, UpdateProjectMemberDto } from './dto';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { AccountRolesGuard } from '../../common/guards/account-roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { AccountRole } from '../../common/enums/account-role.enum';
+import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
+import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
+import { Roles } from '@/common/decorators/roles.decorator';
+import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import { AccountRole } from '@/common/enums/account-role.enum';
 
 @ApiTags('Project Members')
 @ApiBearerAuth()

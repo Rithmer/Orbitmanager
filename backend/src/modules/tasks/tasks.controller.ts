@@ -21,10 +21,10 @@ import {
 } from '@nestjs/swagger';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto, UpdateTaskDto } from './dto';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { AccountRole } from '../../common/enums/account-role.enum';
-import { TaskStatus } from '../../common/enums/task-status.enum';
+import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
+import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import { AccountRole } from '@/common/enums/account-role.enum';
+import { TaskStatus } from '@/common/enums/task-status.enum';
 
 @ApiTags('Tasks')
 @ApiBearerAuth()

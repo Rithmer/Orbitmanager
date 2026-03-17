@@ -5,19 +5,19 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { TasksService } from './tasks.service';
-import { TASK_REPOSITORY } from '../../domain/repositories/task.repository';
-import { PROJECT_REPOSITORY } from '../../domain/repositories/project.repository';
-import { PROJECT_MEMBER_REPOSITORY } from '../../domain/repositories/project-member.repository';
-import { TEAM_MEMBER_REPOSITORY } from '../../domain/repositories/team-member.repository';
+import { TASK_REPOSITORY } from '@/domain/repositories/task.repository';
+import { PROJECT_REPOSITORY } from '@/domain/repositories/project.repository';
+import { PROJECT_MEMBER_REPOSITORY } from '@/domain/repositories/project-member.repository';
+import { TEAM_MEMBER_REPOSITORY } from '@/domain/repositories/team-member.repository';
 import { AuditService } from '../audit-logs/audit.service';
-import { TaskStatus } from '../../common/enums/task-status.enum';
-import { ProjectRole } from '../../common/enums/project-role.enum';
-import { TeamRole } from '../../common/enums/team-role.enum';
-import { AccountRole } from '../../common/enums/account-role.enum';
-import type { Task } from '../../domain/models/task.model';
-import type { Project } from '../../domain/models/project.model';
-import { ProjectStatus } from '../../common/enums/project-status.enum';
-import { BusinessException } from '../../common/exceptions/business.exception';
+import { TaskStatus } from '@/common/enums/task-status.enum';
+import { ProjectRole } from '@/common/enums/project-role.enum';
+import { TeamRole } from '@/common/enums/team-role.enum';
+import { AccountRole } from '@/common/enums/account-role.enum';
+import type { Task } from '@/domain/models/task.model';
+import type { Project } from '@/domain/models/project.model';
+import { ProjectStatus } from '@/common/enums/project-status.enum';
+import { BusinessException } from '@/common/exceptions/business.exception';
 
 const now = new Date();
 const futureISO = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();

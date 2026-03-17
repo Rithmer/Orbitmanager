@@ -1,13 +1,13 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
-import type { IRiskAssessmentService, TaskRiskInput, TaskRiskOutput, ProjectRiskOutput } from '../../domain/services/risk-assessment.interface';
-import type { ITaskRepository } from '../../domain/repositories/task.repository';
-import { TASK_REPOSITORY } from '../../domain/repositories/task.repository';
-import type { IProjectRepository } from '../../domain/repositories/project.repository';
-import { PROJECT_REPOSITORY } from '../../domain/repositories/project.repository';
-import type { IAuditLogRepository } from '../../domain/repositories/audit-log.repository';
-import { AUDIT_LOG_REPOSITORY } from '../../domain/repositories/audit-log.repository';
-import { AuditAction } from '../../common/enums/audit-action.enum';
-import { TaskStatus } from '../../common/enums/task-status.enum';
+import type { IRiskAssessmentService, TaskRiskInput, TaskRiskOutput, ProjectRiskOutput } from '@/domain/services/risk-assessment.interface';
+import type { ITaskRepository } from '@/domain/repositories/task.repository';
+import { TASK_REPOSITORY } from '@/domain/repositories/task.repository';
+import type { IProjectRepository } from '@/domain/repositories/project.repository';
+import { PROJECT_REPOSITORY } from '@/domain/repositories/project.repository';
+import type { IAuditLogRepository } from '@/domain/repositories/audit-log.repository';
+import { AUDIT_LOG_REPOSITORY } from '@/domain/repositories/audit-log.repository';
+import { AuditAction } from '@/common/enums/audit-action.enum';
+import { TaskStatus } from '@/common/enums/task-status.enum';
 import { buildTaskRiskInput } from './helpers/build-task-risk-input';
 
 @Injectable()

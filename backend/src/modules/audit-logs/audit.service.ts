@@ -1,13 +1,13 @@
 import { Injectable, Inject } from '@nestjs/common';
-import type { IAuditLogRepository } from '../../domain/repositories/audit-log.repository';
-import { AUDIT_LOG_REPOSITORY } from '../../domain/repositories/audit-log.repository';
-import { AuditAction } from '../../common/enums/audit-action.enum';
-import { AuditLog } from '../../domain/models/audit-log.model';
+import type { IAuditLogRepository } from '@/domain/repositories/audit-log.repository';
+import { AUDIT_LOG_REPOSITORY } from '@/domain/repositories/audit-log.repository';
+import { AuditAction } from '@/common/enums/audit-action.enum';
+import { AuditLog } from '@/domain/models/audit-log.model';
 import {
   QueryHelper,
   QueryParams,
   PaginatedResult,
-} from '../../common/helpers/query.helper';
+} from '@/common/helpers/query.helper';
 
 @Injectable()
 export class AuditService {

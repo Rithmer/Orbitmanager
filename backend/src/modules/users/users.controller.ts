@@ -21,11 +21,11 @@ import {
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CreateUserDto, UpdateUserDto } from './dto';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { AccountRolesGuard } from '../../common/guards/account-roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { AccountRole } from '../../common/enums/account-role.enum';
+import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
+import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
+import { Roles } from '@/common/decorators/roles.decorator';
+import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import { AccountRole } from '@/common/enums/account-role.enum';
 
 @ApiTags('Users')
 @ApiBearerAuth()

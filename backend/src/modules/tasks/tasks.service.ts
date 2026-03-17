@@ -5,29 +5,29 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
-import type { ITaskRepository } from '../../domain/repositories/task.repository';
-import { TASK_REPOSITORY } from '../../domain/repositories/task.repository';
-import type { IProjectRepository } from '../../domain/repositories/project.repository';
-import { PROJECT_REPOSITORY } from '../../domain/repositories/project.repository';
-import type { IProjectMemberRepository } from '../../domain/repositories/project-member.repository';
-import { PROJECT_MEMBER_REPOSITORY } from '../../domain/repositories/project-member.repository';
-import type { ITeamMemberRepository } from '../../domain/repositories/team-member.repository';
-import { TEAM_MEMBER_REPOSITORY } from '../../domain/repositories/team-member.repository';
-import { Task } from '../../domain/models/task.model';
-import { TaskStatus, ALLOWED_TASK_TRANSITIONS } from '../../common/enums/task-status.enum';
-import { ProjectRole } from '../../common/enums/project-role.enum';
-import { TeamRole } from '../../common/enums/team-role.enum';
-import { AccountRole } from '../../common/enums/account-role.enum';
+import type { ITaskRepository } from '@/domain/repositories/task.repository';
+import { TASK_REPOSITORY } from '@/domain/repositories/task.repository';
+import type { IProjectRepository } from '@/domain/repositories/project.repository';
+import { PROJECT_REPOSITORY } from '@/domain/repositories/project.repository';
+import type { IProjectMemberRepository } from '@/domain/repositories/project-member.repository';
+import { PROJECT_MEMBER_REPOSITORY } from '@/domain/repositories/project-member.repository';
+import type { ITeamMemberRepository } from '@/domain/repositories/team-member.repository';
+import { TEAM_MEMBER_REPOSITORY } from '@/domain/repositories/team-member.repository';
+import { Task } from '@/domain/models/task.model';
+import { TaskStatus, ALLOWED_TASK_TRANSITIONS } from '@/common/enums/task-status.enum';
+import { ProjectRole } from '@/common/enums/project-role.enum';
+import { TeamRole } from '@/common/enums/team-role.enum';
+import { AccountRole } from '@/common/enums/account-role.enum';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import {
   QueryHelper,
   QueryParams,
   PaginatedResult,
-} from '../../common/helpers/query.helper';
+} from '@/common/helpers/query.helper';
 import { AuditService } from '../audit-logs/audit.service';
-import { AuditAction } from '../../common/enums/audit-action.enum';
-import { BusinessException } from '../../common/exceptions/business.exception';
+import { AuditAction } from '@/common/enums/audit-action.enum';
+import { BusinessException } from '@/common/exceptions/business.exception';
 
 @Injectable()
 export class TasksService {

@@ -1,0 +1,81 @@
+@startuml
+' ============================================================
+' Диаграмма 1. Диаграмма вариантов использования
+' Сервис управления проектами и задачами
+' ============================================================
+
+skinparam actorStyle awesome
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor<<bp>> #E8F5E9
+  BackgroundColor<<ai>> #FFF3E0
+  BackgroundColor<<audit>> #E3F2FD
+}
+
+left to right direction
+
+' --- Актёры ---
+actor "Гость" as Guest
+actor "Пользователь\n(member)" as User
+actor "Администратор\n(admin)" as Admin
+actor "ИИ-модуль" as AI <<system>>
+
+Admin -|> User : «наследует»
+
+' --- Система ---
+rectangle "Сервис управления проектами и задачами" {
+
+  ' --- Аутентификация ---
+  usecase "UC1: Регистрация\nв системе" as UC1
+  usecase "UC2: Авторизация\n(вход / обновление токена)" as UC2
+
+  ' --- Команды ---
+  usecase "UC3: Создание\nи управление командой" as UC3
+  usecase "UC4: Управление\nсоставом команды" as UC4
+
+  ' --- Проекты ---
+  usecase "UC5: Создание\nи управление проектами" as UC5
+
+  ' --- Задачи (бизнес-процессы) ---
+  usecase "UC6: Создание\nи планирование задачи\n(БП1)" as UC6 <<bp>>
+  usecase "UC7: Назначение\nисполнителей на задачи" as UC7
+  usecase "UC8: Выполнение\nи изменение статуса\nзадачи (БП2)" as UC8 <<bp>>
+
+  ' --- Мониторинг и ИИ ---
+  usecase "UC9: Мониторинг\nпроекта и дашборд\n(БП3)" as UC9 <<bp>>
+  usecase "UC10: Прогнозирование\nрисков и сроков" as UC10 <<ai>>
+
+  ' --- Аудит ---
+  usecase "UC11: Просмотр\nжурнала действий\n(аудит)" as UC11 <<audit>>
+
+  ' --- Администрирование ---
+  usecase "UC12: Управление\nпользователями" as UC12
+}
+
+' --- Связи: Гость ---
+Guest --> UC1
+Guest --> UC2
+
+' --- Связи: Пользователь ---
+User --> UC2
+User --> UC3
+User --> UC4
+User --> UC5
+User --> UC6
+User --> UC7
+User --> UC8
+User --> UC9
+
+' --- Связи: Администратор ---
+Admin --> UC11
+Admin --> UC12
+
+' --- Связи: ИИ-модуль ---
+UC9 ..> UC10 : «include»
+UC10 <-- AI : прогноз\nи оценка рисков
+
+' --- Include / Extend ---
+UC6 ..> UC7 : «extend»\nназначить исполнителя\nсразу при создании
+UC8 ..> UC10 : «include»\nпересчёт рисков\nпри смене статуса
+
+@enduml

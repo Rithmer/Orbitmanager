@@ -12,8 +12,8 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import * as argon2 from 'argon2';
 import { Client } from 'pg';
-import { AppModule } from '../../src/app.module';
-import { GlobalExceptionFilter } from '../../src/common/filters/global-exception.filter';
+import { AppModule } from '@/app.module';
+import { GlobalExceptionFilter } from '@/common/filters/global-exception.filter';
 
 const TABLES = [
   'audit_logs',

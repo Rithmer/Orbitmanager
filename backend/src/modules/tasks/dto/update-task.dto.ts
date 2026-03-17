@@ -9,7 +9,7 @@ import {
   IsDateString,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { TaskStatus } from '../../../common/enums/task-status.enum';
+import { TaskStatus } from '@/common/enums/task-status.enum';
 
 export class UpdateTaskDto {
   @ApiPropertyOptional({ example: 'Обновлённое название' })
