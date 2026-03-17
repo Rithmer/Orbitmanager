@@ -1,198 +1,110 @@
 @startuml deployment_diagram
 ' ============================================================
-' Диаграмма 6. Диаграмма развёртывания
-' Раздельное развёртывание: Frontend, Backend, БД
-' Порты, взаимодействие, контейнеры, сети
+' Диаграмма 6. Развертывание
+' Текущий Docker Compose runtime
 ' ============================================================
 
-title Диаграмма развёртывания\nСервис управления проектами и задачами
+title Диаграмма 6. Развертывание\nDocker Compose: frontend -> backend -> postgres
 
+skinparam shadowing false
 skinparam node {
   BackgroundColor #FFFFFF
-  BorderColor #333333
+  BorderColor #4A5568
 }
 skinparam component {
   BackgroundColor #E8F5E9
+  BorderColor #4A5568
 }
 skinparam database {
   BackgroundColor #E3F2FD
+  BorderColor #4A5568
+}
+skinparam artifact {
+  BackgroundColor #FFF8E1
+  BorderColor #4A5568
+}
+skinparam folder {
+  BackgroundColor #F8FAFC
+  BorderColor #94A3B8
 }
 
-' ============================================================
-' ПОЛЬЗОВАТЕЛЬ
-' ============================================================
+legend right
+|= Маркер |= Значение |
+|<#FFFFFF>|Реализованный runtime|
+|<#F3F4F6>|Planned: будущий ML-контур|
+endlegend
 
 node "Устройство пользователя" as client {
-  component "Браузер" as browser {
-    [React SPA\n(TypeScript)\nPort: 5173 (dev)\nPort: 80 (prod)] as frontend
-  }
+  component "Браузер" as browser
 }
 
-' ============================================================
-' СЕТЬ
-' ============================================================
+cloud "Docker Network\napp-network" as network
 
-cloud "Сеть: Docker Network\n(app-network, bridge)" as network {
+node "Контейнер frontend\nDocker + nginx" <<Docker>> as frontend #F3F4F6 {
+  component "nginx\ncontainer port 80" as nginx
+  artifact "React/Vite scaffold\nстатическая сборка" as spa
 }
 
-' ============================================================
-' FRONTEND КОНТЕЙНЕР
-' ============================================================
-
-node "Контейнер: frontend" <<Docker>> as frontend_container {
-  component "nginx" as nginx {
-    [Статические файлы\nReact build\nPort: 80 → 80] as static_files
-  }
-  note right of nginx
-    Dockerfile:
-    FROM node:20 AS build
-    → npm run build
-    FROM nginx:alpine
-    → copy dist/ to /usr/share/nginx/html
-    EXPOSE 80
-  end note
-}
-
-' ============================================================
-' BACKEND КОНТЕЙНЕР
-' ============================================================
-
-node "Контейнер: backend" <<Docker>> as backend_container {
-
-  component "NestJS Application" as nestapp {
-    [main.ts\nPort: 3000] as mainapp
-
-    package "Модули" {
-      [Auth Module\n(JWT, argon2)] as auth_mod
-      [Users Module] as users_mod
-      [Teams Module] as teams_mod
-      [Projects Module] as projects_mod
-      [Tasks Module] as tasks_mod
-      [Task Assignments] as assign_mod
-      [Audit Logs Module] as audit_mod
-      [Risk / AI Module] as risk_mod
-    }
-
-    package "Infrastructure" {
-      [JsonFileService\n(read/write/cache)] as json_svc
-      [FileLockService\n(mutex)] as lock_svc
-      [TransactionService\n(atomic multi-file)] as tx_svc
-    }
-
-    package "Guards" {
-      [JwtAuthGuard] as jwt_guard
-      [AccountRolesGuard] as acct_guard
-      [TeamRolesGuard] as team_guard
-    }
-
-    [Swagger UI\n/api/docs] as swagger
-  }
-
-  note right of nestapp
-    Dockerfile:
-    FROM node:20-alpine
-    WORKDIR /app
-    COPY . .
-    RUN npm ci && npm run build
-    EXPOSE 3000
-    CMD ["node", "dist/main.js"]
-  end note
-}
-
-' ============================================================
-' ХРАНИЛИЩЕ ДАННЫХ (текущее — JSON)
-' ============================================================
-
-node "Volume: data-volume" <<Docker Volume>> as data_volume {
-  database "JSON-файлы\n(data/)" as json_db {
-    [users.json] as f1
-    [teams.json] as f2
-    [projects.json] as f3
-    [tasks.json] as f4
-    [task_assignments.json] as f5
-    [task_history.json] as f6
-    [audit_logs.json] as f7
-    [account_roles.json] as f8
-    [team_roles.json] as f9
-    [team_members.json] as f10
-  }
-}
-
-' ============================================================
-' БД (будущее — PostgreSQL)
-' ============================================================
-
-node "Контейнер: postgres\n(будущее)" <<Docker>> as pg_container #F5F5F5 {
-  database "PostgreSQL 16\nPort: 5432" as postgres {
-    [Таблицы: 10 сущностей\nPK, FK, UNIQUE, CHECK\nIndexes] as pg_tables
-  }
-  note right of postgres
-    Dockerfile:
-    FROM postgres:16-alpine
-    EXPOSE 5432
-    Переменные:
-    POSTGRES_DB=taskmanager
-    POSTGRES_USER=app
-    POSTGRES_PASSWORD=***
-  end note
-}
-
-' ============================================================
-' СВЯЗИ И ВЗАИМОДЕЙСТВИЕ
-' ============================================================
-
-browser -down-> nginx : HTTP\nPort 80
-nginx -down-> mainapp : Reverse Proxy\nHTTP → Port 3000\n(/api/*)
-
-mainapp -down-> json_svc : файловые операции
-json_svc -down-> json_db : read/write\n(atomic: tmp → rename)
-
-mainapp .[#999999].> postgres : <i>будущее:</i>\nTypeORM / Prisma\nTCP Port 5432
-
-' Внутренние связи backend
-mainapp --> swagger : /api/docs
-mainapp --> auth_mod
-mainapp --> jwt_guard
-
-' Сетевые связи
-frontend_container -[hidden]- network
-backend_container -[hidden]- network
-data_volume -[hidden]- network
-
-' ============================================================
-' DOCKER COMPOSE
-' ============================================================
-
-note bottom of network
-  **docker-compose.yml**
-  ─────────────────────────
-  services:
-    frontend:
-      build: ./frontend
-      ports: ["80:80"]
-      networks: [app-network]
-      depends_on: [backend]
-    backend:
-      build: ./backend
-      ports: ["3000:3000"]
-      volumes: [data-volume:/app/data]
-      networks: [app-network]
-      environment:
-        - PORT=3000
-        - JWT_SECRET=***
-        - JWT_EXPIRES_IN=15m
-        - JWT_REFRESH_EXPIRES_IN=7d
-    # postgres: (будущее)
-    #   image: postgres:16-alpine
-    #   ports: ["5432:5432"]
-    #   volumes: [pg-data:/var/lib/postgresql/data]
-    #   networks: [app-network]
-  volumes:
-    data-volume:
-    # pg-data:
-  networks:
-    app-network:
-      driver: bridge
+note right of frontend
+  Host port: 5173 -> 80
+  nginx отдает index.html и assets
+  и проксирует /api и /auth в backend
+  Предметный UI пока не реализован
 end note
+
+node "Контейнер backend\nDocker + NestJS" <<Docker>> as backend {
+  component "REST API\ncontainer port 3000" as api
+  component "Swagger UI\n/api/docs" as swagger
+  component "Prisma ORM" as prisma
+  component "Winston + LoggingInterceptor" as logging
+  artifact "docker-entrypoint.sh" as entrypoint
+  folder "bind mounts\nlogs/ и backups/" as mounts
+}
+
+note right of backend
+  Host port: 3000 -> 3000
+  Healthcheck: GET /
+  Modules: auth, users, teams,
+  projects, tasks, audit-logs, risk
+end note
+
+node "Контейнер postgres\nPostgreSQL 16-alpine" <<Docker>> as postgres {
+  database "task_manager" as db
+}
+
+note right of postgres
+  Internal port: 5432
+  Host port: ${DB_PORT:-5433} -> 5432
+  Prisma migrations и seed
+end note
+
+node "Planned ML-контур" <<planned>> as ml #F3F4F6 {
+  component "RiskMlService\nmodel runtime / retraining" as mlruntime
+  artifact "models/risk-model.*" as mlmodel
+}
+
+note right of ml
+  Вне текущего runtime-path.
+  Сейчас backend использует RiskStubService.
+end note
+
+browser --> nginx : HTTP :5173
+nginx --> spa : static files
+nginx --> api : /api и /auth\nHTTP :3000
+
+api --> swagger : /api/docs
+api --> prisma
+api --> logging
+api --> entrypoint
+api --> mounts
+prisma --> db : TCP 5432
+
+frontend -[hidden]- network
+backend -[hidden]- network
+postgres -[hidden]- network
+ml -[hidden]- network
+
+api ..> mlruntime : planned DI switch
+mlruntime --> mlmodel
 
 @enduml

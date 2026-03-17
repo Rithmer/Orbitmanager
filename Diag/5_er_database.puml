@@ -1,206 +1,120 @@
 @startuml
 ' ============================================================
 ' Диаграмма 5. ER-диаграмма базы данных
-' Нотация «воронья лапка» (Information Engineering / Crow's Foot)
-' 10 сущностей, PK, FK, UNIQUE, NOT NULL, справочники
+' Актуальное состояние Prisma / PostgreSQL
 ' ============================================================
 
-title ER-диаграмма базы данных\nНотация «воронья лапка» (Crow's Foot)\n10 сущностей
-
-skinparam linetype ortho
+title Диаграмма 5. ER-диаграмма базы данных\nPrisma schema -> PostgreSQL
 
 hide circle
+skinparam shadowing false
+skinparam linetype ortho
 skinparam class {
   BackgroundColor #FFFFFF
-  BorderColor #333333
+  BorderColor #4A5568
 }
 
-' ============================================================
-' СПРАВОЧНИКИ
-' ============================================================
-
-entity "account_roles" as ar #F5F5F5 {
+entity "users" as users {
   * **id** : int <<PK, auto-increment>>
   --
-  * name : varchar <<UNIQUE, NOT NULL>>
+  * login : varchar(50) <<UNIQUE, NOT NULL>>
+  * password : text <<NOT NULL>>
+  * full_name : text <<NOT NULL>>
+  * profession : text <<NOT NULL, default ''>>
+  * account_status : varchar <<NOT NULL, default 'active'>>
+  * account_role : varchar <<NOT NULL, default 'member'>>
+  * created_at : timestamp <<NOT NULL>>
+  * updated_at : timestamp <<NOT NULL>>
+}
+
+entity "teams" as teams {
+  * **id** : int <<PK, auto-increment>>
+  --
+  * name : text <<NOT NULL>>
+  * description : text <<NOT NULL, default ''>>
+  * created_at : timestamp <<NOT NULL>>
+  * created_by_id : int <<FK -> users.id, NOT NULL>>
+}
+
+entity "team_members" as team_members {
+  * **id** : int <<PK, auto-increment>>
+  --
+  * user_id : int <<FK -> users.id, NOT NULL>>
+  * team_id : int <<FK -> teams.id, NOT NULL>>
+  * team_role : varchar <<NOT NULL>>
   ..
-  //Значения: admin | member | guest//
+  UNIQUE(user_id, team_id)
 }
 
-entity "team_roles" as tr #F5F5F5 {
+entity "projects" as projects {
   * **id** : int <<PK, auto-increment>>
   --
-  * name : varchar <<UNIQUE, NOT NULL>>
-  ..
-  //Значения: owner | team_lead//
-  //| developer | observer//
-}
-
-' ============================================================
-' ПОЛЬЗОВАТЕЛИ
-' ============================================================
-
-entity "users" as u {
-  * **id** : int <<PK, auto-increment>>
-  --
-  * login : varchar <<UNIQUE, NOT NULL, 3..50>>
-  * password : varchar <<NOT NULL, argon2 hash>>
-  * fullName : varchar <<NOT NULL>>
-    profession : varchar <<nullable>>
-  * accountStatus : varchar <<NOT NULL, default 'active'>>
-  * accountRoleId : int <<FK → account_roles.id>>
-  * createdAt : datetime <<NOT NULL, auto>>
-  * updatedAt : datetime <<NOT NULL, auto>>
-}
-
-' ============================================================
-' КОМАНДЫ
-' ============================================================
-
-entity "teams" as t {
-  * **id** : int <<PK, auto-increment>>
-  --
-  * name : varchar <<NOT NULL>>
-    description : text <<nullable>>
-  * createdAt : datetime <<NOT NULL, auto>>
-  * createdById : int <<FK → users.id, NOT NULL>>
-}
-
-' ============================================================
-' УЧАСТНИКИ КОМАНДЫ
-' ============================================================
-
-entity "team_members" as tm {
-  * **id** : int <<PK, auto-increment>>
-  --
-  * userId : int <<FK → users.id, NOT NULL>>
-  * teamId : int <<FK → teams.id, NOT NULL>>
-  * teamRoleId : int <<FK → team_roles.id, NOT NULL>>
-    projectId : int <<FK → projects.id, nullable>>
-  ..
-  //UNIQUE(userId, teamId, projectId)//
-  //owner/developer: projectId = null//
-  //team_lead/observer: projectId = конкретный проект//
-}
-
-' ============================================================
-' ПРОЕКТЫ
-' ============================================================
-
-entity "projects" as p {
-  * **id** : int <<PK, auto-increment>>
-  --
-  * teamId : int <<FK → teams.id, NOT NULL>>
-  * name : varchar <<NOT NULL>>
-    description : text <<nullable>>
+  * team_id : int <<FK -> teams.id, NOT NULL>>
+  * name : text <<NOT NULL>>
+  * description : text <<NOT NULL, default ''>>
   * status : varchar <<NOT NULL, default 'active'>>
-  * createdAt : datetime <<NOT NULL, auto>>
-  * updatedAt : datetime <<NOT NULL, auto>>
-  ..
-  //status: active | on_hold//
-  //| completed | archived//
+  * created_at : timestamp <<NOT NULL>>
+  * updated_at : timestamp <<NOT NULL>>
 }
 
-' ============================================================
-' ЗАДАЧИ
-' ============================================================
-
-entity "tasks" as tk {
+entity "project_members" as project_members {
   * **id** : int <<PK, auto-increment>>
   --
-  * projectId : int <<FK → projects.id, NOT NULL>>
-  * name : varchar <<NOT NULL>>
-    description : text <<nullable>>
-  * deadline : datetime <<NOT NULL>>
+  * project_id : int <<FK -> projects.id, NOT NULL>>
+  * user_id : int <<FK -> users.id, NOT NULL>>
+  * role : varchar <<NOT NULL>>
+  * assigned_at : timestamp <<NOT NULL>>
+  ..
+  UNIQUE(project_id, user_id)
+}
+
+entity "tasks" as tasks {
+  * **id** : int <<PK, auto-increment>>
+  --
+  * project_id : int <<FK -> projects.id, NOT NULL>>
+  * name : text <<NOT NULL>>
+  * description : text <<NOT NULL, default ''>>
+  * deadline : timestamp <<NOT NULL>>
   * status : varchar <<NOT NULL, default 'new'>>
-  * difficulty : int <<NOT NULL, CHECK 1..5>>
-  * createdById : int <<FK → users.id, NOT NULL>>
-  * createdAt : datetime <<NOT NULL, auto>>
-  * updatedAt : datetime <<NOT NULL, auto>>
-  ..
-  //status: new | in_progress//
-  //| review | done | cancelled//
-  //Ограничение: deadline ≥ createdAt//
+  * difficulty : int <<NOT NULL>>
+    assignee_id : int <<FK -> users.id, nullable>>
+  * created_by_id : int <<FK -> users.id, NOT NULL>>
+  * created_at : timestamp <<NOT NULL>>
+  * updated_at : timestamp <<NOT NULL>>
 }
 
-' ============================================================
-' НАЗНАЧЕНИЯ ЗАДАЧ
-' ============================================================
-
-entity "task_assignments" as ta {
+entity "audit_logs" as audit_logs {
   * **id** : int <<PK, auto-increment>>
   --
-  * taskId : int <<FK → tasks.id, NOT NULL>>
-  * userId : int <<FK → users.id, NOT NULL>>
-  * assignedAt : datetime <<NOT NULL, auto>>
-  * status : varchar <<NOT NULL, default 'assigned'>>
-  ..
-  //status: assigned | in_progress//
-  //| completed | rejected//
-}
-
-' ============================================================
-' ИСТОРИЯ ЗАДАЧ
-' ============================================================
-
-entity "task_history" as th {
-  * **id** : int <<PK, auto-increment>>
-  --
-  * taskId : int <<FK → tasks.id, NOT NULL>>
-  * userId : int <<FK → users.id, NOT NULL>>
-  * oldStatus : varchar <<NOT NULL>>
-  * newStatus : varchar <<NOT NULL>>
-  * changedAt : datetime <<NOT NULL, auto>>
-    comment : text <<nullable>>
-  ..
-  //Автосоздание при смене статуса//
-}
-
-' ============================================================
-' ЖУРНАЛ ДЕЙСТВИЙ
-' ============================================================
-
-entity "audit_logs" as al {
-  * **id** : int <<PK, auto-increment>>
-  --
-  * userId : int <<FK → users.id, NOT NULL>>
+  * user_id : int <<FK -> users.id, NOT NULL>>
   * action : varchar <<NOT NULL>>
-  * entityType : varchar <<NOT NULL>>
-    entityId : int <<nullable>>
-  * timestamp : datetime <<NOT NULL, auto>>
-    description : text <<nullable>>
-  ..
-  //action: create | update | delete//
-  //| login | logout | assign//
-  //| status_change//
+  * entity_type : varchar <<NOT NULL>>
+    entity_id : int <<nullable>>
+    old_value : text <<nullable>>
+    new_value : text <<nullable>>
+  * timestamp : timestamp <<NOT NULL>>
+  * description : text <<NOT NULL, default ''>>
 }
 
-' ============================================================
-' СВЯЗИ (воронья лапка)
-' ============================================================
+users ||--o{ teams : "created_by_id"
+users ||--o{ team_members : "user_id"
+teams ||--o{ team_members : "team_id"
 
-' Справочники → Основные таблицы
-ar ||--o{ u : "accountRoleId"
-tr ||--o{ tm : "teamRoleId"
+teams ||--o{ projects : "team_id"
+users ||--o{ project_members : "user_id"
+projects ||--o{ project_members : "project_id"
 
-' Пользователи → Связи
-u ||--o{ t : "createdById\n(создатель команды)"
-u ||--o{ tm : "userId\n(участник)"
-u ||--o{ tk : "createdById\n(постановщик)"
-u ||--o{ ta : "userId\n(исполнитель)"
-u ||--o{ th : "userId\n(автор изменения)"
-u ||--o{ al : "userId\n(инициатор)"
+projects ||--o{ tasks : "project_id"
+users ||--o{ tasks : "created_by_id"
+users |o--o{ tasks : "assignee_id"
 
-' Команды → Участники, Проекты
-t ||--o{ tm : "teamId"
-t ||--o{ p : "teamId"
+users ||--o{ audit_logs : "user_id"
 
-' Проекты → Задачи, Участники (scope)
-p ||--o{ tk : "projectId"
-p ||--o{ tm : "projectId\n(scope, nullable)"
-
-' Задачи → Назначения, История
-tk ||--o{ ta : "taskId"
-tk ||--o{ th : "taskId"
+note bottom of audit_logs
+  Смена статуса задачи не хранится в отдельной таблице.
+  История отражается через:
+  action = status_change
+  old_value / new_value
+end note
 
 @enduml

@@ -1,62 +1,66 @@
 @startuml
 ' ============================================================
-' Диаграмма 1. Диаграмма вариантов использования
+' Диаграмма 1. Варианты использования
 ' Сервис управления проектами и задачами
 ' ============================================================
 
+title Диаграмма 1. Варианты использования\nTask Management API
+
+left to right direction
+skinparam shadowing false
 skinparam actorStyle awesome
 skinparam packageStyle rectangle
 skinparam usecase {
-  BackgroundColor<<bp>> #E8F5E9
-  BackgroundColor<<ai>> #FFF3E0
-  BackgroundColor<<audit>> #E3F2FD
+  BackgroundColor #FFFFFF
+  BorderColor #374151
+}
+skinparam usecase<<stub>> {
+  BackgroundColor #FFF3E0
+  BorderColor #D97706
+}
+skinparam usecase<<planned>> {
+  BackgroundColor #F5F5F5
+  BorderColor #9CA3AF
 }
 
-left to right direction
+legend right
+|= Маркер |= Смысл |
+|<#E8F5E9> реализовано | Текущая backend-функциональность |
+|<#FFF3E0> stub | Endpoint или provider есть, но логика ограничена |
+|<#F5F5F5> planned | Будущее видение, еще не реализовано |
+endlegend
 
-' --- Актёры ---
 actor "Гость" as Guest
 actor "Пользователь\n(member)" as User
 actor "Администратор\n(admin)" as Admin
-actor "ИИ-модуль" as AI <<system>>
 
-Admin -|> User : «наследует»
+Admin -|> User
 
-' --- Система ---
-rectangle "Сервис управления проектами и задачами" {
+rectangle "Сервис управления проектами и задачами" #E8F5E9 {
+  usecase "UC1: Регистрация\nPOST /auth/register" as UC1
+  usecase "UC2: Вход и refresh\nPOST /auth/login\nPOST /auth/refresh" as UC2
 
-  ' --- Аутентификация ---
-  usecase "UC1: Регистрация\nв системе" as UC1
-  usecase "UC2: Авторизация\n(вход / обновление токена)" as UC2
+  usecase "UC3: Команды\nCRUD /teams" as UC3
+  usecase "UC4: Участники команды\n/teams/:teamId/members" as UC4
 
-  ' --- Команды ---
-  usecase "UC3: Создание\nи управление командой" as UC3
-  usecase "UC4: Управление\nсоставом команды" as UC4
+  usecase "UC5: Проекты\nCRUD /projects" as UC5
+  usecase "UC6: Участники проекта\n/projects/:projectId/members" as UC6
 
-  ' --- Проекты ---
-  usecase "UC5: Создание\nи управление проектами" as UC5
+  usecase "UC7: Просмотр проектов\nи задач" as UC7
+  usecase "UC8: Создание и правка\nзадачи (БП1)" as UC8
+  usecase "UC9: Смена статуса задачи\nPATCH /tasks/:id (БП2)" as UC9
 
-  ' --- Задачи (бизнес-процессы) ---
-  usecase "UC6: Создание\nи планирование задачи\n(БП1)" as UC6 <<bp>>
-  usecase "UC7: Назначение\nисполнителей на задачи" as UC7
-  usecase "UC8: Выполнение\nи изменение статуса\nзадачи (БП2)" as UC8 <<bp>>
-
-  ' --- Мониторинг и ИИ ---
-  usecase "UC9: Мониторинг\nпроекта и дашборд\n(БП3)" as UC9 <<bp>>
-  usecase "UC10: Прогнозирование\nрисков и сроков" as UC10 <<ai>>
-
-  ' --- Аудит ---
-  usecase "UC11: Просмотр\nжурнала действий\n(аудит)" as UC11 <<audit>>
-
-  ' --- Администрирование ---
+  usecase "UC10: Оценка риска задачи\nи проекта" as UC10 <<stub>>
+  usecase "UC11: Журнал аудита\nGET /audit-logs" as UC11
   usecase "UC12: Управление\nпользователями" as UC12
+
+  usecase "UC13: Дашборд проекта /\nFrontend UI" as UC13 <<planned>>
+  usecase "UC14: Переобучение ML-\nпровайдера риска" as UC14 <<stub>>
 }
 
-' --- Связи: Гость ---
 Guest --> UC1
 Guest --> UC2
 
-' --- Связи: Пользователь ---
 User --> UC2
 User --> UC3
 User --> UC4
@@ -65,17 +69,32 @@ User --> UC6
 User --> UC7
 User --> UC8
 User --> UC9
+User --> UC10
+User --> UC13
 
-' --- Связи: Администратор ---
 Admin --> UC11
 Admin --> UC12
+Admin --> UC14
 
-' --- Связи: ИИ-модуль ---
-UC9 ..> UC10 : «include»
-UC10 <-- AI : прогноз\nи оценка рисков
+UC13 ..> UC10 : <<include>>
 
-' --- Include / Extend ---
-UC6 ..> UC7 : «extend»\nназначить исполнителя\nсразу при создании
-UC8 ..> UC10 : «include»\nпересчёт рисков\nпри смене статуса
+note right of UC10
+  Текущая реализация:
+  RiskStubService по GET endpoint-ам
+  (/tasks/:id/risk, /projects/:id/risk).
+  Полноценная ML-модель остается planned.
+end note
+
+note bottom of UC9
+  PATCH /tasks/:id не пересчитывает риск внутри
+  запроса. Для актуальной оценки используется
+  отдельный GET /tasks/:id/risk.
+end note
+
+note bottom of UC14
+  POST /risk/retrain существует только как
+  admin-only заглушка и не запускает реальное
+  обучение модели.
+end note
 
 @enduml

@@ -1,96 +1,94 @@
 @startuml
 ' ============================================================
-' Диаграмма 2. Диаграммы активности
-' Содержит две диаграммы:
-'   2а — БП2: Выполнение и изменение статуса задачи
-'   2б — Регистрация и авторизация
+' Диаграмма 2а. БП2: Изменение статуса задачи
 ' ============================================================
 
-' ============================================================
-' ДИАГРАММА 2а — БП2: Изменение статуса задачи
-' ============================================================
-title Диаграмма активности 2а\nБП2: Выполнение и изменение статуса задачи
+title Диаграмма активности 2а\nБП2: Изменение статуса задачи
+
+skinparam shadowing false
+skinparam activity {
+  BackgroundColor #FFFFFF
+  BorderColor #4A5568
+  DiamondBackgroundColor #FFF8E1
+}
+skinparam note {
+  BackgroundColor #F8FAFC
+  BorderColor #94A3B8
+}
 
 start
 
-:Пользователь отправляет запрос
-**PATCH /tasks/:id**
-с полем {newStatus, comment?};
-
-partition "Аутентификация" {
-  :JwtAuthGuard проверяет токен;
-  if (Токен валиден?) then (нет)
-    :Вернуть **401 Unauthorized**;
-    stop
-  else (да)
-    :Извлечь userId и роль из JWT;
-  endif
+partition "Клиент" #F3F4F6 {
+  :Отправить PATCH /tasks/:id\nс Bearer JWT и полем status;
 }
 
-partition "Авторизация (RBAC)" {
-  :Определить роль пользователя\nв команде проекта задачи;
-  if (Роль: owner / team_lead\n(своего проекта) / developer\n(назначен на задачу)?) then (нет)
-    :Вернуть **403 Forbidden**;
+partition "Controller + Guards" #E8F5E9 {
+  :JwtAuthGuard проверяет access token;
+  if (JWT валиден?) then (нет)
+    :401 Unauthorized;
     stop
-  else (да)
   endif
+
+  :TasksController.update()\nпередает id, dto, userId, accountRole;
 }
 
-partition "Бизнес-валидация" {
-  :Получить задачу из tasks.json;
-  if (Задача существует?) then (нет)
-    :Вернуть **404 Not Found**;
+partition "TasksService" #FFF8E1 {
+  :Загрузить task по id;
+  if (Задача найдена?) then (нет)
+    :404 Not Found;
     stop
-  else (да)
   endif
 
-  :Проверить допустимый переход\nstatus: oldStatus → newStatus;
+  :Загрузить project по task.projectId;
+  if (Проект найден?) then (нет)
+    :404 Not Found;
+    stop
+  endif
 
+  if (accountRole = admin?) then (да)
+    :Пропустить проверку членства;
+  else (нет)
+    :Проверить права:\nowner команды\nили team_lead проекта\nили назначенный developer;
+    if (Доступ разрешен?) then (нет)
+      :403 Forbidden;
+      stop
+    endif
+  endif
+
+  :Проверить переход статуса\nчерез ALLOWED_TASK_TRANSITIONS;
   note right
     Допустимые переходы:
-    new → in_progress, cancelled
-    in_progress → review, cancelled
-    review → done, in_progress
-    cancelled → new
-    done → (финальный)
+    new -> in_progress, cancelled
+    in_progress -> review, cancelled
+    review -> done, in_progress
+    cancelled -> new
+    done -> финальный
   end note
 
   if (Переход допустим?) then (нет)
-    :Вернуть **400 Bad Request**\n"Переход статуса запрещён";
+    :422 Unprocessable Entity;
     stop
-  else (да)
   endif
 }
 
-partition "Транзакция (atomic)" #LightGreen {
-  :Захватить lock на файлы:\ntasks, task_history, audit_logs;
-
-  :Обновить task.status\nи task.updatedAt;
-
-  :Создать запись в **task_history**:
-  - oldStatus
-  - newStatus
-  - userId
-  - changedAt
-  - comment;
-
-  :Создать запись в **audit_logs**:
-  - action = status_change
-  - entityType = task
-  - entityId = taskId;
-
-  :Записать все файлы (tmp → rename);
-  :Освободить lock;
+partition "Prisma + PostgreSQL" #E3F2FD {
+  :UPDATE tasks\nSET status, updated_at;
+  :INSERT INTO audit_logs\n(action='status_change',\n old_value, new_value,\n entity_type='task');
 }
 
-partition "Пересчёт рисков" {
-  :Вызвать **riskService.assessTask()**;
-  :Получить delayProbability, riskLevel;
+partition "Ответ" #FCE4EC {
+  :Вернуть обновленную задачу;
 }
 
-:Вернуть **200 OK**
-+ обновлённая задача
-+ riskLevel;
+partition "Клиент" #F3F4F6 {
+  :200 OK + Task;
+}
+
+note right
+  Риск не пересчитывается внутри PATCH.
+  Текущая оценка вызывается отдельно:
+  GET /tasks/:id/risk
+end note
 
 stop
 
