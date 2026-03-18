@@ -32,3 +32,5 @@ logs/
 dist/
 coverage/
 documentation_archive/
+frontend/
+fronendbeta/
