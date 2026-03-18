@@ -100,6 +100,10 @@ export class AuthService {
     });
   }
 
+  async me(userId: number) {
+    return this.usersService.findById(userId);
+  }
+
   private async generateTokens(payload: JwtPayload): Promise<TokenPair> {
     const accessExpiresIn = this.configService.get<string>('JWT_ACCESS_EXPIRES_IN') ?? '15m';
     const refreshExpiresIn = this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') ?? '7d';

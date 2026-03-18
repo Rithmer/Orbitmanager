@@ -1,7 +1,22 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, RefreshDto } from './dto';
+import { LoginDto, RefreshDto, RegisterDto } from './dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -10,7 +25,10 @@ export class AuthController {
 
   @Post('register')
   @ApiOperation({ summary: 'Регистрация нового пользователя' })
-  @ApiResponse({ status: 201, description: 'Пользователь зарегистрирован, токены выданы' })
+  @ApiResponse({
+    status: 201,
+    description: 'Пользователь зарегистрирован, токены выданы',
+  })
   @ApiResponse({ status: 409, description: 'Логин уже занят' })
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
@@ -32,5 +50,18 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Невалидный refresh-токен' })
   refresh(@Body() dto: RefreshDto) {
     return this.authService.refresh(dto.refreshToken);
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Получить текущего пользователя' })
+  @ApiResponse({
+    status: 200,
+    description: 'Сведения о текущем пользователе',
+  })
+  @ApiResponse({ status: 401, description: 'Неавторизовано' })
+  me(@CurrentUser('id') userId: number) {
+    return this.authService.me(userId);
   }
 }

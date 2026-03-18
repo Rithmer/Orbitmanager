@@ -25,6 +25,7 @@ const mockUser = {
 const mockUsersService = {
   findByLogin: jest.fn(),
   findEntityById: jest.fn(),
+  findById: jest.fn(),
   create: jest.fn().mockResolvedValue({
     id: 1,
     login: 'newuser',
@@ -170,5 +171,24 @@ describe('AuthService', () => {
     await expect(service.refresh('bad-token')).rejects.toThrow(
       UnauthorizedException,
     );
+  });
+
+  it('returns current user profile for me()', async () => {
+    const safeUser = {
+      id: mockUser.id,
+      login: mockUser.login,
+      fullName: mockUser.fullName,
+      profession: mockUser.profession,
+      accountStatus: mockUser.accountStatus,
+      accountRole: mockUser.accountRole,
+      createdAt: mockUser.createdAt,
+      updatedAt: mockUser.updatedAt,
+    };
+    mockUsersService.findById.mockResolvedValueOnce(safeUser);
+
+    const result = await service.me(mockUser.id);
+
+    expect(mockUsersService.findById).toHaveBeenCalledWith(mockUser.id);
+    expect(result).toEqual(safeUser);
   });
 });
