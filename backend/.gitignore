@@ -14,11 +14,15 @@ node_modules/
 dist/
 dist-ssr/
 
-# === Environment ===
+# === Environment (secrets!) ===
 .env
 .env.local
 .env.*.local
 *.local
+
+# === Data backups (keep .gitkeep) ===
+data/backups/*
+!data/backups/.gitkeep
 
 # === IDE ===
 .vscode/*
@@ -30,3 +34,7 @@ dist-ssr/
 *.njsproj
 *.sln
 *.sw?
+
+# === ML models (large binary files) ===
+models/*.joblib
+models/*.onnx
