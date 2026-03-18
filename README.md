@@ -98,6 +98,36 @@ docker compose up -d --build
 
 Это тоже работает, потому что в `docker-compose.yml` уже заданы dev-friendly значения по умолчанию.
 
+### Полный e2e-стек
+
+Для отдельного e2e-контура используется [docker-compose.e2e.yml](docker-compose.e2e.yml).
+Он поднимает отдельные `postgres-e2e`, `backend-e2e` и `frontend-e2e` и не мешает основному dev-стеку.
+
+Запуск:
+
+```bash
+docker compose -f docker-compose.e2e.yml up -d --build
+```
+
+Адреса e2e-контура:
+
+- Frontend: `http://localhost:5174`
+- Backend: `http://localhost:3001`
+- Swagger: `http://localhost:5174/api/docs`
+- PostgreSQL: `localhost:5434`, база `task_manager_e2e`
+
+Остановка:
+
+```bash
+docker compose -f docker-compose.e2e.yml down
+```
+
+Полный сброс e2e-базы:
+
+```bash
+docker compose -f docker-compose.e2e.yml down -v
+```
+
 ## Переменные окружения
 
 Root [.env.example](.env.example) нужен для `docker compose` и уже содержит рекомендуемые dev-настройки.
