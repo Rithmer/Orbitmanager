@@ -31,6 +31,9 @@ export interface ProjectRiskOutput {
 export interface IRiskAssessmentService {
   assessTask(input: TaskRiskInput): Promise<TaskRiskOutput>;
   assessProject(projectId: number): Promise<ProjectRiskOutput>;
+  assessProjectsBatch(
+    projectIds: number[],
+  ): Promise<Record<number, ProjectRiskOutput>>;
   loadModel?(): Promise<void>;
 }
 

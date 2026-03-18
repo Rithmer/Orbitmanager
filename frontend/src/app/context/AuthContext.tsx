@@ -6,7 +6,7 @@ import {
   useCallback,
   type ReactNode,
 } from 'react'
-import { api } from '../api/client'
+import { api, ApiError } from '../api/client'
 import { authApi } from '../api/auth'
 import type { User, LoginDto, RegisterDto } from '../types'
 import { AccountRole } from '../types'
@@ -52,8 +52,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authApi
         .me()
         .then(setUser)
-        .catch(() => {
-          api.clearTokens()
+        .catch((err) => {
+          if (err instanceof ApiError && err.status === 401) {
+            api.clearTokens()
+          }
         })
         .finally(() => setLoading(false))
     } else {

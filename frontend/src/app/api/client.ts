@@ -79,10 +79,11 @@ class ApiClient {
 
     if (res.status === 401 && this.refreshToken) {
       if (!this.refreshPromise) {
-        this.refreshPromise = this.doRefresh()
+        this.refreshPromise = this.doRefresh().finally(() => {
+          this.refreshPromise = null
+        })
       }
       const refreshed = await this.refreshPromise
-      this.refreshPromise = null
 
       if (refreshed) {
         headers['Authorization'] = `Bearer ${this.accessToken}`

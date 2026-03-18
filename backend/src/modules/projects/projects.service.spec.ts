@@ -45,9 +45,18 @@ const mockTeamMembership = {
   teamRole: TeamRole.OWNER,
 };
 
+const paginatedProjects = {
+  items: [mockProject],
+  total: 1,
+  page: 1,
+  limit: 20,
+  totalPages: 1,
+};
+
 const mockProjectRepository = {
   findAll: jest.fn().mockResolvedValue([mockProject]),
   findById: jest.fn().mockResolvedValue(mockProject),
+  findPaginated: jest.fn().mockResolvedValue(paginatedProjects),
   findByTeam: jest.fn().mockResolvedValue([mockProject]),
   findByTeams: jest.fn().mockResolvedValue([mockProject]),
   create: jest
@@ -126,6 +135,7 @@ const mockAuditService = {
 
 const mockProjectAccessService = {
   getVisibleProjects: jest.fn().mockResolvedValue([mockProject]),
+  getVisibleProjectIds: jest.fn().mockResolvedValue([mockProject.id]),
   assertProjectVisibility: jest.fn().mockResolvedValue(undefined),
   assertTeamOwnerOrAdmin: jest.fn().mockResolvedValue(undefined),
   assertCanManageProject: jest.fn().mockResolvedValue(undefined),
@@ -161,6 +171,9 @@ describe('ProjectsService', () => {
     mockProjectAccessService.getVisibleProjects.mockResolvedValue([
       mockProject,
     ]);
+    mockProjectAccessService.getVisibleProjectIds.mockResolvedValue([
+      mockProject.id,
+    ]);
     mockProjectAccessService.assertProjectVisibility.mockResolvedValue(
       undefined,
     );
@@ -183,14 +196,20 @@ describe('ProjectsService', () => {
     it('admin sees all projects', async () => {
       const result = await service.findAll({}, 10, AccountRole.ADMIN);
       expect(result.items).toHaveLength(1);
-      expect(mockProjectRepository.findAll).toHaveBeenCalled();
+      expect(mockProjectRepository.findPaginated).toHaveBeenCalledWith(
+        expect.objectContaining({ searchFields: ['name', 'description'] }),
+      );
     });
 
     it('regular user sees only visible projects via access service', async () => {
       const result = await service.findAll({}, 10, AccountRole.MEMBER);
       expect(result.items).toHaveLength(1);
-      expect(mockProjectAccessService.getVisibleProjects).toHaveBeenCalledWith(
-        10,
+      expect(
+        mockProjectAccessService.getVisibleProjectIds,
+      ).toHaveBeenCalledWith(10);
+      expect(mockProjectRepository.findPaginated).toHaveBeenCalledWith(
+        expect.objectContaining({ searchFields: ['name', 'description'] }),
+        [mockProject.id],
       );
     });
   });

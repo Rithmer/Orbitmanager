@@ -21,9 +21,18 @@ const mockUser: User = {
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
+const paginatedUsers = {
+  items: [mockUser],
+  total: 1,
+  page: 1,
+  limit: 20,
+  totalPages: 1,
+};
+
 const mockUserRepository = {
   findAll: jest.fn().mockResolvedValue([mockUser]),
   findById: jest.fn().mockResolvedValue(mockUser),
+  findPaginated: jest.fn().mockResolvedValue(paginatedUsers),
   findByLogin: jest.fn().mockResolvedValue(null),
   create: jest
     .fn()
@@ -97,6 +106,11 @@ describe('UsersService', () => {
       expect(
         (result.items[0] as Record<string, unknown>)['password'],
       ).toBeUndefined();
+      expect(mockUserRepository.findPaginated).toHaveBeenCalledWith(
+        expect.objectContaining({
+          searchFields: ['login', 'fullName', 'profession'],
+        }),
+      );
     });
   });
 

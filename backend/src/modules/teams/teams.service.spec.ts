@@ -42,6 +42,13 @@ const mockMember: TeamMember = {
 
 const mockTeamRepository = {
   findAll: jest.fn().mockResolvedValue([mockTeam]),
+  findPaginated: jest.fn().mockResolvedValue({
+    items: [mockTeam],
+    total: 1,
+    page: 1,
+    limit: 20,
+    totalPages: 1,
+  }),
   findById: jest.fn().mockResolvedValue(mockTeam),
   create: jest
     .fn()
@@ -99,7 +106,17 @@ const mockProjectMemberRepository = {
   findByUser: jest.fn().mockResolvedValue([]),
   findByUserAndProject: jest.fn().mockResolvedValue(null),
   create: jest.fn(),
-  update: jest.fn(),
+  update: jest
+    .fn()
+    .mockImplementation((id: number, partial: { role?: string }) =>
+      Promise.resolve({
+        id,
+        projectId: 100,
+        userId: 20,
+        role: partial.role ?? 'developer',
+        assignedAt: '2026-01-01T00:00:00.000Z',
+      }),
+    ),
   delete: jest.fn(),
   deleteByProject: jest.fn().mockResolvedValue(0),
   deleteByUserAndProjects: jest.fn().mockResolvedValue(0),
@@ -119,6 +136,7 @@ const mockTaskRepository = {
 
 const mockAuditService = {
   log: jest.fn().mockResolvedValue(undefined),
+  logMany: jest.fn().mockResolvedValue(undefined),
 };
 
 describe('TeamsService', () => {
@@ -150,8 +168,17 @@ describe('TeamsService', () => {
   describe('findAll', () => {
     it('should return all teams', async () => {
       const result = await service.findAll({});
+      expect(mockTeamRepository.findPaginated).toHaveBeenCalledWith(
+        expect.objectContaining({
+          searchFields: ['name', 'description'],
+        }),
+      );
       expect(result.items).toHaveLength(1);
       expect(result.items[0].name).toBe('Test Team');
+      expect(result.total).toBe(1);
+      expect(result.page).toBe(1);
+      expect(result.limit).toBe(20);
+      expect(result.totalPages).toBe(1);
     });
   });
 
@@ -238,6 +265,16 @@ describe('TeamsService', () => {
       expect(mockProjectMemberRepository.update).toHaveBeenCalledWith(77, {
         role: ProjectRole.OBSERVER,
       });
+      expect(mockAuditService.logMany).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            entityType: 'project_member',
+            entityId: 77,
+            oldValue: ProjectRole.DEVELOPER,
+            newValue: ProjectRole.OBSERVER,
+          }),
+        ]),
+      );
     });
   });
 
@@ -290,6 +327,15 @@ describe('TeamsService', () => {
       expect(
         mockProjectMemberRepository.deleteByUserAndProjects,
       ).toHaveBeenCalledWith(mockMember.userId, [100]);
+      expect(mockAuditService.logMany).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            entityType: 'project_member',
+            entityId: 77,
+            action: expect.anything(),
+          }),
+        ]),
+      );
       expect(mockTeamMemberRepository.delete).toHaveBeenCalledWith(
         mockMember.id,
       );

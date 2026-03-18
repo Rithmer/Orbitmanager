@@ -2,6 +2,7 @@ import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { ProjectRole } from '@/common/enums/project-role.enum';
 import { TeamRole } from '@/common/enums/team-role.enum';
+import { TtlCacheService } from '@/common/cache/ttl-cache.service';
 import type { Project } from '@/domain/models/project.model';
 import type { TeamMember } from '@/domain/models/team-member.model';
 import type { IProjectRepository } from '@/domain/repositories/project.repository';
@@ -10,6 +11,8 @@ import type { IProjectMemberRepository } from '@/domain/repositories/project-mem
 import { PROJECT_MEMBER_REPOSITORY } from '@/domain/repositories/project-member.repository';
 import type { ITeamMemberRepository } from '@/domain/repositories/team-member.repository';
 import { TEAM_MEMBER_REPOSITORY } from '@/domain/repositories/team-member.repository';
+
+const VISIBLE_PROJECTS_TTL = 60_000;
 
 @Injectable()
 export class ProjectAccessService {
@@ -20,9 +23,23 @@ export class ProjectAccessService {
     private readonly projectMemberRepository: IProjectMemberRepository,
     @Inject(TEAM_MEMBER_REPOSITORY)
     private readonly teamMemberRepository: ITeamMemberRepository,
+    private readonly cache: TtlCacheService,
   ) {}
 
   async getVisibleProjects(userId: number): Promise<Project[]> {
+    return this.cache.getOrSet(
+      `visible_projects:${userId}`,
+      () => this.computeVisibleProjects(userId),
+      VISIBLE_PROJECTS_TTL,
+    );
+  }
+
+  async getVisibleProjectIds(userId: number): Promise<number[]> {
+    const projects = await this.getVisibleProjects(userId);
+    return projects.map((project) => project.id);
+  }
+
+  private async computeVisibleProjects(userId: number): Promise<Project[]> {
     const teamMemberships = await this.teamMemberRepository.findByUser(userId);
     if (teamMemberships.length === 0) {
       return [];
@@ -45,11 +62,6 @@ export class ProjectAccessService {
     return this.dedupeProjects(
       allTeamProjects.filter((project) => visibleProjectIds.has(project.id)),
     );
-  }
-
-  async getVisibleProjectIds(userId: number): Promise<number[]> {
-    const projects = await this.getVisibleProjects(userId);
-    return projects.map((project) => project.id);
   }
 
   async assertProjectVisibility(

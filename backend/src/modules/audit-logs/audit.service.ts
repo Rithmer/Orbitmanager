@@ -1,10 +1,9 @@
 import { Injectable, Inject } from '@nestjs/common';
-import type { IAuditLogRepository } from '@/domain/repositories/audit-log.repository';
+import type { IAuditLogRepository, AuditLogFilters } from '@/domain/repositories/audit-log.repository';
 import { AUDIT_LOG_REPOSITORY } from '@/domain/repositories/audit-log.repository';
 import { AuditAction } from '@/common/enums/audit-action.enum';
 import { AuditLog } from '@/domain/models/audit-log.model';
-import {
-  QueryHelper,
+import type {
   QueryParams,
   PaginatedResult,
 } from '@/common/helpers/query.helper';
@@ -37,45 +36,36 @@ export class AuditService {
     });
   }
 
+  async logMany(
+    logs: {
+      userId: number;
+      action: AuditAction;
+      entityType: string;
+      entityId: number | null;
+      description?: string;
+      oldValue?: string | null;
+      newValue?: string | null;
+    }[],
+  ): Promise<void> {
+    if (logs.length === 0) return;
+    await this.auditLogRepository.createMany(
+      logs.map((l) => ({
+        userId: l.userId,
+        action: l.action,
+        entityType: l.entityType,
+        entityId: l.entityId,
+        oldValue: l.oldValue ?? null,
+        newValue: l.newValue ?? null,
+        timestamp: new Date().toISOString(),
+        description: l.description ?? '',
+      })),
+    );
+  }
+
   async findAll(
     params: QueryParams,
-    filters?: {
-      userId?: number;
-      entityType?: string;
-      entityId?: number;
-      action?: string;
-      from?: string;
-      to?: string;
-    },
+    filters?: AuditLogFilters,
   ): Promise<PaginatedResult<AuditLog>> {
-    let logs = await this.auditLogRepository.findAll();
-
-    if (filters?.userId) {
-      logs = logs.filter((l) => l.userId === filters.userId);
-    }
-    if (filters?.entityType) {
-      logs = logs.filter((l) => l.entityType === filters.entityType);
-    }
-    if (filters?.entityId) {
-      logs = logs.filter((l) => l.entityId === filters.entityId);
-    }
-    if (filters?.action) {
-      logs = logs.filter((l) => l.action === filters.action);
-    }
-    if (filters?.from) {
-      logs = logs.filter((l) => l.timestamp >= filters.from!);
-    }
-    if (filters?.to) {
-      logs = logs.filter((l) => l.timestamp <= filters.to!);
-    }
-
-    return QueryHelper.apply(logs, {
-      ...params,
-      searchFields: params.searchFields ?? [
-        'description',
-        'entityType',
-        'action',
-      ],
-    });
+    return this.auditLogRepository.findPaginated(params, filters);
   }
 }

@@ -11,9 +11,8 @@ import { AuditAction } from '@/common/enums/audit-action.enum';
 import { ProjectRole } from '@/common/enums/project-role.enum';
 import { ProjectStatus } from '@/common/enums/project-status.enum';
 import { TeamRole } from '@/common/enums/team-role.enum';
-import {
+import type {
   PaginatedResult,
-  QueryHelper,
   QueryParams,
 } from '@/common/helpers/query.helper';
 import { ProjectMember } from '@/domain/models/project-member.model';
@@ -56,15 +55,22 @@ export class ProjectsService {
     userId: number,
     userRole: AccountRole,
   ): Promise<PaginatedResult<Project>> {
-    const projects =
-      userRole === AccountRole.ADMIN
-        ? await this.projectRepository.findAll()
-        : await this.projectAccessService.getVisibleProjects(userId);
-
-    return QueryHelper.apply(projects, {
+    const queryParams = {
       ...params,
       searchFields: params.searchFields ?? ['name', 'description'],
-    });
+    };
+
+    if (userRole === AccountRole.ADMIN) {
+      return this.projectRepository.findPaginated(queryParams);
+    }
+
+    const visibleProjectIds =
+      await this.projectAccessService.getVisibleProjectIds(userId);
+    if (visibleProjectIds.length === 0) {
+      return { items: [], total: 0, page: 1, limit: params.limit ?? 20, totalPages: 1 };
+    }
+
+    return this.projectRepository.findPaginated(queryParams, visibleProjectIds);
   }
 
   async findById(
@@ -126,8 +132,9 @@ export class ProjectsService {
     dto: UpdateProjectDto,
     userId: number,
     userRole: AccountRole,
+    cachedProject?: Project,
   ): Promise<Project> {
-    const project = await this.findById(id, userId, userRole);
+    const project = cachedProject ?? (await this.findById(id, userId, userRole));
 
     await this.projectAccessService.assertCanManageProject(
       project,

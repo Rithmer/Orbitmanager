@@ -15,6 +15,49 @@ export interface PaginatedResult<T> {
   totalPages: number;
 }
 
+export interface DbPaginationArgs {
+  page: number;
+  limit: number;
+  skip: number;
+  take: number;
+}
+
+export function buildDbPagination(
+  page?: number,
+  limit?: number,
+): DbPaginationArgs {
+  const safePage = Math.max(1, page ?? 1);
+  const safeLimit = Math.min(100, Math.max(1, limit ?? 20));
+  return {
+    page: safePage,
+    limit: safeLimit,
+    skip: (safePage - 1) * safeLimit,
+    take: safeLimit,
+  };
+}
+
+export function buildPaginatedResult<T>(
+  items: T[],
+  total: number,
+  pagination: DbPaginationArgs,
+): PaginatedResult<T> {
+  return {
+    items,
+    total,
+    page: pagination.page,
+    limit: pagination.limit,
+    totalPages: Math.ceil(total / pagination.limit) || 1,
+  };
+}
+
+export function buildDbSort(
+  sort?: string,
+): { field: string; direction: 'asc' | 'desc' } | null {
+  if (!sort) return null;
+  const desc = sort.startsWith('-');
+  return { field: desc ? sort.slice(1) : sort, direction: desc ? 'desc' : 'asc' };
+}
+
 export class QueryHelper {
   static apply<T extends object>(
     items: T[],

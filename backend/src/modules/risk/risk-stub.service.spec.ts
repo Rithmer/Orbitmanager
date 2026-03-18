@@ -24,6 +24,7 @@ const mockTaskRepository = {
   findAll: jest.fn(),
   findById: jest.fn(),
   findByProject: jest.fn(),
+  findByProjects: jest.fn().mockResolvedValue([]),
   create: jest.fn(),
   update: jest.fn(),
   delete: jest.fn(),
@@ -41,6 +42,7 @@ const mockProjectRepository = {
 const mockAuditLogRepository = {
   findAll: jest.fn().mockResolvedValue([]),
   findById: jest.fn(),
+  findByEntityIds: jest.fn().mockResolvedValue([]),
   create: jest.fn(),
 };
 
@@ -355,6 +357,63 @@ describe('RiskStubService', () => {
           result.tasksAtRisk[1].delayProbability,
         );
       }
+    });
+  });
+
+  // ────────────── assessProjectsBatch ──────────────
+
+  describe('assessProjectsBatch', () => {
+    it('should return empty object for empty projectIds', async () => {
+      const result = await service.assessProjectsBatch([]);
+      expect(result).toEqual({});
+      expect(mockTaskRepository.findByProjects).not.toHaveBeenCalled();
+    });
+
+    it('should return low risk for projects with no active tasks', async () => {
+      mockTaskRepository.findByProjects.mockResolvedValueOnce([
+        { id: 1, projectId: 1, status: TaskStatus.DONE },
+        { id: 2, projectId: 1, status: TaskStatus.CANCELLED },
+      ]);
+
+      const result = await service.assessProjectsBatch([1]);
+      expect(result[1]).toBeDefined();
+      expect(result[1].riskScore).toBe(0);
+      expect(result[1].riskLevel).toBe('low');
+      expect(result[1].tasksAtRisk).toHaveLength(0);
+      expect(mockTaskRepository.findByProjects).toHaveBeenCalledWith([1]);
+    });
+
+    it('should return risk for multiple projects', async () => {
+      const tasks: Partial<Task>[] = [
+        {
+          id: 1,
+          projectId: 1,
+          name: 'Overdue',
+          status: TaskStatus.IN_PROGRESS,
+          difficulty: 4,
+          deadline: pastDate,
+          createdAt: new Date(
+            now.getTime() - 15 * 24 * 60 * 60 * 1000,
+          ).toISOString(),
+          assigneeId: 1,
+        },
+        {
+          id: 2,
+          projectId: 2,
+          name: 'Safe',
+          status: TaskStatus.NEW,
+          difficulty: 1,
+          deadline: futureDate,
+          createdAt: isoNow,
+          assigneeId: 2,
+        },
+      ];
+      mockTaskRepository.findByProjects.mockResolvedValueOnce(tasks);
+
+      const result = await service.assessProjectsBatch([1, 2]);
+      expect(result[1]).toBeDefined();
+      expect(result[2]).toBeDefined();
+      expect(Object.keys(result)).toHaveLength(2);
     });
   });
 });

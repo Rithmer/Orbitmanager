@@ -61,27 +61,33 @@ export class ProjectRolesGuard implements CanActivate {
       throw new ForbiddenException('Не указан ID проекта');
     }
 
-    // Load project to get teamId
     const project = await this.projectRepository.findById(projectId);
     if (!project) {
       throw new ForbiddenException('Проект не найден');
     }
 
-    // Team owner automatically passes all project-level role checks
     const teamMembership = await this.teamMemberRepository.findByUserAndTeam(
       user.id,
       project.teamId,
     );
+
+    const projectMembership =
+      teamMembership?.teamRole === TeamRole.OWNER
+        ? null
+        : await this.projectMemberRepository.findByUserAndProject(
+            user.id,
+            projectId,
+          );
+
+    request.projectAccessCache = {
+      project,
+      teamMembership: teamMembership ?? undefined,
+      projectMembership: projectMembership ?? undefined,
+    };
+
     if (teamMembership?.teamRole === TeamRole.OWNER) {
       return true;
     }
-
-    // Check project-level role
-    const projectMembership =
-      await this.projectMemberRepository.findByUserAndProject(
-        user.id,
-        projectId,
-      );
 
     if (!projectMembership) {
       throw new ForbiddenException('Вы не являетесь участником этого проекта');

@@ -126,6 +126,119 @@ export class RiskStubService implements IRiskAssessmentService {
     return { riskScore, riskLevel, tasksAtRisk: taskRisks, summary };
   }
 
+  async assessProjectsBatch(
+    projectIds: number[],
+  ): Promise<Record<number, ProjectRiskOutput>> {
+    if (projectIds.length === 0) return {};
+
+    const allTasks = await this.taskRepository.findByProjects(projectIds);
+
+    const tasksByProject = new Map<number, typeof allTasks>();
+    for (const task of allTasks) {
+      const list = tasksByProject.get(task.projectId) ?? [];
+      list.push(task);
+      tasksByProject.set(task.projectId, list);
+    }
+
+    const allActiveTasks = allTasks.filter(
+      (t) => t.status !== TaskStatus.DONE && t.status !== TaskStatus.CANCELLED,
+    );
+    const allActiveTaskIds = allActiveTasks.map((t) => t.id);
+
+    const allAuditLogs =
+      allActiveTaskIds.length > 0
+        ? await this.auditLogRepository.findByEntityIds(
+            'task',
+            allActiveTaskIds,
+          )
+        : [];
+
+    const result: Record<number, ProjectRiskOutput> = {};
+
+    for (const projectId of projectIds) {
+      const tasks = tasksByProject.get(projectId) ?? [];
+      const activeTasks = tasks.filter(
+        (t) =>
+          t.status !== TaskStatus.DONE && t.status !== TaskStatus.CANCELLED,
+      );
+
+      if (activeTasks.length === 0) {
+        result[projectId] = {
+          riskScore: 0,
+          riskLevel: 'low',
+          tasksAtRisk: [],
+          summary: 'В проекте нет активных задач. Риски отсутствуют.',
+        };
+        continue;
+      }
+
+      const taskRisks: {
+        taskId: number;
+        taskName: string;
+        delayProbability: number;
+      }[] = [];
+      let totalDelay = 0;
+
+      for (const task of activeTasks) {
+        const statusChangesCount = allAuditLogs.filter(
+          (l) =>
+            l.entityId === task.id &&
+            l.action === AuditAction.STATUS_CHANGE,
+        ).length;
+
+        const assigneeLoad = task.assigneeId
+          ? tasks.filter(
+              (t) =>
+                t.assigneeId === task.assigneeId &&
+                t.status !== TaskStatus.DONE &&
+                t.status !== TaskStatus.CANCELLED &&
+                t.id !== task.id,
+            ).length
+          : 0;
+
+        const input = buildTaskRiskInput(
+          task,
+          statusChangesCount,
+          assigneeLoad,
+        );
+        const { delayProbability } = this.calculateTaskRisk(input);
+        totalDelay += delayProbability;
+
+        if (delayProbability > 0.3) {
+          taskRisks.push({
+            taskId: task.id,
+            taskName: task.name,
+            delayProbability: Math.round(delayProbability * 100) / 100,
+          });
+        }
+      }
+
+      const avgDelay = totalDelay / activeTasks.length;
+      const riskScore = Math.round(avgDelay * 100);
+      const riskLevel = this.getRiskLevel(avgDelay);
+      taskRisks.sort((a, b) => b.delayProbability - a.delayProbability);
+
+      const highRiskCount = taskRisks.filter(
+        (t) => t.delayProbability > 0.6,
+      ).length;
+
+      result[projectId] = {
+        riskScore,
+        riskLevel,
+        tasksAtRisk: taskRisks,
+        summary: this.generateProjectSummary(
+          riskLevel,
+          riskScore,
+          activeTasks.length,
+          taskRisks.length,
+          highRiskCount,
+        ),
+      };
+    }
+
+    return result;
+  }
+
   // ────────────── Private helpers ──────────────
 
   private calculateTaskRisk(input: TaskRiskInput): {
