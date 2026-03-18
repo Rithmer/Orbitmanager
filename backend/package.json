@@ -4,6 +4,8 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "postinstall": "npm run db:generate",
+    "prebuild": "npm run db:generate",
     "build": "nest build",
     "format": "prettier --write \"{src,test}/**/*.ts\"",
     "start": "nest start",

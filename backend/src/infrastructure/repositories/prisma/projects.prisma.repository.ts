@@ -1,8 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
-import type { IProjectRepository } from '@/domain/repositories/project.repository';
+import type {
+  IProjectRepository,
+  ProjectListQuery,
+} from '@/domain/repositories/project.repository';
 import { Project } from '@/domain/models/project.model';
 import type { Project as PrismaProject } from '@prisma/client';
+import { buildOrderBy, buildStringSearch, getPagination } from './prisma-query.utils';
 
 @Injectable()
 export class ProjectsPrismaRepository implements IProjectRepository {
@@ -13,9 +17,50 @@ export class ProjectsPrismaRepository implements IProjectRepository {
     return rows.map((r) => this.toDomain(r));
   }
 
+  async findPage(params: ProjectListQuery) {
+    const { skip, take } = getPagination(params.page, params.limit);
+    const where = {
+      ...(params.projectIds ? { id: { in: params.projectIds } } : {}),
+      ...(params.teamId !== undefined ? { teamId: params.teamId } : {}),
+      ...(params.status ? { status: params.status } : {}),
+      ...buildStringSearch(params.search, ['name', 'description']),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.project.findMany({
+        where,
+        orderBy: buildOrderBy(
+          params.sort,
+          ['id', 'teamId', 'name', 'description', 'status', 'createdAt', 'updatedAt'],
+          'id',
+        ),
+        skip,
+        take,
+      }),
+      this.prisma.project.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((row) => this.toDomain(row)),
+      total,
+    };
+  }
+
   async findById(id: number): Promise<Project | null> {
     const row = await this.prisma.project.findUnique({ where: { id } });
     return row ? this.toDomain(row) : null;
+  }
+
+  async findByIds(ids: number[]): Promise<Project[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const rows = await this.prisma.project.findMany({
+      where: { id: { in: ids } },
+      orderBy: { id: 'asc' },
+    });
+    return rows.map((row) => this.toDomain(row));
   }
 
   async findByTeam(teamId: number): Promise<Project[]> {
@@ -27,11 +72,26 @@ export class ProjectsPrismaRepository implements IProjectRepository {
   }
 
   async findByTeams(teamIds: number[]): Promise<Project[]> {
+    if (teamIds.length === 0) return [];
     const rows = await this.prisma.project.findMany({
       where: { teamId: { in: teamIds } },
       orderBy: { id: 'asc' },
     });
     return rows.map((r) => this.toDomain(r));
+  }
+
+  async findIdsByTeams(teamIds: number[]): Promise<number[]> {
+    if (teamIds.length === 0) {
+      return [];
+    }
+
+    const rows = await this.prisma.project.findMany({
+      where: { teamId: { in: teamIds } },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.map((row) => row.id);
   }
 
   async create(project: Omit<Project, 'id'>): Promise<Project> {

@@ -15,7 +15,8 @@ export class PrismaService
     const connectionString = config.getOrThrow<string>('DATABASE_URL');
     const pool = new pg.Pool({
       connectionString,
-      max: config.get<number>('DB_POOL_MAX', 20),
+      min: config.get<number>('DB_POOL_MIN', 2),
+      max: config.get<number>('DB_POOL_MAX', 10),
       idleTimeoutMillis: config.get<number>('DB_POOL_IDLE_TIMEOUT', 30_000),
       connectionTimeoutMillis: config.get<number>(
         'DB_POOL_CONNECTION_TIMEOUT',
@@ -35,5 +36,9 @@ export class PrismaService
   async onModuleDestroy(): Promise<void> {
     await this.$disconnect();
     await this.pool.end();
+  }
+
+  async checkConnection(): Promise<void> {
+    await this.$queryRawUnsafe('SELECT 1');
   }
 }

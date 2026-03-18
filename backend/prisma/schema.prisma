@@ -39,6 +39,7 @@ model Team {
   members     TeamMember[]
   projects    Project[]
 
+  @@index([createdById])
   @@map("teams")
 }
 
@@ -52,6 +53,7 @@ model TeamMember {
   team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
   @@unique([userId, teamId])
+  @@index([teamId])
   @@map("team_members")
 }
 
@@ -69,6 +71,7 @@ model Project {
   tasks          Task[]
   calendarEvents CalendarEvent[]
 
+  @@index([teamId])
   @@map("projects")
 }
 
@@ -83,6 +86,7 @@ model ProjectMember {
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, userId])
+  @@index([userId])
   @@map("project_members")
 }
 
@@ -104,6 +108,8 @@ model Task {
   createdBy      User            @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Restrict)
   calendarEvents CalendarEvent[]
 
+  @@index([projectId])
+  @@index([assigneeId])
   @@map("tasks")
 }
 
@@ -120,6 +126,9 @@ model AuditLog {
 
   user User @relation(fields: [userId], references: [id], onDelete: Restrict)
 
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([timestamp])
   @@map("audit_logs")
 }
 
@@ -141,5 +150,6 @@ model CalendarEvent {
   project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   task    Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
 
+  @@index([userId, startDate])
   @@map("calendar_events")
 }

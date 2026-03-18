@@ -1,8 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
-import type { IAuditLogRepository } from '@/domain/repositories/audit-log.repository';
+import type {
+  AuditLogListQuery,
+  IAuditLogRepository,
+} from '@/domain/repositories/audit-log.repository';
 import { AuditLog } from '@/domain/models/audit-log.model';
 import type { AuditLog as PrismaAuditLog } from '@prisma/client';
+import { buildOrderBy, buildStringSearch, getPagination } from './prisma-query.utils';
 
 @Injectable()
 export class AuditLogsPrismaRepository implements IAuditLogRepository {
@@ -13,6 +17,44 @@ export class AuditLogsPrismaRepository implements IAuditLogRepository {
       orderBy: { id: 'asc' },
     });
     return rows.map((r) => this.toDomain(r));
+  }
+
+  async findPage(params: AuditLogListQuery) {
+    const { skip, take } = getPagination(params.page, params.limit);
+    const where = {
+      ...(params.userId !== undefined ? { userId: params.userId } : {}),
+      ...(params.entityType ? { entityType: params.entityType } : {}),
+      ...(params.entityId !== undefined ? { entityId: params.entityId } : {}),
+      ...(params.action ? { action: params.action } : {}),
+      ...(params.from || params.to
+        ? {
+            timestamp: {
+              ...(params.from ? { gte: new Date(params.from) } : {}),
+              ...(params.to ? { lte: new Date(params.to) } : {}),
+            },
+          }
+        : {}),
+      ...buildStringSearch(params.search, ['description', 'entityType', 'action']),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.auditLog.findMany({
+        where,
+        orderBy: buildOrderBy(
+          params.sort,
+          ['id', 'userId', 'action', 'entityType', 'entityId', 'timestamp'],
+          'id',
+        ),
+        skip,
+        take,
+      }),
+      this.prisma.auditLog.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((row) => this.toDomain(row)),
+      total,
+    };
   }
 
   async findById(id: number): Promise<AuditLog | null> {

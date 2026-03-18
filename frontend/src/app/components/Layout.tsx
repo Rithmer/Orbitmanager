@@ -16,8 +16,8 @@ import {
   ShieldCheck,
   X,
 } from 'lucide-react'
-import { useTheme } from '../context/ThemeContext'
-import { useAuth } from '../context/AuthContext'
+import { useTheme } from '../context/useTheme'
+import { useAuth } from '../context/useAuth'
 import { AccountRole, ACCOUNT_ROLE_LABELS } from '../types'
 
 export function Layout() {

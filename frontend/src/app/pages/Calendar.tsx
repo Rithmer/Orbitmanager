@@ -1,672 +1,802 @@
-import { useState, useEffect, useCallback } from 'react'
-import { createPortal } from 'react-dom'
+import { useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
+  AlertTriangle,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
-  X,
   Clock,
+  Filter,
   Plus,
+  Tag,
   Trash2,
   Edit3,
-  Filter,
-  CalendarDays,
-  Tag,
 } from 'lucide-react'
-import { useTheme } from '../context/ThemeContext'
-import { useAuth } from '../context/AuthContext'
-import { tasksApi } from '../api/tasks'
+import { useAuth } from '../context/useAuth'
+import { useTheme } from '../context/useTheme'
 import { calendarApi } from '../api/calendar'
-import { projectsApi } from '../api/projects'
+import { AccountRole, TASK_STATUS_LABELS, TaskStatus } from '../types'
 import { Modal, InputField, SelectField, SubmitButton, ErrorMessage } from '../components/Modal'
-import type { Task, CalendarEvent, Project } from '../types'
-import { TaskStatus, TASK_STATUS_LABELS, AccountRole } from '../types'
+import { PageShell } from '../components/PageShell'
 import {
   formatLocalDateInput,
   formatLocalTimeInput,
-  getLocalMonthRangeIso,
-  isSameLocalDate,
   toLocalDateTimeIso,
+  toLocalEndOfDayIso,
 } from '../utils/dateTime'
+import {
+  CalendarMonthViewSkeleton,
+} from '../features/calendar/calendar-view'
+import { DAY_NAMES, MONTH_NAMES, buildMonthCells, getLocalMonthTitle } from '../features/calendar/calendar-view.constants'
+import {
+  useCalendarMonthViewQuery,
+  type CalendarMonthView,
+  type CalendarViewEvent,
+} from '../features/calendar'
 
-const DAYS_OF_WEEK = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
-const MONTHS = [
-  'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
-  'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь',
-]
-const DAY_NAMES = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота']
+type CalendarFilter = 'all' | 'tasks' | 'events'
 
-type EventFilterType = 'all' | 'tasks' | 'events'
-
-interface CalItem {
+interface CalendarDayEntry {
   id: string
   type: 'task' | 'event'
   title: string
-  color: string
-  textColor: string
+  description: string
+  projectName: string | null
   time: string
   duration?: string
-  description?: string
-  status?: string
+  status?: TaskStatus
   eventId?: number
-  taskId?: number
-  projectName?: string
+  accentColor?: string
+  backgroundClass: string
+  textClass: string
+  sortTimestamp: number
 }
 
-const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  [TaskStatus.NEW]: { bg: 'bg-[#4880ff]', text: 'text-white' },
-  [TaskStatus.IN_PROGRESS]: { bg: 'bg-amber-500', text: 'text-white' },
-  [TaskStatus.REVIEW]: { bg: 'bg-purple-500', text: 'text-white' },
-  [TaskStatus.DONE]: { bg: 'bg-emerald-500', text: 'text-white' },
-  [TaskStatus.CANCELLED]: { bg: 'bg-red-500', text: 'text-white' },
-}
-
-const EVENT_COLORS = [
-  { value: '#3b82f6', label: 'Синий' },
-  { value: '#10b981', label: 'Зелёный' },
-  { value: '#8b5cf6', label: 'Фиолетовый' },
-  { value: '#f59e0b', label: 'Оранжевый' },
-  { value: '#ef4444', label: 'Красный' },
-  { value: '#ec4899', label: 'Розовый' },
-  { value: '#06b6d4', label: 'Голубой' },
+const EVENT_COLOR_OPTIONS = [
+  { label: 'Синий', value: '#3b82f6' },
+  { label: 'Фиолетовый', value: '#8b5cf6' },
+  { label: 'Зелёный', value: '#10b981' },
+  { label: 'Жёлтый', value: '#f59e0b' },
+  { label: 'Красный', value: '#ef4444' },
 ]
 
-const DURATION_OPTIONS = [
-  { value: '15', label: '15 минут' },
-  { value: '30', label: '30 минут' },
-  { value: '45', label: '45 минут' },
-  { value: '60', label: '1 час' },
-  { value: '90', label: '1.5 часа' },
-  { value: '120', label: '2 часа' },
-  { value: '180', label: '3 часа' },
-  { value: '240', label: '4 часа' },
-  { value: '480', label: '8 часов (весь день)' },
+const EVENT_DURATION_OPTIONS = [
+  { label: '30 минут', value: '30' },
+  { label: '1 час', value: '60' },
+  { label: '2 часа', value: '120' },
+  { label: '4 часа', value: '240' },
 ]
 
-function formatDuration(startDate: string, endDate: string): string {
-  const diffMs = new Date(endDate).getTime() - new Date(startDate).getTime()
-  const mins = Math.round(diffMs / 60000)
-  if (mins < 60) return `${mins} мин`
-  const hrs = Math.floor(mins / 60)
-  const remainMins = mins % 60
-  if (remainMins === 0) return `${hrs} ч`
-  return `${hrs} ч ${remainMins} мин`
+const TASK_STATUS_STYLES: Record<TaskStatus, { backgroundClass: string; textClass: string }> = {
+  [TaskStatus.NEW]: { backgroundClass: 'bg-blue-50 dark:bg-blue-500/10', textClass: 'text-[#4880ff]' },
+  [TaskStatus.IN_PROGRESS]: { backgroundClass: 'bg-amber-50 dark:bg-amber-500/10', textClass: 'text-amber-500' },
+  [TaskStatus.REVIEW]: { backgroundClass: 'bg-violet-50 dark:bg-violet-500/10', textClass: 'text-violet-500' },
+  [TaskStatus.DONE]: { backgroundClass: 'bg-emerald-50 dark:bg-emerald-500/10', textClass: 'text-emerald-500' },
+  [TaskStatus.CANCELLED]: { backgroundClass: 'bg-red-50 dark:bg-red-500/10', textClass: 'text-red-500' },
 }
 
-function getDaysInMonth(year: number, month: number) {
-  return new Date(year, month, 0).getDate()
+function pad2(value: number): string {
+  return String(value).padStart(2, '0')
 }
 
-function getFirstDayOfMonth(year: number, month: number) {
-  return new Date(year, month - 1, 1).getDay()
+function toLocalDateKey(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value)
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
+}
+
+function getTimeLabel(value: string): string {
+  const date = new Date(value)
+  return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`
+}
+
+function formatDurationLabel(minutes: number): string {
+  if (minutes <= 0) return '0 мин'
+  if (minutes < 60) return `${minutes} мин`
+
+  const hours = Math.floor(minutes / 60)
+  const remainingMinutes = minutes % 60
+  return remainingMinutes === 0 ? `${hours} ч` : `${hours} ч ${remainingMinutes} мин`
+}
+
+function getEventDurationMinutes(event: CalendarViewEvent): number {
+  const start = new Date(event.startDate).getTime()
+  const end = new Date(event.endDate).getTime()
+  return Math.max(0, Math.round((end - start) / 60000))
+}
+
+function buildCalendarDayEntries(
+  calendarMonthView: CalendarMonthView,
+  selectedDay: number | null,
+  filterType: CalendarFilter = 'all',
+): CalendarDayEntry[] {
+  if (selectedDay === null) {
+    return []
+  }
+
+  const selectedDateKey = toLocalDateKey(
+    new Date(calendarMonthView.year, calendarMonthView.month - 1, selectedDay),
+  )
+
+  const taskEntries = calendarMonthView.tasks
+    .filter((task) => filterType !== 'events' && toLocalDateKey(task.deadline) === selectedDateKey)
+    .map<CalendarDayEntry>((task) => {
+      const statusStyles = TASK_STATUS_STYLES[task.status as TaskStatus]
+      return {
+        id: `task-${task.id}`,
+        type: 'task',
+        title: task.name,
+        description: task.description,
+        projectName: task.projectName,
+        time: `Дедлайн: ${new Date(task.deadline).toLocaleDateString('ru-RU')}`,
+        status: task.status as TaskStatus,
+        backgroundClass: statusStyles.backgroundClass,
+        textClass: statusStyles.textClass,
+        sortTimestamp: new Date(task.deadline).getTime(),
+      }
+    })
+
+  const eventEntries = calendarMonthView.events
+    .filter((event) => filterType !== 'tasks' && toLocalDateKey(event.startDate) === selectedDateKey)
+    .map<CalendarDayEntry>((event) => ({
+      id: `event-${event.id}`,
+      type: 'event',
+      title: event.title,
+      description: event.description,
+      projectName: event.projectName,
+      time: event.allDay ? 'Весь день' : getTimeLabel(event.startDate),
+      duration: event.allDay ? undefined : formatDurationLabel(getEventDurationMinutes(event)),
+      eventId: event.id,
+      accentColor: event.color,
+      backgroundClass: 'bg-[#4880ff]',
+      textClass: 'text-white',
+      sortTimestamp: new Date(event.startDate).getTime(),
+    }))
+
+  return [...taskEntries, ...eventEntries].sort((left, right) => left.sortTimestamp - right.sortTimestamp)
+}
+
+function buildMonthDayItems(calendarMonthView: CalendarMonthView) {
+  const dayItems = new Map<number, CalendarDayEntry[]>()
+
+  for (const task of calendarMonthView.tasks) {
+    const taskDate = new Date(task.deadline)
+    if (
+      taskDate.getFullYear() !== calendarMonthView.year ||
+      taskDate.getMonth() + 1 !== calendarMonthView.month
+    ) {
+      continue
+    }
+
+    const statusStyles = TASK_STATUS_STYLES[task.status as TaskStatus]
+    const bucket = dayItems.get(taskDate.getDate()) ?? []
+    bucket.push({
+      id: `task-${task.id}`,
+      type: 'task',
+      title: task.name,
+      description: task.description,
+      projectName: task.projectName,
+      time: `Дедлайн: ${taskDate.toLocaleDateString('ru-RU')}`,
+      status: task.status as TaskStatus,
+      backgroundClass: statusStyles.backgroundClass,
+      textClass: statusStyles.textClass,
+      sortTimestamp: taskDate.getTime(),
+    })
+    dayItems.set(taskDate.getDate(), bucket)
+  }
+
+  for (const event of calendarMonthView.events) {
+    const eventDate = new Date(event.startDate)
+    if (
+      eventDate.getFullYear() !== calendarMonthView.year ||
+      eventDate.getMonth() + 1 !== calendarMonthView.month
+    ) {
+      continue
+    }
+
+    const bucket = dayItems.get(eventDate.getDate()) ?? []
+    bucket.push({
+      id: `event-${event.id}`,
+      type: 'event',
+      title: event.title,
+      description: event.description,
+      projectName: event.projectName,
+      time: event.allDay ? 'Весь день' : getTimeLabel(event.startDate),
+      duration: event.allDay ? undefined : formatDurationLabel(getEventDurationMinutes(event)),
+      eventId: event.id,
+      accentColor: event.color,
+      backgroundClass: 'bg-[#4880ff]',
+      textClass: 'text-white',
+      sortTimestamp: eventDate.getTime(),
+    })
+    dayItems.set(eventDate.getDate(), bucket)
+  }
+
+  return dayItems
 }
 
 export function Calendar() {
   const { isDark } = useTheme()
   const { user } = useAuth()
+  const queryClient = useQueryClient()
   const today = new Date()
+
   const [currentYear, setCurrentYear] = useState(today.getFullYear())
   const [currentMonth, setCurrentMonth] = useState(today.getMonth() + 1)
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [events, setEvents] = useState<CalendarEvent[]>([])
-  const [projects, setProjects] = useState<Project[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
-  const [filterType, setFilterType] = useState<EventFilterType>('all')
+  const [filterType, setFilterType] = useState<CalendarFilter>('all')
+  const [isEventFormOpen, setIsEventFormOpen] = useState(false)
+  const [selectedEventForEditing, setSelectedEventForEditing] = useState<CalendarViewEvent | null>(null)
+  const [eventFormError, setEventFormError] = useState('')
+  const [eventFormTitle, setEventFormTitle] = useState('')
+  const [eventFormDescription, setEventFormDescription] = useState('')
+  const [eventFormDate, setEventFormDate] = useState(formatLocalDateInput(today))
+  const [eventFormTime, setEventFormTime] = useState('09:00')
+  const [eventFormDurationMinutes, setEventFormDurationMinutes] = useState('60')
+  const [eventFormProjectId, setEventFormProjectId] = useState('')
+  const [eventFormColor, setEventFormColor] = useState('#3b82f6')
+  const [eventFormAllDay, setEventFormAllDay] = useState(false)
 
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
-  const [formTitle, setFormTitle] = useState('')
-  const [formDesc, setFormDesc] = useState('')
-  const [formDate, setFormDate] = useState('')
-  const [formTime, setFormTime] = useState('09:00')
-  const [formDuration, setFormDuration] = useState('60')
-  const [formColor, setFormColor] = useState('#3b82f6')
-  const [formProjectId, setFormProjectId] = useState('')
-  const [formLoading, setFormLoading] = useState(false)
-  const [formError, setFormError] = useState('')
+  const canManageCalendar =
+    user?.accountRole === AccountRole.ADMIN || user?.accountRole === AccountRole.MEMBER
 
-  const canManageCalendar = user?.accountRole === AccountRole.ADMIN || user?.accountRole === AccountRole.MEMBER
-
+  const calendarQuery = useCalendarMonthViewQuery({
+    year: currentYear,
+    month: currentMonth,
+  })
+  const calendarMonthView = calendarQuery.data ?? null
+  const viewYear = calendarMonthView?.year ?? currentYear
+  const viewMonth = calendarMonthView?.month ?? currentMonth
   const pageBg = isDark ? 'bg-[#1c2534]' : 'bg-[#f5f6fa]'
   const cardBg = isDark ? 'bg-[#273142]' : 'bg-white'
   const cardBorder = isDark ? 'border-[#313d4f]' : 'border-[#e8e8e8]'
+  const dayCellBorder = isDark ? 'border-[#313d4f]' : 'border-gray-200'
+  const dayCellHover = isDark ? 'hover:bg-[#273142]' : 'hover:bg-gray-50'
   const textPrimary = isDark ? 'text-[#f4f3f2]' : 'text-[#202224]'
   const textSecondary = isDark ? 'text-[#94a3b8]' : 'text-[#737373]'
-  const dayCellBorder = isDark ? 'border-[#313d4f]' : 'border-gray-100'
-  const dayCellHover = isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'
-  const dayHeaderBg = isDark ? 'bg-[#1e2a3a]' : 'bg-[#f0f4f8]'
-  const modalBg = isDark ? 'bg-[#273142]' : 'bg-white'
 
-  const loadData = useCallback(async () => {
-    setError('')
-    try {
-      const { from, to } = getLocalMonthRangeIso(currentYear, currentMonth)
-      const [tasksRes, eventsRes, projectsRes] = await Promise.all([
-        tasksApi.list({ limit: 500 }),
-        calendarApi.list({ limit: 500, from, to }).catch((e) => { console.warn('Failed to load calendar events:', e); return { items: [] as CalendarEvent[], total: 0, page: 1, limit: 500, totalPages: 0 } }),
-        projectsApi.list({ limit: 100 }).catch((e) => { console.warn('Failed to load projects:', e); return { items: [] as Project[], total: 0, page: 1, limit: 100, totalPages: 0 } }),
-      ])
-      setTasks(tasksRes.items)
-      setEvents(eventsRes.items)
-      setProjects(projectsRes.items)
-    } catch (e) {
-      console.error('Calendar: failed to load data:', e)
-      setError('Не удалось загрузить данные календаря. Попробуйте обновить страницу.')
-    } finally {
-      setLoading(false)
-    }
-  }, [currentYear, currentMonth])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData])
-
-  const getProjectName = (projectId: number | null) => {
-    if (!projectId) return ''
-    return projects.find((p) => p.id === projectId)?.name || ''
+  const invalidateCalendar = async () => {
+    await queryClient.invalidateQueries({
+      queryKey: ['calendar', 'month-view'],
+    })
   }
 
-  const getItemsForDay = (day: number): CalItem[] => {
-    const items: CalItem[] = []
+  const createEventMutation = useMutation({
+    mutationFn: async () => {
+      const startDate = eventFormAllDay
+        ? toLocalDateTimeIso(eventFormDate, '00:00')
+        : toLocalDateTimeIso(eventFormDate, eventFormTime)
+      const endDate = eventFormAllDay
+        ? toLocalEndOfDayIso(eventFormDate)
+        : new Date(
+            new Date(startDate).getTime() + Number(eventFormDurationMinutes) * 60_000,
+          ).toISOString()
 
-    if (filterType === 'all' || filterType === 'tasks') {
-      tasks
-        .filter((t) => t.deadline && isSameLocalDate(t.deadline, currentYear, currentMonth, day))
-        .forEach((t) => {
-          const sc = STATUS_COLORS[t.status] || STATUS_COLORS[TaskStatus.NEW]
-          items.push({
-            id: `task-${t.id}`,
-            type: 'task',
-            taskId: t.id,
-            title: t.name,
-            color: sc.bg,
-            textColor: sc.text,
-            time: new Date(t.deadline).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
-            description: t.description,
-            status: t.status,
-            projectName: getProjectName(t.projectId),
-          })
-        })
-    }
-
-    if (filterType === 'all' || filterType === 'events') {
-      events
-        .filter((e) => isSameLocalDate(e.startDate, currentYear, currentMonth, day))
-        .forEach((e) => {
-          items.push({
-            id: `event-${e.id}`,
-            type: 'event',
-            eventId: e.id,
-            title: e.title,
-            color: '',
-            textColor: 'text-white',
-            time: new Date(e.startDate).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
-            duration: formatDuration(e.startDate, e.endDate),
-            description: e.description,
-            projectName: getProjectName(e.projectId),
-          })
-        })
-    }
-
-    return items.sort((a, b) => a.time.localeCompare(b.time))
-  }
-
-  const daysInMonth = getDaysInMonth(currentYear, currentMonth)
-  const firstDayOfMonth = getFirstDayOfMonth(currentYear, currentMonth)
-
-  const prevMonth = () => {
-    if (currentMonth === 1) { setCurrentMonth(12); setCurrentYear(currentYear - 1) }
-    else setCurrentMonth(currentMonth - 1)
-  }
-
-  const nextMonth = () => {
-    if (currentMonth === 12) { setCurrentMonth(1); setCurrentYear(currentYear + 1) }
-    else setCurrentMonth(currentMonth + 1)
-  }
-
-  const isToday = (day: number) =>
-    today.getFullYear() === currentYear && today.getMonth() + 1 === currentMonth && today.getDate() === day
-
-  const handleDayClick = (day: number) => {
-    setSelectedDay(day)
-  }
-
-  const selectedDayItems = selectedDay ? getItemsForDay(selectedDay) : []
-
-  const getDayOfWeek = (day: number) => {
-    const date = new Date(currentYear, currentMonth - 1, day)
-    return DAY_NAMES[date.getDay()]
-  }
-
-  const openCreateForDay = (day?: number) => {
-    const d = day || selectedDay || today.getDate()
-    const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-    setFormTitle('')
-    setFormDesc('')
-    setFormDate(dateStr)
-    setFormTime('09:00')
-    setFormDuration('60')
-    setFormColor('#3b82f6')
-    setFormProjectId('')
-    setFormError('')
-    setShowCreateModal(true)
-  }
-
-  const handleCreate = async () => {
-    setFormLoading(true)
-    setFormError('')
-    try {
-      const startDate = toLocalDateTimeIso(formDate, formTime)
-      const endDate = new Date(new Date(startDate).getTime() + Number(formDuration) * 60000).toISOString()
-      await calendarApi.create({
-        title: formTitle,
-        description: formDesc || undefined,
+      return calendarApi.create({
+        title: eventFormTitle.trim(),
+        description: eventFormDescription.trim() || undefined,
         startDate,
         endDate,
-        color: formColor,
-        projectId: formProjectId ? Number(formProjectId) : undefined,
+        allDay: eventFormAllDay,
+        color: eventFormColor,
+        projectId: eventFormProjectId ? Number(eventFormProjectId) : undefined,
       })
-      setShowCreateModal(false)
-      await loadData()
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Ошибка создания')
-    } finally {
-      setFormLoading(false)
-    }
-  }
+    },
+    onSuccess: async () => {
+      setIsEventFormOpen(false)
+      resetEventForm()
+      await invalidateCalendar()
+    },
+    onError: (error) => {
+      setEventFormError(error instanceof Error ? error.message : 'Ошибка создания события')
+    },
+  })
 
-  const openEditEvent = (eventId: number) => {
-    const ev = events.find((e) => e.id === eventId)
-    if (!ev) return
-    setEditingEvent(ev)
-    const start = new Date(ev.startDate)
-    setFormTitle(ev.title)
-    setFormDesc(ev.description || '')
-    setFormDate(formatLocalDateInput(ev.startDate))
-    setFormTime(formatLocalTimeInput(start))
-    const diffMin = Math.round((new Date(ev.endDate).getTime() - start.getTime()) / 60000)
-    setFormDuration(String(diffMin))
-    setFormColor(ev.color)
-    setFormProjectId(ev.projectId ? String(ev.projectId) : '')
-    setFormError('')
-    setShowEditModal(true)
-  }
+  const updateEventMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedEventForEditing) {
+        throw new Error('Событие не выбрано')
+      }
 
-  const handleEdit = async () => {
-    if (!editingEvent) return
-    setFormLoading(true)
-    setFormError('')
-    try {
-      const startDate = toLocalDateTimeIso(formDate, formTime)
-      const endDate = new Date(new Date(startDate).getTime() + Number(formDuration) * 60000).toISOString()
-      await calendarApi.update(editingEvent.id, {
-        title: formTitle,
-        description: formDesc,
+      const startDate = eventFormAllDay
+        ? toLocalDateTimeIso(eventFormDate, '00:00')
+        : toLocalDateTimeIso(eventFormDate, eventFormTime)
+      const endDate = eventFormAllDay
+        ? toLocalEndOfDayIso(eventFormDate)
+        : new Date(
+            new Date(startDate).getTime() + Number(eventFormDurationMinutes) * 60_000,
+          ).toISOString()
+
+      return calendarApi.update(selectedEventForEditing.id, {
+        title: eventFormTitle.trim(),
+        description: eventFormDescription.trim(),
         startDate,
         endDate,
-        color: formColor,
-        projectId: formProjectId ? Number(formProjectId) : null,
+        allDay: eventFormAllDay,
+        color: eventFormColor,
+        projectId: eventFormProjectId ? Number(eventFormProjectId) : null,
       })
-      setShowEditModal(false)
-      setEditingEvent(null)
-      await loadData()
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Ошибка обновления')
-    } finally {
-      setFormLoading(false)
-    }
+    },
+    onSuccess: async () => {
+      setIsEventFormOpen(false)
+      setSelectedEventForEditing(null)
+      resetEventForm()
+      await invalidateCalendar()
+    },
+    onError: (error) => {
+      setEventFormError(error instanceof Error ? error.message : 'Ошибка обновления события')
+    },
+  })
+
+  const deleteEventMutation = useMutation({
+    mutationFn: async (eventId: number) => calendarApi.delete(eventId),
+    onSuccess: async () => {
+      await invalidateCalendar()
+    },
+  })
+
+  if (calendarQuery.isLoading && !calendarMonthView) {
+    return (
+      <PageShell title="Календарь" description="Загрузка календарной сетки..." className={pageBg}>
+        <CalendarMonthViewSkeleton />
+      </PageShell>
+    )
   }
 
-  const handleDeleteEvent = async (eventId: number) => {
-    if (!confirm('Удалить событие?')) return
-    try {
-      await calendarApi.delete(eventId)
-      await loadData()
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Ошибка удаления')
-    }
+  if (calendarQuery.isError && !calendarMonthView) {
+    return (
+      <PageShell
+        title="Календарь"
+        description="Не удалось загрузить календарь."
+        className={pageBg}
+        actions={
+          <button
+            onClick={() => calendarQuery.refetch()}
+            className="rounded-lg bg-[#4880ff] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#3a6fe0]"
+          >
+            Повторить
+          </button>
+        }
+      >
+        <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-black/10 bg-white/60 p-10 text-center dark:border-white/10 dark:bg-[#273142]">
+          <AlertTriangle className="h-10 w-10 text-red-500" />
+          <p className={`text-lg font-bold ${textPrimary}`}>Ошибка загрузки</p>
+          <p className={`max-w-xl text-sm ${textSecondary}`}>
+            {calendarQuery.error instanceof Error
+              ? calendarQuery.error.message
+              : 'Не удалось загрузить данные календаря. Попробуйте повторить запрос.'}
+          </p>
+        </div>
+      </PageShell>
+    )
   }
 
-  const cells: Array<{ type: 'empty' } | { type: 'day'; day: number }> = []
-  for (let i = 0; i < firstDayOfMonth; i++) cells.push({ type: 'empty' })
-  for (let d = 1; d <= daysInMonth; d++) cells.push({ type: 'day', day: d })
+  if (!calendarMonthView) {
+    return null
+  }
 
-  const filterBtns: { key: EventFilterType; label: string }[] = [
+  const monthCells = buildMonthCells(viewYear, viewMonth)
+  const refreshLabel = calendarQuery.isFetching && !calendarQuery.isLoading
+  const monthDayItems = buildMonthDayItems(calendarMonthView)
+  const selectedDayEntries = buildCalendarDayEntries(calendarMonthView, selectedDay, filterType)
+  const filterButtons: Array<{ key: CalendarFilter; label: string }> = [
     { key: 'all', label: 'Все' },
     { key: 'tasks', label: 'Задачи' },
     { key: 'events', label: 'События' },
   ]
 
-  if (loading) {
-    return (
-      <div className={`${pageBg} min-h-full flex items-center justify-center`}>
-        <div className="w-8 h-8 border-4 border-[#4880ff] border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
+  function resetEventForm() {
+    setEventFormError('')
+    setEventFormTitle('')
+    setEventFormDescription('')
+    setEventFormDate(formatLocalDateInput(today))
+    setEventFormTime('09:00')
+    setEventFormDurationMinutes('60')
+    setEventFormProjectId('')
+    setEventFormColor('#3b82f6')
+    setEventFormAllDay(false)
   }
 
-  if (error) {
-    return (
-      <div className={`${pageBg} min-h-full p-8`}>
-        <div className="flex flex-col items-center justify-center py-20 gap-4">
-          <CalendarDays className="w-10 h-10 text-red-500" />
-          <p className={`text-lg font-bold ${textPrimary}`}>Ошибка загрузки</p>
-          <p className={`text-sm ${textSecondary} text-center max-w-md`}>{error}</p>
-          <button onClick={() => { setLoading(true); loadData() }} className="bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2.5 rounded-lg text-sm font-semibold">
-            Повторить
-          </button>
-        </div>
-      </div>
-    )
+  function openEventCreation(day?: number) {
+    setSelectedEventForEditing(null)
+    resetEventForm()
+    const maxDay = new Date(viewYear, viewMonth, 0).getDate()
+    const targetDay = Math.min(day ?? selectedDay ?? today.getDate(), maxDay)
+    const targetDate = new Date(viewYear, viewMonth - 1, targetDay)
+    setEventFormDate(formatLocalDateInput(targetDate))
+    setIsEventFormOpen(true)
+  }
+
+  function openEventEditing(event: CalendarViewEvent) {
+    setSelectedEventForEditing(event)
+    setEventFormError('')
+    setEventFormTitle(event.title)
+    setEventFormDescription(event.description)
+    setEventFormDate(formatLocalDateInput(event.startDate))
+    setEventFormTime(formatLocalTimeInput(event.startDate))
+    setEventFormDurationMinutes(String(Math.max(30, getEventDurationMinutes(event) || 60)))
+    setEventFormProjectId(event.projectId ? String(event.projectId) : '')
+    setEventFormColor(event.color)
+    setEventFormAllDay(event.allDay)
+    setIsEventFormOpen(true)
+  }
+
+  const goToPreviousMonth = () => {
+    setSelectedDay(null)
+    if (currentMonth === 1) {
+      setCurrentYear((year) => year - 1)
+      setCurrentMonth(12)
+      return
+    }
+
+    setCurrentMonth((month) => month - 1)
+  }
+
+  const goToNextMonth = () => {
+    setSelectedDay(null)
+    if (currentMonth === 12) {
+      setCurrentYear((year) => year + 1)
+      setCurrentMonth(1)
+      return
+    }
+
+    setCurrentMonth((month) => month + 1)
   }
 
   return (
-    <div className={`${pageBg} min-h-full p-4 md:p-8`}>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-        <div>
-          <h1 className={`text-2xl font-bold ${textPrimary}`}>{MONTHS[currentMonth - 1]} {currentYear}</h1>
-          <p className={`mt-1 text-sm ${textSecondary}`}>Дедлайны задач и события на календаре</p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1">
-            <button onClick={prevMonth} className={`p-2 rounded-lg transition-colors ${isDark ? 'text-[#f4f3f2] hover:bg-[#273142]' : 'text-[#202224] hover:bg-gray-100'}`}>
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <button onClick={nextMonth} className={`p-2 rounded-lg transition-colors ${isDark ? 'text-[#f4f3f2] hover:bg-[#273142]' : 'text-[#202224] hover:bg-gray-100'}`}>
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
+    <PageShell
+      title={getLocalMonthTitle(viewYear, viewMonth)}
+      description="Дедлайны задач и события в календаре"
+      className={pageBg}
+      actions={
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={goToPreviousMonth}
+            className={`rounded-lg border px-3 py-2 transition-colors ${
+              isDark
+                ? 'border-[#313d4f] text-[#f4f3f2] hover:bg-[#273142]'
+                : 'border-gray-200 text-[#202224] hover:bg-gray-50'
+            }`}
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <button
+            onClick={goToNextMonth}
+            className={`rounded-lg border px-3 py-2 transition-colors ${
+              isDark
+                ? 'border-[#313d4f] text-[#f4f3f2] hover:bg-[#273142]'
+                : 'border-gray-200 text-[#202224] hover:bg-gray-50'
+            }`}
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
           {canManageCalendar && (
             <button
-              onClick={() => openCreateForDay()}
-              className="flex items-center gap-2 bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 btn-fizzy"
+              onClick={() => openEventCreation()}
+              className="inline-flex items-center gap-2 rounded-lg bg-[#4880ff] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#3a6fe0]"
             >
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Событие</span>
+              <Plus className="h-4 w-4" />
+              Событие
             </button>
           )}
         </div>
-      </div>
+      }
+    >
+      {refreshLabel && (
+        <div className={`mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${isDark ? 'bg-[#273142] text-[#94a3b8]' : 'bg-white text-[#737373] shadow-sm'}`}>
+          <span className="h-2 w-2 rounded-full bg-[#4880ff]" />
+          Обновление календарной сетки
+        </div>
+      )}
 
-      {/* Filters */}
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <Filter className={`w-4 h-4 ${textSecondary}`} />
-        {filterBtns.map((f) => (
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Filter className={`h-4 w-4 ${textSecondary}`} />
+        {filterButtons.map((button) => (
           <button
-            key={f.key}
-            onClick={() => setFilterType(f.key)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-              filterType === f.key
+            key={button.key}
+            onClick={() => setFilterType(button.key)}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+              filterType === button.key
                 ? 'bg-[#4880ff] text-white'
                 : isDark
                   ? 'bg-[#273142] text-[#94a3b8] hover:text-white'
-                  : 'bg-white text-gray-500 hover:text-gray-700 border border-gray-200'
+                  : 'border border-gray-200 bg-white text-gray-500 hover:text-gray-700'
             }`}
           >
-            {f.label}
+            {button.label}
           </button>
         ))}
       </div>
 
-      <div className={`${cardBg} border ${cardBorder} rounded-xl overflow-hidden`}>
-        <div className={`grid grid-cols-7 ${dayHeaderBg}`}>
-          {DAYS_OF_WEEK.map((d) => (
-            <div key={d} className={`py-3 text-center text-xs font-bold uppercase tracking-wider ${textSecondary}`}>{d}</div>
+      <div className={`${cardBg} overflow-hidden rounded-xl border ${cardBorder}`}>
+        <div className="grid grid-cols-7 border-b border-black/5 dark:border-white/5">
+          {DAY_NAMES.map((dayName) => (
+            <div
+              key={dayName}
+              className={`py-3 text-center text-xs font-bold uppercase tracking-wider ${textSecondary}`}
+            >
+              {dayName}
+            </div>
           ))}
         </div>
 
         <div className="grid grid-cols-7">
-          {cells.map((cell, idx) => {
+          {monthCells.map((cell, index) => {
             if (cell.type === 'empty') {
-              return <div key={`empty-${idx}`} className={`border-t border-r ${dayCellBorder} min-h-[80px] md:min-h-[110px] ${idx % 7 === 6 ? 'border-r-0' : ''}`} />
+              return (
+                <div
+                  key={`empty-${index}`}
+                  className={`min-h-[92px] border-t border-r p-2 md:min-h-[120px] ${dayCellBorder} ${
+                    index % 7 === 6 ? 'border-r-0' : ''
+                  }`}
+                />
+              )
             }
-            const { day } = cell
-            const dayItems = getItemsForDay(day)
-            const todayCell = isToday(day)
-            const colIdx = (firstDayOfMonth + day - 1) % 7
+
+            const items = monthDayItems.get(cell.day) ?? []
+            const visibleItems = items.filter((entry) => {
+              if (filterType === 'tasks') return entry.type === 'task'
+              if (filterType === 'events') return entry.type === 'event'
+              return true
+            })
+            const isToday =
+              cell.day === today.getDate() &&
+              viewMonth === today.getMonth() + 1 &&
+              viewYear === today.getFullYear()
 
             return (
-              <div
-                key={`day-${day}`}
-                onClick={() => handleDayClick(day)}
-                className={`border-t border-r ${dayCellBorder} min-h-[80px] md:min-h-[110px] p-1.5 md:p-2 transition-colors cursor-pointer
-                  ${colIdx === 6 ? 'border-r-0' : ''}
-                  ${dayCellHover}
-                  ${todayCell ? (isDark ? 'bg-[#4880ff]/10' : 'bg-blue-50/60') : ''}
-                `}
+              <button
+                key={`day-${cell.day}`}
+                type="button"
+                onClick={() => setSelectedDay(cell.day)}
+                className={`min-h-[92px] border-t border-r p-2 text-left transition-colors md:min-h-[120px] ${dayCellBorder} ${dayCellHover} ${
+                  index % 7 === 6 ? 'border-r-0' : ''
+                } ${isToday ? (isDark ? 'bg-[#4880ff]/10' : 'bg-blue-50/60') : ''}`}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <span className={`text-xs md:text-sm font-bold w-6 h-6 md:w-7 md:h-7 flex items-center justify-center rounded-full ${todayCell ? 'bg-[#4880ff] text-white' : textPrimary}`}>
-                    {day}
+                <div className="mb-1 flex items-center justify-between">
+                  <span
+                    className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold md:h-7 md:w-7 ${
+                      isToday ? 'bg-[#4880ff] text-white' : textPrimary
+                    }`}
+                  >
+                    {cell.day}
                   </span>
                 </div>
-                <div className="space-y-0.5 md:space-y-1">
-                  {dayItems.slice(0, 2).map((item) => (
+                <div className="space-y-1">
+                  {visibleItems.slice(0, 2).map((entry) => (
                     <div
-                      key={item.id}
-                      className={`text-[9px] md:text-[10px] font-semibold px-1 md:px-1.5 py-0.5 rounded truncate ${
-                        item.type === 'task'
-                          ? `${item.color} ${item.textColor}`
-                          : 'text-white'
-                      }`}
-                      style={item.type === 'event' ? { backgroundColor: events.find((e) => e.id === item.eventId)?.color || '#3b82f6' } : undefined}
+                      key={entry.id}
+                      className={`truncate rounded px-1.5 py-0.5 text-[10px] font-semibold ${entry.backgroundClass} ${entry.textClass}`}
+                      style={entry.type === 'event' ? { backgroundColor: entry.accentColor ?? '#4880ff' } : undefined}
                     >
-                      {item.type === 'event' && <span className="mr-0.5">&#9679;</span>}
-                      {item.title}
+                      {entry.type === 'event' && <span className="mr-0.5">●</span>}
+                      {entry.title}
                     </div>
                   ))}
-                  {dayItems.length > 2 && (
-                    <div className={`text-[9px] md:text-[10px] font-semibold ${textSecondary}`}>+{dayItems.length - 2} ещё</div>
+                  {visibleItems.length > 2 && (
+                    <div className={`text-[10px] font-semibold ${textSecondary}`}>+{visibleItems.length - 2} ещё</div>
                   )}
                 </div>
-              </div>
+              </button>
             )
           })}
         </div>
       </div>
 
-      {/* Day Detail Modal */}
-      {selectedDay !== null && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 modal-overlay-enter" onClick={() => setSelectedDay(null)}>
-          <div className={`${modalBg} rounded-2xl shadow-2xl w-full max-w-md overflow-hidden modal-content-enter`} onClick={(e) => e.stopPropagation()}>
-            <div className={`flex items-center justify-between px-6 py-4 border-b ${isDark ? 'border-[#313d4f]' : 'border-gray-100'}`}>
+      <Modal
+        open={selectedDay !== null}
+        onClose={() => setSelectedDay(null)}
+        title={selectedDay ? `${selectedDay} ${MONTH_NAMES[viewMonth - 1]}` : 'День календаря'}
+        maxWidth="max-w-2xl"
+      >
+        {selectedDay !== null ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className={`font-bold text-lg ${textPrimary}`}>{selectedDay} {MONTHS[currentMonth - 1]}</h2>
-                <p className={`text-sm capitalize ${textSecondary}`}>
-                  {getDayOfWeek(selectedDay)}
-                  {isToday(selectedDay) && (
-                    <span className="ml-2 text-[10px] font-bold bg-[#4880ff] text-white px-2 py-0.5 rounded-full uppercase tracking-wide">Сегодня</span>
-                  )}
+                <p className={`text-sm font-semibold ${textPrimary}`}>
+                  {selectedDay} {MONTH_NAMES[viewMonth - 1]}
                 </p>
+                <p className={`text-xs ${textSecondary}`}>{viewYear}</p>
               </div>
-              <div className="flex items-center gap-2">
-                {canManageCalendar && (
-                  <button
-                    onClick={() => openCreateForDay(selectedDay)}
-                    className="p-2 rounded-lg bg-[#4880ff] text-white hover:bg-[#3a6fe0] transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                )}
-                <button onClick={() => setSelectedDay(null)} className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-[#1c2534] text-[#94a3b8]' : 'hover:bg-gray-100 text-gray-400'}`}>
-                  <X className="w-5 h-5" />
+              {canManageCalendar && (
+                <button
+                  onClick={() => openEventCreation(selectedDay)}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#4880ff] px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#3a6fe0]"
+                >
+                  <Plus className="h-4 w-4" />
+                  Событие
                 </button>
-              </div>
+              )}
             </div>
 
-            <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
-              {selectedDayItems.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 gap-3">
-                  <div className={`w-14 h-14 rounded-full flex items-center justify-center ${isDark ? 'bg-[#1c2534]' : 'bg-gray-50'}`}>
-                    <Clock className={`w-6 h-6 ${textSecondary}`} />
-                  </div>
-                  <p className={`text-sm font-semibold ${textSecondary}`}>Нет событий</p>
-                  <p className={`text-xs ${textSecondary}`}>В этот день нет задач и событий</p>
+            {selectedDayEntries.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-3 py-10">
+                <div className={`flex h-14 w-14 items-center justify-center rounded-full ${isDark ? 'bg-[#1c2534]' : 'bg-gray-50'}`}>
+                  <Clock className={`h-6 w-6 ${textSecondary}`} />
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {selectedDayItems.map((item) => (
-                    <div key={item.id} className={`flex gap-3 p-3 md:p-4 rounded-xl ${isDark ? 'bg-[#1c2534]' : 'bg-gray-50'}`}>
+                <p className={`text-sm font-semibold ${textSecondary}`}>Нет событий</p>
+                <p className={`text-xs ${textSecondary}`}>В этот день нет задач и календарных записей.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {selectedDayEntries.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className={`flex gap-3 rounded-xl p-3 md:p-4 ${entry.type === 'event' ? 'text-white' : isDark ? 'bg-[#1c2534]' : 'bg-gray-50'}`}
+                      style={entry.type === 'event' ? { backgroundColor: entry.accentColor ?? '#4880ff' } : undefined}
+                    >
                       <div
-                        className={`w-1 rounded-full shrink-0 ${item.type === 'task' ? item.color : ''}`}
-                        style={item.type === 'event' ? { backgroundColor: events.find((e) => e.id === item.eventId)?.color || '#3b82f6' } : undefined}
+                        className={`w-1 shrink-0 rounded-full ${entry.type === 'task' ? entry.backgroundClass : ''}`}
+                        style={entry.type === 'event' ? { backgroundColor: '#ffffff' } : undefined}
                       />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            {item.type === 'event' && <CalendarDays className="w-3 h-3 text-[#4880ff] shrink-0" />}
-                            {item.type === 'task' && <Tag className="w-3 h-3 text-amber-500 shrink-0" />}
-                            <p className={`font-semibold text-sm ${textPrimary} truncate`}>{item.title}</p>
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-1 flex items-center justify-between gap-2">
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            {entry.type === 'event' && <CalendarDays className="h-3 w-3 shrink-0 text-white" />}
+                            {entry.type === 'task' && <Tag className={`h-3 w-3 shrink-0 ${entry.textClass}`} />}
+                            <p className={`truncate text-sm font-semibold ${entry.type === 'event' ? 'text-white' : textPrimary}`}>
+                              {entry.title}
+                            </p>
                           </div>
-                          {item.type === 'task' && item.status && (
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${item.color} ${item.textColor} shrink-0`}>
-                              {TASK_STATUS_LABELS[item.status as TaskStatus] || item.status}
+                          {entry.type === 'task' && entry.status && (
+                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${entry.backgroundClass} ${entry.textClass}`}>
+                              {TASK_STATUS_LABELS[entry.status]}
                             </span>
                           )}
                         </div>
-                        {item.description && <p className={`text-xs ${textSecondary} mb-1`}>{item.description}</p>}
-                        <div className="flex items-center gap-3 flex-wrap">
-                          <span className={`text-xs ${textSecondary}`}>{item.time}</span>
-                          {item.duration && (
-                            <span className={`text-xs ${textSecondary} flex items-center gap-1`}>
-                              <Clock className="w-3 h-3" /> {item.duration}
-                            </span>
+                        {entry.description && (
+                          <p className={`mb-1 text-xs ${entry.type === 'event' ? 'text-white/90' : textSecondary}`}>
+                            {entry.description}
+                          </p>
+                        )}
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className={`text-xs ${entry.type === 'event' ? 'text-white/90' : textSecondary}`}>{entry.time}</span>
+                          {entry.duration && (
+                            <span className={`text-xs ${entry.type === 'event' ? 'text-white/90' : textSecondary}`}>{entry.duration}</span>
                           )}
-                          {item.projectName && (
-                            <span className={`text-xs ${textSecondary}`}>{item.projectName}</span>
+                          {entry.projectName && (
+                            <span className={`text-xs ${entry.type === 'event' ? 'text-white/90' : textSecondary}`}>{entry.projectName}</span>
                           )}
-                          {item.type === 'event' && (
-                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-[#4880ff]/15 text-[#4880ff]' : 'bg-blue-50 text-[#4880ff]'}`}>
-                              Событие
-                            </span>
-                          )}
+                          {entry.type === 'event' && <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold text-white">Событие</span>}
                         </div>
-                        {item.type === 'event' && canManageCalendar && item.eventId && (
-                          <div className="flex items-center gap-1 mt-2">
+                        {entry.type === 'event' && canManageCalendar && entry.eventId && (
+                          <div className="mt-2 flex items-center gap-1">
                             <button
-                              onClick={(e) => { e.stopPropagation(); openEditEvent(item.eventId!) }}
-                              className="p-1 rounded hover:bg-[#4880ff]/10 text-[#4880ff] transition-colors"
+                              onClick={() => {
+                                const event = calendarMonthView.events.find((candidate) => candidate.id === entry.eventId)
+                                if (event) {
+                                  openEventEditing(event)
+                                }
+                              }}
+                              className="rounded p-1 text-white/90 transition-colors hover:bg-white/10"
                             >
-                              <Edit3 className="w-3.5 h-3.5" />
+                              <Edit3 className="h-3.5 w-3.5" />
                             </button>
                             <button
-                              onClick={(e) => { e.stopPropagation(); handleDeleteEvent(item.eventId!) }}
-                              className="p-1 rounded hover:bg-red-500/10 text-red-500 transition-colors"
+                              onClick={() => {
+                                if (entry.eventId) {
+                                  deleteEventMutation.mutate(entry.eventId)
+                                }
+                              }}
+                              className="rounded p-1 text-white/90 transition-colors hover:bg-white/10"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           </div>
                         )}
                       </div>
                     </div>
                   ))}
-                </div>
-              )}
-            </div>
-
-            <div className={`px-6 py-4 border-t ${isDark ? 'border-[#313d4f]' : 'border-gray-100'} flex justify-between items-center`}>
-              <span className={`text-xs ${textSecondary}`}>
-                {selectedDayItems.length > 0
-                  ? `${selectedDayItems.filter((i) => i.type === 'task').length} задач, ${selectedDayItems.filter((i) => i.type === 'event').length} событий`
-                  : 'Нет записей'}
-              </span>
-            </div>
+              </div>
+            )}
           </div>
-        </div>,
-        document.body,
-      )}
+        ) : null}
+      </Modal>
 
-      {/* Create Event Modal */}
-      <Modal open={showCreateModal} onClose={() => setShowCreateModal(false)} title="Новое событие">
-        <ErrorMessage message={formError} />
-        <form onSubmit={(e) => { e.preventDefault(); handleCreate() }} className="space-y-4">
-          <InputField label="Название" value={formTitle} onChange={setFormTitle} required placeholder="Дейлик, созвон, корпоратив..." />
-          <InputField label="Описание" value={formDesc} onChange={setFormDesc} placeholder="Описание события" />
-          <InputField label="Дата" value={formDate} onChange={setFormDate} type="date" required />
-          <InputField label="Время начала" value={formTime} onChange={setFormTime} type="time" required />
-          <SelectField
-            label="Продолжительность"
-            value={formDuration}
-            onChange={setFormDuration}
-            options={DURATION_OPTIONS}
+      <Modal
+        open={isEventFormOpen}
+        onClose={() => {
+          setIsEventFormOpen(false)
+          setSelectedEventForEditing(null)
+          resetEventForm()
+        }}
+        title={selectedEventForEditing ? 'Редактировать событие' : 'Новое событие'}
+        maxWidth="max-w-xl"
+      >
+        <ErrorMessage message={eventFormError} />
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (selectedEventForEditing) {
+              void updateEventMutation.mutateAsync()
+              return
+            }
+
+            void createEventMutation.mutateAsync()
+          }}
+          className="space-y-4"
+        >
+          <InputField
+            label="Название"
+            value={eventFormTitle}
+            onChange={setEventFormTitle}
+            required
+            placeholder="Название события"
+          />
+          <InputField
+            label="Описание"
+            value={eventFormDescription}
+            onChange={setEventFormDescription}
+            placeholder="Описание события"
+          />
+          <InputField label="Дата" value={eventFormDate} onChange={setEventFormDate} type="date" required />
+          <InputField
+            label="Время начала"
+            value={eventFormTime}
+            onChange={setEventFormTime}
+            type="time"
+            required={!eventFormAllDay}
+            disabled={eventFormAllDay}
           />
           <SelectField
-            label="Проект (необязательно)"
-            value={formProjectId}
-            onChange={setFormProjectId}
+            label="Длительность"
+            value={eventFormDurationMinutes}
+            onChange={setEventFormDurationMinutes}
+            options={EVENT_DURATION_OPTIONS}
+            disabled={eventFormAllDay}
+          />
+          <SelectField
+            label="Проект"
+            value={eventFormProjectId}
+            onChange={setEventFormProjectId}
             options={[
               { value: '', label: 'Без проекта' },
-              ...projects.map((p) => ({ value: String(p.id), label: p.name })),
+              ...calendarMonthView.projects.map((project) => ({ value: String(project.id), label: project.name })),
             ]}
           />
           <div>
-            <label className={`block text-sm font-semibold mb-1.5 ${isDark ? 'text-[#94a3b8]' : 'text-[#737373]'}`}>Цвет</label>
-            <div className="flex gap-2 flex-wrap">
-              {EVENT_COLORS.map((c) => (
+            <label className={`mb-1.5 block text-sm font-semibold ${isDark ? 'text-[#94a3b8]' : 'text-[#737373]'}`}>
+              Цвет
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {EVENT_COLOR_OPTIONS.map((colorOption) => (
                 <button
-                  key={c.value}
+                  key={colorOption.value}
                   type="button"
-                  onClick={() => setFormColor(c.value)}
-                  className={`w-8 h-8 rounded-full transition-all ${formColor === c.value ? 'ring-2 ring-offset-2 ring-[#4880ff]' : ''}`}
-                  style={{ backgroundColor: c.value }}
-                  title={c.label}
+                  onClick={() => setEventFormColor(colorOption.value)}
+                  className={`h-8 w-8 rounded-full transition-all ${eventFormColor === colorOption.value ? 'ring-2 ring-[#4880ff] ring-offset-2' : ''}`}
+                  style={{ backgroundColor: colorOption.value }}
+                  title={colorOption.label}
                 />
               ))}
             </div>
           </div>
+          <label className={`flex items-center gap-2 text-sm ${textPrimary}`}>
+            <input
+              type="checkbox"
+              checked={eventFormAllDay}
+              onChange={(event) => setEventFormAllDay(event.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-[#4880ff] focus:ring-[#4880ff]"
+            />
+            Весь день
+          </label>
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setShowCreateModal(false)} className={`px-4 py-2 rounded-lg text-sm font-semibold ${textSecondary}`}>Отмена</button>
-            <SubmitButton loading={formLoading}>Создать</SubmitButton>
+            <button
+              type="button"
+              onClick={() => {
+                setIsEventFormOpen(false)
+                setSelectedEventForEditing(null)
+                resetEventForm()
+              }}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold ${textSecondary}`}
+            >
+              Отмена
+            </button>
+            <SubmitButton loading={createEventMutation.isPending || updateEventMutation.isPending}>
+              {selectedEventForEditing ? 'Сохранить' : 'Создать'}
+            </SubmitButton>
           </div>
         </form>
       </Modal>
-
-      {/* Edit Event Modal */}
-      <Modal open={showEditModal} onClose={() => { setShowEditModal(false); setEditingEvent(null) }} title="Редактировать событие">
-        <ErrorMessage message={formError} />
-        <form onSubmit={(e) => { e.preventDefault(); handleEdit() }} className="space-y-4">
-          <InputField label="Название" value={formTitle} onChange={setFormTitle} required />
-          <InputField label="Описание" value={formDesc} onChange={setFormDesc} />
-          <InputField label="Дата" value={formDate} onChange={setFormDate} type="date" required />
-          <InputField label="Время начала" value={formTime} onChange={setFormTime} type="time" required />
-          <SelectField
-            label="Продолжительность"
-            value={formDuration}
-            onChange={setFormDuration}
-            options={DURATION_OPTIONS}
-          />
-          <SelectField
-            label="Проект (необязательно)"
-            value={formProjectId}
-            onChange={setFormProjectId}
-            options={[
-              { value: '', label: 'Без проекта' },
-              ...projects.map((p) => ({ value: String(p.id), label: p.name })),
-            ]}
-          />
-          <div>
-            <label className={`block text-sm font-semibold mb-1.5 ${isDark ? 'text-[#94a3b8]' : 'text-[#737373]'}`}>Цвет</label>
-            <div className="flex gap-2 flex-wrap">
-              {EVENT_COLORS.map((c) => (
-                <button
-                  key={c.value}
-                  type="button"
-                  onClick={() => setFormColor(c.value)}
-                  className={`w-8 h-8 rounded-full transition-all ${formColor === c.value ? 'ring-2 ring-offset-2 ring-[#4880ff]' : ''}`}
-                  style={{ backgroundColor: c.value }}
-                  title={c.label}
-                />
-              ))}
-            </div>
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => { setShowEditModal(false); setEditingEvent(null) }} className={`px-4 py-2 rounded-lg text-sm font-semibold ${textSecondary}`}>Отмена</button>
-            <SubmitButton loading={formLoading}>Сохранить</SubmitButton>
-          </div>
-        </form>
-      </Modal>
-    </div>
+    </PageShell>
   )
 }

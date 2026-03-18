@@ -474,3 +474,36 @@ input:focus, select:focus, textarea:focus {
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .page-enter,
+  .stagger-row,
+  .fade-in-up,
+  .chart-draw-ltr,
+  .nav-bounce-item,
+  .letter-bounce,
+  .sidebar-slide-in,
+  .dropdown-enter,
+  .dropdown-up-enter,
+  .modal-overlay-enter,
+  .modal-overlay-exit,
+  .modal-content-enter,
+  .modal-content-exit,
+  .skeleton-shimmer,
+  .btn-fizzy:active:not(:disabled) {
+    animation: none !important;
+  }
+}

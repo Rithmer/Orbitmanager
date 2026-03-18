@@ -1,8 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
-import type { ICalendarEventRepository } from '@/domain/repositories/calendar-event.repository';
+import type {
+  CalendarEventListQuery,
+  ICalendarEventRepository,
+} from '@/domain/repositories/calendar-event.repository';
 import { CalendarEvent } from '@/domain/models/calendar-event.model';
 import type { CalendarEvent as PrismaCalendarEvent } from '@prisma/client';
+import { buildOrderBy, buildStringSearch, getPagination } from './prisma-query.utils';
 
 @Injectable()
 export class CalendarEventsPrismaRepository implements ICalendarEventRepository {
@@ -13,6 +17,44 @@ export class CalendarEventsPrismaRepository implements ICalendarEventRepository 
       orderBy: { startDate: 'asc' },
     });
     return rows.map((r) => this.toDomain(r));
+  }
+
+  async findPage(params: CalendarEventListQuery) {
+    const { skip, take } = getPagination(params.page, params.limit);
+    const where = {
+      ...(params.userId !== undefined ? { userId: params.userId } : {}),
+      ...(params.projectId !== undefined ? { projectId: params.projectId } : {}),
+      ...(params.from || params.to
+        ? {
+            startDate: {
+              ...(params.to ? { lte: new Date(params.to) } : {}),
+            },
+            endDate: {
+              ...(params.from ? { gte: new Date(params.from) } : {}),
+            },
+          }
+        : {}),
+      ...buildStringSearch(params.search, ['title', 'description']),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.calendarEvent.findMany({
+        where,
+        orderBy: buildOrderBy(
+          params.sort,
+          ['id', 'userId', 'projectId', 'taskId', 'title', 'startDate', 'endDate', 'createdAt', 'updatedAt'],
+          'startDate',
+        ),
+        skip,
+        take,
+      }),
+      this.prisma.calendarEvent.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((row) => this.toDomain(row)),
+      total,
+    };
   }
 
   async findById(id: number): Promise<CalendarEvent | null> {

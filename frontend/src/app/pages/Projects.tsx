@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   Plus,
   MoreVertical,
@@ -11,46 +11,110 @@ import {
   Search,
   AlertTriangle,
 } from 'lucide-react'
-import { useNavigate } from 'react-router'
-import { useTheme } from '../context/ThemeContext'
+import { useQueryClient } from '@tanstack/react-query'
+import { useNavigate, useSearchParams } from 'react-router'
+import { useTheme } from '../context/useTheme'
 import { projectsApi } from '../api/projects'
-import { teamsApi } from '../api/teams'
-import { usersApi } from '../api/users'
-import { riskApi } from '../api/risk'
-import { Modal, InputField, SelectField, SubmitButton, ErrorMessage } from '../components/Modal'
-import type { Project, Team, TeamMember, ProjectMember, User, ProjectRiskOutput } from '../types'
+import { ErrorMessage, Modal, InputField, SelectField, SubmitButton } from '../components/Modal'
+import { PageShell, PageShellSectionSkeleton } from '../components/PageShell'
+import { ProjectRole, PROJECT_ROLE_LABELS, ProjectStatus, PROJECT_STATUS_LABELS, RiskLevel } from '../types'
 import {
-  ProjectStatus,
-  PROJECT_STATUS_LABELS,
-  ProjectRole,
-  PROJECT_ROLE_LABELS,
-  RiskLevel,
-} from '../types'
+  useProjectMemberUsersQuery,
+  useProjectMembersQuery,
+  useProjectTeamMembersQuery,
+  useProjectTeamOptionsQuery,
+  useProjectsListViewQuery,
+} from '../features/projects'
+
+const PAGE_SIZE = 12
+const SEARCH_DEBOUNCE_MS = 300
+
+const CARD_COLORS = [
+  'bg-[#4880ff]',
+  'bg-[#10b981]',
+  'bg-[#8b5cf6]',
+  'bg-[#f59e0b]',
+  'bg-[#ef4444]',
+]
+
+function readPositiveInt(value: string | null, fallback: number): number {
+  if (!value) {
+    return fallback
+  }
+
+  const parsed = Number.parseInt(value, 10)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
+}
+
+function formatShortDate(value: string) {
+  return new Date(value).toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+  })
+}
+
+function buildPageQueryParams(
+  currentParams: URLSearchParams,
+  nextPage: number,
+  nextSearch: string,
+) {
+  const nextParams = new URLSearchParams(currentParams)
+
+  if (nextPage > 1) {
+    nextParams.set('page', String(nextPage))
+  } else {
+    nextParams.delete('page')
+  }
+
+  if (nextSearch) {
+    nextParams.set('search', nextSearch)
+  } else {
+    nextParams.delete('search')
+  }
+
+  return nextParams
+}
+
+function PaginationButton({
+  children,
+  disabled,
+  onClick,
+}: {
+  children: ReactNode
+  disabled?: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="rounded-lg border border-[#e8e8e8] px-3 py-2 text-sm font-semibold text-[#202224] transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-[#313d4f] dark:text-[#f4f3f2] dark:hover:bg-[#1c2534]"
+    >
+      {children}
+    </button>
+  )
+}
 
 export function Projects() {
   const navigate = useNavigate()
   const { isDark } = useTheme()
+  const queryClient = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
 
-  const [projects, setProjects] = useState<Project[]>([])
-  const [teams, setTeams] = useState<Team[]>([])
-  const [allUsers, setAllUsers] = useState<User[]>([])
-  const [projectMembers, setProjectMembers] = useState<Record<number, ProjectMember[]>>({})
-  const [teamMembersMap, setTeamMembersMap] = useState<Record<number, TeamMember[]>>({})
-  const [projectRisks, setProjectRisks] = useState<Record<number, ProjectRiskOutput>>({})
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
+  const page = readPositiveInt(searchParams.get('page'), 1)
+  const searchTerm = searchParams.get('search') ?? ''
 
+  const [searchInput, setSearchInput] = useState(searchTerm)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showMembersModal, setShowMembersModal] = useState(false)
   const [showAddMemberModal, setShowAddMemberModal] = useState(false)
-  const [editingProject, setEditingProject] = useState<Project | null>(null)
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+  const [editingProjectId, setEditingProjectId] = useState<number | null>(null)
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null)
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
-
   const [formName, setFormName] = useState('')
-  const [formDesc, setFormDesc] = useState('')
+  const [formDescription, setFormDescription] = useState('')
   const [formTeamId, setFormTeamId] = useState('')
   const [formStatus, setFormStatus] = useState(ProjectStatus.ACTIVE)
   const [memberUserId, setMemberUserId] = useState('')
@@ -58,22 +122,244 @@ export function Projects() {
   const [formLoading, setFormLoading] = useState(false)
   const [formError, setFormError] = useState('')
 
-  const pageBg = isDark ? 'bg-[#1c2534]' : 'bg-[#f5f6fa]'
-  const cardBg = isDark ? 'bg-[#273142]' : 'bg-white'
-  const cardBorder = isDark ? 'border-[#313d4f]' : 'border-[#e8e8e8]'
+  const projectsQuery = useProjectsListViewQuery({
+    page,
+    limit: PAGE_SIZE,
+    search: searchTerm || undefined,
+  })
+  const projects = projectsQuery.data?.items ?? []
+  const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null
+  const projectMembersQuery = useProjectMembersQuery(selectedProjectId, showMembersModal)
+  const projectTeamMembersQuery = useProjectTeamMembersQuery(
+    selectedProject?.teamId ?? null,
+    showAddMemberModal,
+  )
+  const projectMemberUsersQuery = useProjectMemberUsersQuery(
+    showMembersModal || showAddMemberModal,
+  )
+  const teamsOptionsQuery = useProjectTeamOptionsQuery(showCreateModal)
+
+  const isInitialLoading = projectsQuery.isPending && !projectsQuery.data
+  const listError = projectsQuery.error instanceof Error ? projectsQuery.error.message : ''
+  const totalProjects = projectsQuery.data?.total ?? 0
+  const totalPages = projectsQuery.data?.totalPages ?? 1
+  const selectedProjectMembers = useMemo(() => projectMembersQuery.data ?? [], [projectMembersQuery.data])
+  const projectMemberNames = useMemo(() => {
+    const names = new Map<number, string>()
+
+    for (const user of projectMemberUsersQuery.data?.items ?? []) {
+      names.set(user.id, user.fullName)
+    }
+
+    return names
+  }, [projectMemberUsersQuery.data])
+
+  const availableProjectMemberOptions = useMemo(() => {
+    const teamMemberIds = new Set((projectTeamMembersQuery.data ?? []).map((member) => member.userId))
+    const projectMemberIds = new Set(selectedProjectMembers.map((member) => member.userId))
+    return (projectMemberUsersQuery.data?.items ?? []).filter(
+      (user) => teamMemberIds.has(user.id) && !projectMemberIds.has(user.id),
+    )
+  }, [projectMemberUsersQuery.data, projectTeamMembersQuery.data, selectedProjectMembers])
+
   const textPrimary = isDark ? 'text-[#f4f3f2]' : 'text-[#202224]'
   const textSecondary = isDark ? 'text-[#94a3b8]' : 'text-[#737373]'
   const dividerColor = isDark ? 'border-[#313d4f]' : 'border-gray-100'
-  const moreIconColor = isDark
-    ? 'text-[#94a3b8] hover:text-[#f4f3f2]'
-    : 'text-gray-400 hover:text-gray-600'
   const inputBg = isDark
     ? 'bg-[#1c2534] border-[#313d4f] text-[#f4f3f2]'
     : 'bg-white border-[#e8e8e8] text-[#202224]'
+  const moreIconColor = isDark
+    ? 'text-[#94a3b8] hover:text-[#f4f3f2]'
+    : 'text-gray-400 hover:text-gray-600'
 
-  const colors = ['bg-[#4880ff]', 'bg-[#10b981]', 'bg-[#8b5cf6]', 'bg-[#f59e0b]', 'bg-[#ef4444]']
+  useEffect(() => {
+    setSearchInput(searchTerm)
+  }, [searchTerm])
 
-  const statusConfig: Record<string, { bg: string; text: string }> = {
+  useEffect(() => {
+    const normalizedSearch = searchInput.trim()
+    const timeoutId = setTimeout(() => {
+      if (normalizedSearch === searchTerm) {
+        return
+      }
+
+      const nextParams = buildPageQueryParams(searchParams, 1, normalizedSearch)
+      setSearchParams(nextParams, { replace: true })
+    }, SEARCH_DEBOUNCE_MS)
+
+    return () => clearTimeout(timeoutId)
+  }, [searchInput, searchParams, searchTerm, setSearchParams])
+
+  useEffect(() => {
+    if (totalPages > 0 && page > totalPages) {
+      const nextParams = buildPageQueryParams(searchParams, totalPages, searchTerm)
+      setSearchParams(nextParams, { replace: true })
+    }
+  }, [page, searchParams, searchTerm, setSearchParams, totalPages])
+
+  useEffect(() => {
+    setOpenMenuId(null)
+  }, [page, searchTerm])
+
+  useEffect(() => {
+    if (!showCreateModal) {
+      return
+    }
+
+    if (!formTeamId && teamsOptionsQuery.data?.items.length) {
+      setFormTeamId(String(teamsOptionsQuery.data.items[0].id))
+    }
+  }, [formTeamId, showCreateModal, teamsOptionsQuery.data])
+
+  useEffect(() => {
+    if (!showAddMemberModal) {
+      return
+    }
+
+    if (!memberUserId && availableProjectMemberOptions.length > 0) {
+      setMemberUserId(String(availableProjectMemberOptions[0].id))
+    }
+  }, [availableProjectMemberOptions, memberUserId, showAddMemberModal])
+
+  const updatePage = (nextPage: number) => {
+    const nextParams = buildPageQueryParams(searchParams, nextPage, searchTerm)
+    setSearchParams(nextParams)
+  }
+
+  const openCreateModal = () => {
+    setFormName('')
+    setFormDescription('')
+    setFormTeamId('')
+    setFormStatus(ProjectStatus.ACTIVE)
+    setFormError('')
+    setShowCreateModal(true)
+  }
+
+  const openEditModal = (projectId: number) => {
+    const project = projects.find((item) => item.id === projectId)
+    if (!project) {
+      return
+    }
+
+    setEditingProjectId(projectId)
+    setFormName(project.name)
+    setFormDescription(project.description || '')
+    setFormStatus(project.status)
+    setFormError('')
+    setShowEditModal(true)
+  }
+
+  const openMembersModal = (projectId: number) => {
+    setSelectedProjectId(projectId)
+    setFormError('')
+    setShowMembersModal(true)
+  }
+
+  const openAddMemberModal = () => {
+    setMemberUserId('')
+    setMemberRole(ProjectRole.DEVELOPER)
+    setFormError('')
+    setShowAddMemberModal(true)
+  }
+
+  const invalidateProjectQueries = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['projects'] })
+  }
+
+  const handleCreateProject = async () => {
+    setFormLoading(true)
+    setFormError('')
+
+    try {
+      await projectsApi.create({
+        name: formName.trim(),
+        description: formDescription.trim() || undefined,
+        teamId: Number(formTeamId),
+        status: formStatus,
+      })
+      setShowCreateModal(false)
+      await invalidateProjectQueries()
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Не удалось создать проект')
+    } finally {
+      setFormLoading(false)
+    }
+  }
+
+  const handleEditProject = async () => {
+    if (editingProjectId === null) {
+      return
+    }
+
+    setFormLoading(true)
+    setFormError('')
+
+    try {
+      await projectsApi.update(editingProjectId, {
+        name: formName.trim(),
+        description: formDescription.trim() || undefined,
+        status: formStatus,
+      })
+      setShowEditModal(false)
+      setEditingProjectId(null)
+      await invalidateProjectQueries()
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Не удалось обновить проект')
+    } finally {
+      setFormLoading(false)
+    }
+  }
+
+  const handleDeleteProject = async (projectId: number) => {
+    if (!confirm('Удалить проект?')) {
+      return
+    }
+
+    try {
+      await projectsApi.delete(projectId)
+      setOpenMenuId(null)
+      await invalidateProjectQueries()
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Не удалось удалить проект')
+    }
+  }
+
+  const handleAddProjectMember = async () => {
+    if (selectedProjectId === null) {
+      return
+    }
+
+    setFormLoading(true)
+    setFormError('')
+
+    try {
+      await projectsApi.addMember(selectedProjectId, {
+        userId: Number(memberUserId),
+        role: memberRole,
+      })
+      setShowAddMemberModal(false)
+      await invalidateProjectQueries()
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Не удалось добавить участника')
+    } finally {
+      setFormLoading(false)
+    }
+  }
+
+  const handleRemoveProjectMember = async (memberId: number) => {
+    if (!confirm('Убрать участника из проекта?')) {
+      return
+    }
+
+    try {
+      await projectsApi.removeMember(memberId)
+      await invalidateProjectQueries()
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Не удалось удалить участника')
+    }
+  }
+
+  const statusClassMap: Record<ProjectStatus, { bg: string; text: string }> = {
     [ProjectStatus.ACTIVE]: {
       bg: isDark ? 'bg-emerald-500/10' : 'bg-emerald-50',
       text: 'text-emerald-500',
@@ -92,443 +378,416 @@ export function Projects() {
     },
   }
 
-  const loadData = useCallback(async () => {
-    setError('')
-    try {
-      const [projectsRes, teamsRes, usersRes] = await Promise.all([
-        projectsApi.list({ limit: 100 }),
-        teamsApi.list({ limit: 100 }),
-        usersApi.list({ limit: 100 }),
-      ])
-      setProjects(projectsRes.items)
-      setTeams(teamsRes.items)
-      setAllUsers(usersRes.items)
-
-      const [membersMap, tmMap] = await Promise.all([
-        projectsApi.getAllMembersBatch().catch((e) => {
-          console.warn('Failed to load project members batch:', e)
-          return {} as Record<number, ProjectMember[]>
-        }),
-        teamsApi.getAllMembersBatch().catch((e) => {
-          console.warn('Failed to load team members batch:', e)
-          return {} as Record<number, TeamMember[]>
-        }),
-      ])
-      setProjectMembers(membersMap)
-      setTeamMembersMap(tmMap)
-
-      try {
-        const risksMap = await riskApi.getAllProjectsRisk()
-        setProjectRisks(risksMap)
-      } catch (e) {
-        console.warn('Failed to load project risks:', e)
-      }
-    } catch (e) {
-      console.error('Projects: failed to load data:', e)
-      setError('Не удалось загрузить данные проектов. Попробуйте обновить страницу.')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData])
-
-  const getTeamName = (teamId: number) => teams.find((t) => t.id === teamId)?.name || `Команда #${teamId}`
-
-  const getUserName = (userId: number) => allUsers.find((u) => u.id === userId)?.fullName || `#${userId}`
-
-  const handleCreate = async () => {
-    setFormLoading(true)
-    setFormError('')
-    try {
-      await projectsApi.create({
-        name: formName,
-        description: formDesc || undefined,
-        teamId: Number(formTeamId),
-        status: formStatus,
-      })
-      setShowCreateModal(false)
-      await loadData()
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Ошибка')
-    } finally {
-      setFormLoading(false)
-    }
-  }
-
-  const handleEdit = async () => {
-    if (!editingProject) return
-    setFormLoading(true)
-    setFormError('')
-    try {
-      await projectsApi.update(editingProject.id, {
-        name: formName,
-        description: formDesc || undefined,
-        status: formStatus,
-      })
-      setShowEditModal(false)
-      await loadData()
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Ошибка')
-    } finally {
-      setFormLoading(false)
-    }
-  }
-
-  const handleDelete = async (id: number) => {
-    if (!confirm('Удалить проект?')) return
-    try {
-      await projectsApi.delete(id)
-      await loadData()
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Ошибка')
-    }
-  }
-
-  const handleAddMember = async () => {
-    if (!selectedProject) return
-    setFormLoading(true)
-    setFormError('')
-    try {
-      await projectsApi.addMember(selectedProject.id, {
-        userId: Number(memberUserId),
-        role: memberRole,
-      })
-      setShowAddMemberModal(false)
-      await loadData()
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Ошибка')
-    } finally {
-      setFormLoading(false)
-    }
-  }
-
-  const handleRemoveProjectMember = async (memberId: number) => {
-    if (!confirm('Убрать участника из проекта?')) return
-    try {
-      await projectsApi.removeMember(memberId)
-      await loadData()
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Ошибка')
-    }
-  }
-
-  const filteredProjects = projects.filter(
-    (p) =>
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.description || '').toLowerCase().includes(searchQuery.toLowerCase()),
-  )
-
-  if (loading) {
-    return (
-      <div className={`${pageBg} min-h-full flex items-center justify-center`}>
-        <div className="w-8 h-8 border-4 border-[#4880ff] border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className={`${pageBg} min-h-full p-8`}>
-        <div className="flex flex-col items-center justify-center py-20 gap-4">
-          <AlertTriangle className="w-10 h-10 text-red-500" />
-          <p className={`text-lg font-bold ${textPrimary}`}>Ошибка загрузки</p>
-          <p className={`text-sm ${textSecondary} text-center max-w-md`}>{error}</p>
-          <button onClick={() => { setLoading(true); loadData() }} className="bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2.5 rounded-lg text-sm font-semibold">
-            Повторить
-          </button>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className={`${pageBg} min-h-full p-4 md:p-8`}>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div>
-          <h1 className={`text-xl md:text-2xl font-bold ${textPrimary}`}>Проекты</h1>
-          <p className={`mt-1 text-sm ${textSecondary}`}>{projects.length} проектов</p>
-        </div>
+    <PageShell
+      title="Проекты"
+      description="Серверная пагинация, компактная карточка проекта и ленивые модальные списки."
+      actions={
         <button
-          onClick={() => {
-            setFormName('')
-            setFormDesc('')
-            setFormTeamId(teams[0]?.id ? String(teams[0].id) : '')
-            setFormStatus(ProjectStatus.ACTIVE)
-            setFormError('')
-            setShowCreateModal(true)
-          }}
-          className="flex items-center gap-2 bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors duration-150 self-start sm:self-auto btn-fizzy"
+          type="button"
+          onClick={openCreateModal}
+          className="flex items-center gap-2 rounded-lg bg-[#4880ff] px-4 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-[#3a6fe0] btn-fizzy"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="h-4 w-4" />
           Новый проект
         </button>
+      }
+    >
+      <div className="mb-6">
+        <div className="relative">
+          <Search className={`absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 ${textSecondary}`} />
+          <input
+            type="text"
+            placeholder="Поиск проектов..."
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            className={`w-full rounded-xl border px-9 py-2.5 text-sm transition-colors focus:border-[#4880ff] focus:outline-none ${inputBg}`}
+          />
+        </div>
+        <div className={`mt-2 flex items-center justify-between gap-3 text-xs ${textSecondary}`}>
+          <span>
+            {totalProjects} {totalProjects === 1 ? 'проект' : 'проектов'}
+          </span>
+          {projectsQuery.isFetching && projectsQuery.data ? <span>Обновление списка...</span> : null}
+        </div>
       </div>
 
-      <div className="relative mb-6">
-        <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${textSecondary}`} />
-        <input
-          type="text"
-          placeholder="Поиск проектов..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className={`w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm transition-colors focus:outline-none focus:border-[#4880ff] ${inputBg}`}
-        />
-      </div>
+      {listError && !projectsQuery.data ? <ErrorMessage message={listError} /> : null}
+      {projectsQuery.isError && projectsQuery.data ? <ErrorMessage message={listError} /> : null}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
-        {filteredProjects.length > 0 ? (
-          filteredProjects.map((project, idx) => {
-            const ci = idx % colors.length
-            const st = statusConfig[project.status] || statusConfig[ProjectStatus.ACTIVE]
-            const members = projectMembers[project.id] || []
-            const risk = projectRisks[project.id]
+      {isInitialLoading ? (
+        <PageShellSectionSkeleton rows={4} />
+      ) : projects.length > 0 ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {projects.map((project, index) => {
+            const colorIndex = index % CARD_COLORS.length
+            const statusStyle = statusClassMap[project.status]
+            const isHighRisk = project.riskSummary.riskLevel === RiskLevel.HIGH
 
             return (
               <div
                 key={project.id}
-                className={`${cardBg} border ${cardBorder} rounded-xl p-6 cursor-pointer card-hover transition-all duration-200 group`}
+                className="group card-hover cursor-pointer rounded-xl border border-[#e8e8e8] bg-white p-6 transition-all duration-200 dark:border-[#313d4f] dark:bg-[#273142]"
               >
-                <div className="flex items-start justify-between mb-4">
+                <div className="mb-4 flex items-start justify-between gap-3">
                   <div
-                    className="flex items-center gap-3 flex-1 min-w-0"
+                    className="flex min-w-0 flex-1 items-center gap-3"
                     onClick={() => navigate(`/board/${project.id}`)}
                   >
                     <div
-                      className={`w-11 h-11 ${colors[ci]} rounded-xl flex items-center justify-center text-white font-bold text-base shrink-0`}
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${CARD_COLORS[colorIndex]} text-base font-bold text-white`}
                     >
                       {project.name.charAt(0)}
                     </div>
                     <div className="min-w-0">
-                      <h3 className={`font-bold ${textPrimary} group-hover:text-[#4880ff] transition-colors truncate`}>
+                      <h3 className={`truncate font-bold ${textPrimary} group-hover:text-[#4880ff] transition-colors`}>
                         {project.name}
                       </h3>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${st.bg} ${st.text}`}>
-                          {PROJECT_STATUS_LABELS[project.status as ProjectStatus] || project.status}
+                      <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusStyle.bg} ${statusStyle.text}`}
+                        >
+                          {PROJECT_STATUS_LABELS[project.status] || project.status}
                         </span>
-                        {risk && risk.riskLevel !== RiskLevel.LOW && (
+                        {project.riskSummary.riskLevel !== RiskLevel.LOW ? (
                           <span
-                            className={`text-xs font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                              risk.riskLevel === RiskLevel.HIGH
+                            className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
+                              isHighRisk
                                 ? 'bg-red-500/10 text-red-500'
                                 : 'bg-amber-500/10 text-amber-500'
                             }`}
                           >
-                            <AlertTriangle className="w-3 h-3" />
-                            {risk.riskLevel === RiskLevel.HIGH ? 'Высокий риск' : 'Средний риск'}
+                            <AlertTriangle className="h-3 w-3" />
+                            {isHighRisk ? 'Высокий риск' : 'Средний риск'}
                           </span>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                   </div>
                   <div className="relative">
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setOpenMenuId(openMenuId === project.id ? null : project.id)
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        setOpenMenuId((currentMenuId) =>
+                          currentMenuId === project.id ? null : project.id,
+                        )
                       }}
-                      className={`p-1 rounded ${moreIconColor} transition-colors`}
+                      className={`rounded p-1 transition-colors ${moreIconColor}`}
                     >
-                      <MoreVertical className="w-4 h-4" />
+                      <MoreVertical className="h-4 w-4" />
                     </button>
-                    {openMenuId === project.id && (
+                    {openMenuId === project.id ? (
                       <div
-                        className={`absolute right-0 top-8 z-10 w-52 rounded-xl shadow-xl border overflow-hidden dropdown-enter ${
-                          isDark ? 'bg-[#273142] border-[#313d4f]' : 'bg-white border-[#e8e8e8]'
+                        className={`dropdown-enter absolute right-0 top-8 z-10 w-52 overflow-hidden rounded-xl border shadow-xl ${
+                          isDark
+                            ? 'border-[#313d4f] bg-[#273142]'
+                            : 'border-[#e8e8e8] bg-white'
                         }`}
                       >
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setSelectedProject(project)
-                            setShowMembersModal(true)
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            openMembersModal(project.id)
                             setOpenMenuId(null)
                           }}
-                          className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm ${textPrimary} ${isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'}`}
+                          className={`flex w-full items-center gap-2 px-4 py-2.5 text-sm ${textPrimary} ${
+                            isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'
+                          }`}
                         >
-                          <Users className="w-4 h-4" /> Участники
+                          <Users className="h-4 w-4" />
+                          Участники
                         </button>
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setEditingProject(project)
-                            setFormName(project.name)
-                            setFormDesc(project.description || '')
-                            setFormStatus(project.status as ProjectStatus)
-                            setFormError('')
-                            setShowEditModal(true)
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            openEditModal(project.id)
                             setOpenMenuId(null)
                           }}
-                          className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm ${textPrimary} ${isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'}`}
+                          className={`flex w-full items-center gap-2 px-4 py-2.5 text-sm ${textPrimary} ${
+                            isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'
+                          }`}
                         >
-                          <Edit3 className="w-4 h-4" /> Редактировать
+                          <Edit3 className="h-4 w-4" />
+                          Редактировать
                         </button>
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleDelete(project.id)
-                            setOpenMenuId(null)
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            void handleDeleteProject(project.id)
                           }}
-                          className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-500 ${isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'}`}
+                          className={`flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-500 ${
+                            isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'
+                          }`}
                         >
-                          <Trash2 className="w-4 h-4" /> Удалить
+                          <Trash2 className="h-4 w-4" />
+                          Удалить
                         </button>
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 </div>
 
-                {project.description && (
-                  <p className={`text-sm mb-4 leading-relaxed ${textSecondary}`} onClick={() => navigate(`/board/${project.id}`)}>
+                {project.description ? (
+                  <p
+                    className={`mb-4 text-sm leading-relaxed ${textSecondary}`}
+                    onClick={() => navigate(`/board/${project.id}`)}
+                  >
                     {project.description}
                   </p>
-                )}
+                ) : null}
 
-                <div className={`flex items-center justify-between pt-4 border-t ${dividerColor}`} onClick={() => navigate(`/board/${project.id}`)}>
+                <div
+                  className={`flex items-center justify-between border-t pt-4 ${dividerColor}`}
+                  onClick={() => navigate(`/board/${project.id}`)}
+                >
                   <div className={`flex items-center gap-1.5 text-xs ${textSecondary}`}>
-                    <Users className="w-3.5 h-3.5" />
-                    <span>{getTeamName(project.teamId)}</span>
+                    <Users className="h-3.5 w-3.5" />
+                    <span>{project.teamName}</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <div className={`flex items-center gap-1.5 text-xs ${textSecondary}`}>
-                      <BarChart2 className="w-3.5 h-3.5" />
-                      <span>{members.length} уч.</span>
+                      <BarChart2 className="h-3.5 w-3.5" />
+                      <span>{project.memberCount} уч.</span>
                     </div>
                     <div className={`flex items-center gap-1.5 text-xs ${textSecondary}`}>
-                      <CalendarIcon className="w-3.5 h-3.5" />
-                      <span>{new Date(project.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</span>
+                      <CalendarIcon className="h-3.5 w-3.5" />
+                      <span>{formatShortDate(project.createdAt)}</span>
                     </div>
                   </div>
                 </div>
               </div>
             )
-          })
-        ) : (
-          <div className={`col-span-2 flex flex-col items-center justify-center py-16 gap-3 ${cardBg} border ${cardBorder} rounded-xl`}>
-            <Search className={`w-6 h-6 ${textSecondary}`} />
-            <p className={`font-semibold ${textSecondary}`}>{searchQuery ? 'Ничего не найдено' : 'Проектов пока нет'}</p>
-          </div>
-        )}
-      </div>
+          })}
+        </div>
+      ) : (
+        <div
+          className={`flex flex-col items-center justify-center gap-3 rounded-xl border border-[#e8e8e8] py-16 dark:border-[#313d4f] ${
+            isDark ? 'bg-[#273142]' : 'bg-white'
+          }`}
+        >
+          <Search className={`h-6 w-6 ${textSecondary}`} />
+          <p className={`font-semibold ${textSecondary}`}>
+            {searchTerm ? 'Ничего не найдено' : 'Проектов пока нет'}
+          </p>
+          <p className={`text-xs ${textSecondary}`}>
+            {searchTerm ? 'Попробуйте изменить поисковый запрос' : 'Создайте первый проект'}
+          </p>
+        </div>
+      )}
 
-      {/* Create Project */}
+      {totalPages > 1 ? (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+          <div className={`text-xs ${textSecondary}`}>
+            Страница {page} из {totalPages}
+          </div>
+          <div className="flex items-center gap-2">
+            <PaginationButton disabled={page <= 1} onClick={() => updatePage(page - 1)}>
+              Назад
+            </PaginationButton>
+            <PaginationButton disabled={page >= totalPages} onClick={() => updatePage(page + 1)}>
+              Вперед
+            </PaginationButton>
+          </div>
+        </div>
+      ) : null}
+
       <Modal open={showCreateModal} onClose={() => setShowCreateModal(false)} title="Новый проект">
         <ErrorMessage message={formError} />
-        <form onSubmit={(e) => { e.preventDefault(); handleCreate() }} className="space-y-4">
-          <InputField label="Название" value={formName} onChange={setFormName} required placeholder="Название проекта" />
-          <InputField label="Описание" value={formDesc} onChange={setFormDesc} placeholder="Описание" />
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            void handleCreateProject()
+          }}
+          className="space-y-4"
+        >
+          <InputField
+            label="Название"
+            value={formName}
+            onChange={setFormName}
+            required
+            placeholder="Название проекта"
+          />
+          <InputField
+            label="Описание"
+            value={formDescription}
+            onChange={setFormDescription}
+            placeholder="Описание"
+          />
           <SelectField
             label="Команда"
             value={formTeamId}
             onChange={setFormTeamId}
             required
-            options={teams.map((t) => ({ value: String(t.id), label: t.name }))}
+            options={[
+              { value: '', label: teamsOptionsQuery.isFetching ? 'Загрузка команд...' : 'Выберите команду...' },
+              ...(teamsOptionsQuery.data?.items ?? []).map((team) => ({
+                value: String(team.id),
+                label: team.name,
+              })),
+            ]}
           />
           <SelectField
             label="Статус"
             value={formStatus}
-            onChange={(v) => setFormStatus(v as ProjectStatus)}
-            options={Object.entries(PROJECT_STATUS_LABELS).map(([v, l]) => ({ value: v, label: l }))}
+            onChange={(value) => setFormStatus(value as ProjectStatus)}
+            options={Object.entries(PROJECT_STATUS_LABELS).map(([value, label]) => ({
+              value,
+              label,
+            }))}
           />
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setShowCreateModal(false)} className={`px-4 py-2 rounded-lg text-sm font-semibold ${textSecondary}`}>Отмена</button>
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(false)}
+              className={`px-4 py-2 text-sm font-semibold ${textSecondary}`}
+            >
+              Отмена
+            </button>
             <SubmitButton loading={formLoading}>Создать</SubmitButton>
           </div>
         </form>
       </Modal>
 
-      {/* Edit Project */}
       <Modal open={showEditModal} onClose={() => setShowEditModal(false)} title="Редактировать проект">
         <ErrorMessage message={formError} />
-        <form onSubmit={(e) => { e.preventDefault(); handleEdit() }} className="space-y-4">
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            void handleEditProject()
+          }}
+          className="space-y-4"
+        >
           <InputField label="Название" value={formName} onChange={setFormName} required />
-          <InputField label="Описание" value={formDesc} onChange={setFormDesc} />
+          <InputField label="Описание" value={formDescription} onChange={setFormDescription} />
           <SelectField
             label="Статус"
             value={formStatus}
-            onChange={(v) => setFormStatus(v as ProjectStatus)}
-            options={Object.entries(PROJECT_STATUS_LABELS).map(([v, l]) => ({ value: v, label: l }))}
+            onChange={(value) => setFormStatus(value as ProjectStatus)}
+            options={Object.entries(PROJECT_STATUS_LABELS).map(([value, label]) => ({
+              value,
+              label,
+            }))}
           />
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setShowEditModal(false)} className={`px-4 py-2 rounded-lg text-sm font-semibold ${textSecondary}`}>Отмена</button>
+            <button
+              type="button"
+              onClick={() => setShowEditModal(false)}
+              className={`px-4 py-2 text-sm font-semibold ${textSecondary}`}
+            >
+              Отмена
+            </button>
             <SubmitButton loading={formLoading}>Сохранить</SubmitButton>
           </div>
         </form>
       </Modal>
 
-      {/* Project Members */}
       <Modal
         open={showMembersModal}
         onClose={() => setShowMembersModal(false)}
         title={`Участники: ${selectedProject?.name || ''}`}
       >
-        {selectedProject && (
+        {selectedProject ? (
           <div className="space-y-3">
             <button
-              onClick={() => {
-                setMemberUserId('')
-                setMemberRole(ProjectRole.DEVELOPER)
-                setFormError('')
-                setShowAddMemberModal(true)
-              }}
-              className="flex items-center gap-2 text-[#4880ff] text-sm font-semibold hover:underline mb-4"
+              type="button"
+              onClick={openAddMemberModal}
+              className="mb-4 flex items-center gap-2 text-sm font-semibold text-[#4880ff] hover:underline"
             >
-              <UserPlus className="w-4 h-4" /> Добавить участника
+              <UserPlus className="h-4 w-4" />
+              Добавить участника
             </button>
-            {(projectMembers[selectedProject.id] || []).map((pm) => (
-              <div key={pm.id} className={`flex items-center justify-between py-2 border-b ${dividerColor} last:border-0`}>
+
+            {projectMembersQuery.isPending && !projectMembersQuery.data ? (
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div
+                    key={`project-member-skeleton-${index}`}
+                    className="h-12 rounded-lg skeleton-shimmer bg-black/5 dark:bg-white/5"
+                  />
+                ))}
+              </div>
+            ) : null}
+
+            {selectedProjectMembers.map((member) => (
+              <div
+                key={member.id}
+                className={`flex items-center justify-between border-b py-2 last:border-0 ${dividerColor}`}
+              >
                 <div>
-                  <p className={`text-sm font-semibold ${textPrimary}`}>{getUserName(pm.userId)}</p>
-                  <p className={`text-xs ${textSecondary}`}>{PROJECT_ROLE_LABELS[pm.role as ProjectRole] || pm.role}</p>
+                  <p className={`text-sm font-semibold ${textPrimary}`}>
+                    {projectMemberNames.get(member.userId) || `#${member.userId}`}
+                  </p>
+                  <p className={`text-xs ${textSecondary}`}>
+                    {PROJECT_ROLE_LABELS[member.role as ProjectRole] || member.role}
+                  </p>
                 </div>
                 <button
-                  onClick={() => handleRemoveProjectMember(pm.id)}
-                  className="p-1 rounded hover:bg-red-500/10 text-red-500 transition-colors"
+                  type="button"
+                  onClick={() => handleRemoveProjectMember(member.id)}
+                  className="rounded p-1 text-red-500 transition-colors hover:bg-red-500/10"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="h-4 w-4" />
                 </button>
               </div>
             ))}
-            {(projectMembers[selectedProject.id] || []).length === 0 && (
-              <p className={`text-sm ${textSecondary} text-center py-4`}>Участников пока нет</p>
-            )}
+
+            {!projectMembersQuery.isPending && selectedProjectMembers.length === 0 ? (
+              <p className={`py-4 text-center text-sm ${textSecondary}`}>Участников пока нет</p>
+            ) : null}
           </div>
-        )}
+        ) : null}
       </Modal>
 
-      {/* Add Project Member */}
       <Modal open={showAddMemberModal} onClose={() => setShowAddMemberModal(false)} title="Добавить в проект">
         <ErrorMessage message={formError} />
-        <form onSubmit={(e) => { e.preventDefault(); handleAddMember() }} className="space-y-4">
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            void handleAddProjectMember()
+          }}
+          className="space-y-4"
+        >
           <SelectField
             label="Пользователь"
             value={memberUserId}
             onChange={setMemberUserId}
             required
             options={[
-              { value: '', label: 'Выберите...' },
-              ...(selectedProject
-                ? (teamMembersMap[selectedProject.teamId] || [])
-                    .filter((tm) => !(projectMembers[selectedProject.id] || []).some((pm) => pm.userId === tm.userId))
-                    .map((tm) => ({ value: String(tm.userId), label: getUserName(tm.userId) }))
-                : []),
+              {
+                value: '',
+                label: projectMemberUsersQuery.isFetching ? 'Загрузка...' : 'Выберите...',
+              },
+              ...availableProjectMemberOptions.map((user) => ({
+                value: String(user.id),
+                label: `${user.fullName} (${user.login})`,
+              })),
             ]}
           />
           <SelectField
             label="Роль в проекте"
             value={memberRole}
-            onChange={(v) => setMemberRole(v as ProjectRole)}
-            options={Object.entries(PROJECT_ROLE_LABELS).map(([v, l]) => ({ value: v, label: l }))}
+            onChange={(value) => setMemberRole(value as ProjectRole)}
+            options={Object.entries(PROJECT_ROLE_LABELS).map(([value, label]) => ({
+              value,
+              label,
+            }))}
           />
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setShowAddMemberModal(false)} className={`px-4 py-2 rounded-lg text-sm font-semibold ${textSecondary}`}>Отмена</button>
+            <button
+              type="button"
+              onClick={() => setShowAddMemberModal(false)}
+              className={`px-4 py-2 text-sm font-semibold ${textSecondary}`}
+            >
+              Отмена
+            </button>
             <SubmitButton loading={formLoading}>Добавить</SubmitButton>
           </div>
         </form>
       </Modal>
-    </div>
+    </PageShell>
   )
 }

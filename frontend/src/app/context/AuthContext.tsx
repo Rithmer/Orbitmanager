@@ -1,84 +1,83 @@
 import {
-  createContext,
-  useContext,
   useState,
   useEffect,
   useCallback,
   type ReactNode,
 } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { authApi } from '../api/auth'
-import type { User, LoginDto, RegisterDto } from '../types'
+import { appQueryKeys } from '../query'
 import { AccountRole } from '../types'
-
-interface AuthContextType {
-  user: User | null
-  loading: boolean
-  isAuthenticated: boolean
-  isAdmin: boolean
-  login: (dto: LoginDto) => Promise<void>
-  register: (dto: RegisterDto) => Promise<void>
-  logout: () => void
-  refreshUser: () => Promise<void>
-}
-
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  loading: true,
-  isAuthenticated: false,
-  isAdmin: false,
-  login: async () => {},
-  register: async () => {},
-  logout: () => {},
-  refreshUser: async () => {},
-})
+import type { LoginDto, RegisterDto } from '../types'
+import { AuthContext } from './auth-context'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+  const [hasAuthTokens, setHasAuthTokens] = useState(() => {
+    api.loadTokens()
+    return api.isAuthenticated()
+  })
+
+  const fetchCurrentUser = useCallback((signal?: AbortSignal) => {
+    return authApi.me({ signal })
+  }, [])
+
+  const currentUserQuery = useQuery({
+    queryKey: appQueryKeys.auth.me,
+    queryFn: ({ signal }) => fetchCurrentUser(signal),
+    enabled: hasAuthTokens,
+    retry: false,
+    staleTime: 5 * 60_000,
+  })
+
+  const user = currentUserQuery.data ?? null
+  const loading = hasAuthTokens && currentUserQuery.isPending && !currentUserQuery.data
 
   const logout = useCallback(() => {
     api.clearTokens()
-    setUser(null)
-  }, [])
+    setHasAuthTokens(false)
+    queryClient.clear()
+  }, [queryClient])
 
   useEffect(() => {
     api.setOnAuthExpired(logout)
   }, [logout])
 
-  useEffect(() => {
-    api.loadTokens()
-    if (api.isAuthenticated()) {
-      authApi
-        .me()
-        .then(setUser)
-        .catch(() => {
-          api.clearTokens()
-        })
-        .finally(() => setLoading(false))
-    } else {
-      setLoading(false)
-    }
-  }, [])
-
   const login = async (dto: LoginDto) => {
     const tokens = await authApi.login(dto)
-    api.setTokens(tokens.accessToken, tokens.refreshToken)
-    const me = await authApi.me()
-    setUser(me)
+    try {
+      api.setTokens(tokens.accessToken, tokens.refreshToken)
+      const me = await fetchCurrentUser()
+      queryClient.setQueryData(appQueryKeys.auth.me, me)
+      setHasAuthTokens(true)
+    } catch (error) {
+      api.clearTokens()
+      setHasAuthTokens(false)
+      queryClient.clear()
+      throw error
+    }
   }
 
   const register = async (dto: RegisterDto) => {
     const tokens = await authApi.register(dto)
-    api.setTokens(tokens.accessToken, tokens.refreshToken)
-    const me = await authApi.me()
-    setUser(me)
+    try {
+      api.setTokens(tokens.accessToken, tokens.refreshToken)
+      const me = await fetchCurrentUser()
+      queryClient.setQueryData(appQueryKeys.auth.me, me)
+      setHasAuthTokens(true)
+    } catch (error) {
+      api.clearTokens()
+      setHasAuthTokens(false)
+      queryClient.clear()
+      throw error
+    }
   }
 
   const refreshUser = async () => {
     try {
-      const me = await authApi.me()
-      setUser(me)
+      const me = await fetchCurrentUser()
+      queryClient.setQueryData(appQueryKeys.auth.me, me)
     } catch {
       /* ignore */
     }
@@ -100,8 +99,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   )
-}
-
-export function useAuth() {
-  return useContext(AuthContext)
 }

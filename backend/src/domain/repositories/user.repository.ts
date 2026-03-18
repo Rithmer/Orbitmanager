@@ -1,7 +1,16 @@
 import { User } from '../models/user.model';
+import {
+  RepositoryPageParams,
+  RepositoryPageResult,
+} from './paginated-query.types';
+
+export interface UserListQuery extends RepositoryPageParams {
+  accountRole?: string;
+}
 
 export interface IUserRepository {
   findAll(): Promise<User[]>;
+  findPage?(params: UserListQuery): Promise<RepositoryPageResult<User>>;
   findById(id: number): Promise<User | null>;
   findByLogin(login: string): Promise<User | null>;
   create(user: Omit<User, 'id'>): Promise<User>;

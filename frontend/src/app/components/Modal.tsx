@@ -1,7 +1,7 @@
-import { useEffect, useCallback, type ReactNode, type MouseEvent } from 'react'
+import { useEffect, useCallback, useRef, useState, type ReactNode, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
-import { useTheme } from '../context/ThemeContext'
+import { useTheme } from '../context/useTheme'
 
 interface ModalProps {
   open: boolean
@@ -13,37 +13,65 @@ interface ModalProps {
 
 export function Modal({ open, onClose, title, children, maxWidth = 'max-w-lg' }: ModalProps) {
   const { isDark } = useTheme()
+  const [isClosing, setIsClosing] = useState(false)
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const closeAnimationMs = 350
 
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = ''
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
     }
+
+    return () => {
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current)
+        closeTimerRef.current = null
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    document.body.style.overflow = open || isClosing ? 'hidden' : ''
     return () => {
       document.body.style.overflow = ''
     }
-  }, [open])
+  }, [open, isClosing])
 
-  if (!open) return null
+  if (!open && !isClosing) return null
+
+  const handleClose = () => {
+    if (isClosing) {
+      return
+    }
+
+    setIsClosing(true)
+    closeTimerRef.current = setTimeout(() => {
+      setIsClosing(false)
+      closeTimerRef.current = null
+    }, closeAnimationMs)
+    onClose()
+  }
 
   const modalBg = isDark ? 'bg-[#273142]' : 'bg-white'
   const borderColor = isDark ? 'border-[#313d4f]' : 'border-gray-100'
   const textPrimary = isDark ? 'text-[#f4f3f2]' : 'text-[#202224]'
+  const overlayClassName = isClosing ? 'modal-overlay-exit' : 'modal-overlay-enter'
+  const contentClassName = isClosing ? 'modal-content-exit' : 'modal-content-enter'
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 modal-overlay-enter"
-      onClick={onClose}
+      className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 ${overlayClassName}`}
+      onClick={handleClose}
     >
       <div
-        className={`${modalBg} rounded-2xl shadow-2xl w-full ${maxWidth} overflow-hidden modal-content-enter`}
+        className={`${modalBg} rounded-2xl shadow-2xl w-full ${maxWidth} overflow-hidden ${contentClassName}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className={`flex items-center justify-between px-6 py-4 border-b ${borderColor}`}>
           <h2 className={`font-bold text-lg ${textPrimary}`}>{title}</h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className={`p-2 rounded-lg transition-all duration-200 hover:rotate-90 ${
               isDark
                 ? 'hover:bg-[#1c2534] text-[#94a3b8]'

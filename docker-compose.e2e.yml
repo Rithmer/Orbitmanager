@@ -38,7 +38,11 @@ services:
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
       DATABASE_URL: postgresql://${E2E_DB_USERNAME:-postgres}:${E2E_DB_PASSWORD:-postgres}@postgres-e2e:5432/${E2E_DB_NAME:-task_manager_e2e}
       THROTTLE_TTL: ${THROTTLE_TTL:-60000}
-      THROTTLE_LIMIT: ${THROTTLE_LIMIT:-60}
+      THROTTLE_LIMIT: ${THROTTLE_LIMIT:-180}
+      THROTTLE_AUTH_TTL: ${THROTTLE_AUTH_TTL:-60000}
+      THROTTLE_AUTH_LIMIT: ${THROTTLE_AUTH_LIMIT:-20}
+      DB_POOL_MIN: ${DB_POOL_MIN:-2}
+      DB_POOL_MAX: ${DB_POOL_MAX:-10}
       CORS_ORIGIN: ${E2E_CORS_ORIGIN:-http://localhost:5174,http://localhost:3001}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       AUTO_SEED: ${E2E_AUTO_SEED:-true}
@@ -61,7 +65,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:3000/').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+          "fetch('http://127.0.0.1:3000/health/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 10s
       timeout: 5s

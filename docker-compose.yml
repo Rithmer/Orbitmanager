@@ -38,12 +38,15 @@ services:
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173,http://localhost:3000}
       THROTTLE_TTL: ${THROTTLE_TTL:-60000}
-      THROTTLE_LIMIT: ${THROTTLE_LIMIT:-60}
-      DB_POOL_MAX: ${DB_POOL_MAX:-20}
+      THROTTLE_LIMIT: ${THROTTLE_LIMIT:-180}
+      THROTTLE_AUTH_TTL: ${THROTTLE_AUTH_TTL:-60000}
+      THROTTLE_AUTH_LIMIT: ${THROTTLE_AUTH_LIMIT:-20}
+      DB_POOL_MIN: ${DB_POOL_MIN:-2}
+      DB_POOL_MAX: ${DB_POOL_MAX:-10}
       DB_POOL_IDLE_TIMEOUT: ${DB_POOL_IDLE_TIMEOUT:-30000}
       DB_POOL_CONNECTION_TIMEOUT: ${DB_POOL_CONNECTION_TIMEOUT:-5000}
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      AUTO_SEED: ${AUTO_SEED:-true}
+      AUTO_SEED: ${AUTO_SEED:-false}
     ports:
       - "${PORT:-3000}:3000"
     volumes:
@@ -52,7 +55,7 @@ services:
     networks:
       - app-network
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 10

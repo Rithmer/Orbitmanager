@@ -1,8 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
-import type { IUserRepository } from '@/domain/repositories/user.repository';
+import type {
+  IUserRepository,
+  UserListQuery,
+} from '@/domain/repositories/user.repository';
 import { User } from '@/domain/models/user.model';
 import type { User as PrismaUser } from '@prisma/client';
+import { buildOrderBy, buildStringSearch, getPagination } from './prisma-query.utils';
 
 @Injectable()
 export class UsersPrismaRepository implements IUserRepository {
@@ -11,6 +15,42 @@ export class UsersPrismaRepository implements IUserRepository {
   async findAll(): Promise<User[]> {
     const rows = await this.prisma.user.findMany({ orderBy: { id: 'asc' } });
     return rows.map((r) => this.toDomain(r));
+  }
+
+  async findPage(params: UserListQuery) {
+    const { skip, take } = getPagination(params.page, params.limit);
+    const where = {
+      ...(params.accountRole ? { accountRole: params.accountRole } : {}),
+      ...buildStringSearch(params.search, ['login', 'fullName', 'profession']),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        orderBy: buildOrderBy(
+          params.sort,
+          [
+            'id',
+            'login',
+            'fullName',
+            'profession',
+            'accountRole',
+            'accountStatus',
+            'createdAt',
+            'updatedAt',
+          ],
+          'id',
+        ),
+        skip,
+        take,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((row) => this.toDomain(row)),
+      total,
+    };
   }
 
   async findById(id: number): Promise<User | null> {

@@ -1,7 +1,23 @@
 import { AuditLog } from '../models/audit-log.model';
+import {
+  RepositoryPageParams,
+  RepositoryPageResult,
+} from './paginated-query.types';
+
+export interface AuditLogListQuery extends RepositoryPageParams {
+  userId?: number;
+  entityType?: string;
+  entityId?: number;
+  action?: string;
+  from?: string;
+  to?: string;
+}
 
 export interface IAuditLogRepository {
   findAll(): Promise<AuditLog[]>;
+  findPage?(
+    params: AuditLogListQuery,
+  ): Promise<RepositoryPageResult<AuditLog>>;
   findById(id: number): Promise<AuditLog | null>;
   findByEntity(entityType: string, entityId: number): Promise<AuditLog[]>;
   findByEntityIds(

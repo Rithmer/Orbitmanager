@@ -41,6 +41,7 @@ const mockProjectRepository = {
 const mockAuditLogRepository = {
   findAll: jest.fn().mockResolvedValue([]),
   findById: jest.fn(),
+  findByEntityIds: jest.fn().mockResolvedValue([]),
   create: jest.fn(),
 };
 

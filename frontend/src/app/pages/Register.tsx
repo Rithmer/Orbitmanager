@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router'
 import { Eye, EyeOff } from 'lucide-react'
-import { useTheme } from '../context/ThemeContext'
-import { useAuth } from '../context/AuthContext'
+import { useTheme } from '../context/useTheme'
+import { useAuth } from '../context/useAuth'
 
 export function Register() {
   const { isDark } = useTheme()

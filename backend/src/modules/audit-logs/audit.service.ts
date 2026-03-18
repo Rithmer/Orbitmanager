@@ -4,7 +4,6 @@ import { AUDIT_LOG_REPOSITORY } from '@/domain/repositories/audit-log.repository
 import { AuditAction } from '@/common/enums/audit-action.enum';
 import { AuditLog } from '@/domain/models/audit-log.model';
 import {
-  QueryHelper,
   QueryParams,
   PaginatedResult,
 } from '@/common/helpers/query.helper';
@@ -48,6 +47,21 @@ export class AuditService {
       to?: string;
     },
   ): Promise<PaginatedResult<AuditLog>> {
+    const page = normalizePage(params.page);
+    const limit = normalizeLimit(params.limit);
+
+    if (this.auditLogRepository.findPage) {
+      const result = await this.auditLogRepository.findPage({
+        page,
+        limit,
+        search: params.search,
+        sort: params.sort,
+        ...filters,
+      });
+
+      return toPaginatedResult(result.items, result.total, page, limit);
+    }
+
     let logs = await this.auditLogRepository.findAll();
 
     if (filters?.userId) {
@@ -69,13 +83,59 @@ export class AuditService {
       logs = logs.filter((l) => l.timestamp <= filters.to!);
     }
 
-    return QueryHelper.apply(logs, {
-      ...params,
-      searchFields: params.searchFields ?? [
-        'description',
-        'entityType',
-        'action',
-      ],
-    });
+    return applyInMemoryPagination(
+      logs.filter((log) => {
+        if (!params.search) {
+          return true;
+        }
+
+        const search = params.search.toLowerCase();
+        return [log.description, log.entityType, log.action].some((field) =>
+          field.toLowerCase().includes(search),
+        );
+      }),
+      page,
+      limit,
+    );
   }
+}
+
+function normalizePage(page: number | undefined): number {
+  if (!Number.isFinite(page)) {
+    return 1;
+  }
+
+  return Math.max(1, Math.trunc(page as number));
+}
+
+function normalizeLimit(limit: number | undefined): number {
+  if (!Number.isFinite(limit)) {
+    return 20;
+  }
+
+  return Math.min(100, Math.max(1, Math.trunc(limit as number)));
+}
+
+function toPaginatedResult<T>(
+  items: T[],
+  total: number,
+  page: number,
+  limit: number,
+): PaginatedResult<T> {
+  return {
+    items,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit) || 1,
+  };
+}
+
+function applyInMemoryPagination<T>(
+  items: T[],
+  page: number,
+  limit: number,
+): PaginatedResult<T> {
+  const offset = (page - 1) * limit;
+  return toPaginatedResult(items.slice(offset, offset + limit), items.length, page, limit);
 }

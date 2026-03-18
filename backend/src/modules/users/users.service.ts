@@ -18,7 +18,6 @@ import { AccountRole } from '@/common/enums/account-role.enum';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import {
-  QueryHelper,
   QueryParams,
   PaginatedResult,
 } from '@/common/helpers/query.helper';
@@ -42,12 +41,53 @@ export class UsersService {
   async findAll(
     params: QueryParams,
   ): Promise<PaginatedResult<Omit<User, 'password'>>> {
+    const page = normalizePage(params.page);
+    const limit = normalizeLimit(params.limit);
+
+    if (this.userRepository.findPage) {
+      const result = await this.userRepository.findPage({
+        page,
+        limit,
+        search: params.search,
+        sort: params.sort,
+        accountRole:
+          typeof params.filters?.['accountRole'] === 'string'
+            ? (params.filters['accountRole'] as string)
+            : undefined,
+      });
+
+      return toPaginatedResult(
+        result.items.map((user) => this.omitPassword(user)),
+        result.total,
+        page,
+        limit,
+      );
+    }
+
     const users = await this.userRepository.findAll();
     const safe = users.map((u) => this.omitPassword(u));
-    return QueryHelper.apply(safe, {
-      ...params,
-      searchFields: params.searchFields ?? ['login', 'fullName', 'profession'],
-    });
+    return applyInMemoryPagination(
+      safe
+        .filter((user) => {
+          const accountRole = params.filters?.['accountRole'];
+          if (accountRole === undefined) {
+            return true;
+          }
+
+          return user.accountRole === accountRole;
+        })
+        .filter((user) => {
+          if (!params.search) {
+            return true;
+          }
+
+          const search = params.search.toLowerCase();
+          return [user.login, user.fullName, user.profession]
+            .some((field) => field.toLowerCase().includes(search));
+        }),
+      page,
+      limit,
+    );
   }
 
   async findById(id: number): Promise<Omit<User, 'password'>> {
@@ -170,4 +210,44 @@ export class UsersService {
     void _password;
     return safe;
   }
+}
+
+function normalizePage(page: number | undefined): number {
+  if (!Number.isFinite(page)) {
+    return 1;
+  }
+
+  return Math.max(1, Math.trunc(page as number));
+}
+
+function normalizeLimit(limit: number | undefined): number {
+  if (!Number.isFinite(limit)) {
+    return 20;
+  }
+
+  return Math.min(100, Math.max(1, Math.trunc(limit as number)));
+}
+
+function toPaginatedResult<T>(
+  items: T[],
+  total: number,
+  page: number,
+  limit: number,
+): PaginatedResult<T> {
+  return {
+    items,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit) || 1,
+  };
+}
+
+function applyInMemoryPagination<T>(
+  items: T[],
+  page: number,
+  limit: number,
+): PaginatedResult<T> {
+  const offset = (page - 1) * limit;
+  return toPaginatedResult(items.slice(offset, offset + limit), items.length, page, limit);
 }

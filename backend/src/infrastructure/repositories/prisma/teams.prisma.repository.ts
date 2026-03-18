@@ -1,8 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
-import type { ITeamRepository } from '@/domain/repositories/team.repository';
+import type {
+  ITeamRepository,
+  TeamListQuery,
+} from '@/domain/repositories/team.repository';
 import { Team } from '@/domain/models/team.model';
 import type { Team as PrismaTeam } from '@prisma/client';
+import { buildOrderBy, buildStringSearch, getPagination } from './prisma-query.utils';
 
 @Injectable()
 export class TeamsPrismaRepository implements ITeamRepository {
@@ -11,6 +15,30 @@ export class TeamsPrismaRepository implements ITeamRepository {
   async findAll(): Promise<Team[]> {
     const rows = await this.prisma.team.findMany({ orderBy: { id: 'asc' } });
     return rows.map((r) => this.toDomain(r));
+  }
+
+  async findPage(params: TeamListQuery) {
+    const { skip, take } = getPagination(params.page, params.limit);
+    const where = buildStringSearch(params.search, ['name', 'description']);
+
+    const [rows, total] = await Promise.all([
+      this.prisma.team.findMany({
+        where,
+        orderBy: buildOrderBy(
+          params.sort,
+          ['id', 'name', 'description', 'createdAt', 'createdById'],
+          'id',
+        ),
+        skip,
+        take,
+      }),
+      this.prisma.team.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((row) => this.toDomain(row)),
+      total,
+    };
   }
 
   async findById(id: number): Promise<Team | null> {
