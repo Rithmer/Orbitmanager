@@ -777,6 +777,7 @@ networks:
 | `DB_NAME`               | Имя базы данных             | `taskmanager`   |
 | `DB_USER`               | Пользователь БД              | `postgres`      |
 | `DB_PASSWORD`           | Пароль БД                    | —               |
+| `DATABASE_URL`          | Строка подключения Postgres (без интерполяции `${VAR}` в `.env`) | — |
 
 ### 10.4 Сетевое взаимодействие
 

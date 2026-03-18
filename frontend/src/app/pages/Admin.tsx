@@ -35,13 +35,13 @@ export function Admin() {
   const tabInactive = isDark ? 'bg-[#273142] text-[#94a3b8] hover:text-white' : 'bg-white text-gray-500 hover:text-gray-700'
 
   return (
-    <div className={`${pageBg} min-h-full p-8`}>
+    <div className={`${pageBg} min-h-full p-4 md:p-8`}>
       <div className="mb-6">
-        <h1 className={`text-2xl font-bold ${textPrimary}`}>Админ-панель</h1>
+        <h1 className={`text-xl md:text-2xl font-bold ${textPrimary}`}>Админ-панель</h1>
         <p className={`mt-1 text-sm ${textSecondary}`}>Управление пользователями и аудит</p>
       </div>
 
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-6 flex-wrap">
         {[
           { key: 'users' as Tab, label: 'Пользователи', icon: Users },
           { key: 'audit' as Tab, label: 'Журнал аудита', icon: FileText },
@@ -67,6 +67,7 @@ function UsersPanel() {
   const { isDark } = useTheme()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
@@ -94,12 +95,14 @@ function UsersPanel() {
     : 'bg-white border-[#e8e8e8] text-[#202224]'
 
   const loadUsers = useCallback(async () => {
+    setError('')
     try {
       const res = await usersApi.list({ search: search || undefined, page, limit })
       setUsers(res.items)
       setTotal(res.total)
-    } catch {
-      /* skip */
+    } catch (e) {
+      console.error('Admin: failed to load users:', e)
+      setError('Не удалось загрузить пользователей.')
     } finally {
       setLoading(false)
     }
@@ -181,10 +184,23 @@ function UsersPanel() {
     )
   }
 
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <Users className="w-10 h-10 text-red-500" />
+        <p className={`text-lg font-bold ${textPrimary}`}>Ошибка загрузки</p>
+        <p className={`text-sm ${textSecondary} text-center max-w-md`}>{error}</p>
+        <button onClick={() => { setLoading(true); loadUsers() }} className="bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2.5 rounded-lg text-sm font-semibold">
+          Повторить
+        </button>
+      </div>
+    )
+  }
+
   return (
     <>
-      <div className="flex items-center justify-between gap-4 mb-4">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-4">
+        <div className="relative flex-1 sm:max-w-md">
           <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${textSecondary}`} />
           <input
             type="text"
@@ -204,7 +220,7 @@ function UsersPanel() {
             setFormError('')
             setShowCreateModal(true)
           }}
-          className="flex items-center gap-2 bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2.5 rounded-lg text-sm font-semibold"
+          className="flex items-center gap-2 bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 btn-fizzy"
         >
           <Plus className="w-4 h-4" />
           Создать
@@ -358,6 +374,7 @@ function AuditPanel() {
   const { isDark } = useTheme()
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [filterAction, setFilterAction] = useState('')
@@ -372,6 +389,7 @@ function AuditPanel() {
 
   const loadLogs = useCallback(async () => {
     setLoading(true)
+    setError('')
     try {
       const res = await auditApi.list({
         page,
@@ -381,8 +399,9 @@ function AuditPanel() {
       })
       setLogs(res.items)
       setTotal(res.total)
-    } catch {
-      /* skip */
+    } catch (e) {
+      console.error('Admin: failed to load audit logs:', e)
+      setError('Не удалось загрузить журнал аудита.')
     } finally {
       setLoading(false)
     }
@@ -428,6 +447,16 @@ function AuditPanel() {
           ))}
         </select>
       </div>
+
+      {error && (
+        <div className="flex flex-col items-center justify-center py-12 gap-3 mb-4">
+          <FileText className="w-8 h-8 text-red-500" />
+          <p className={`text-sm font-semibold ${textPrimary}`}>{error}</p>
+          <button onClick={loadLogs} className="bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-3 py-1.5 rounded-lg text-sm font-semibold">
+            Повторить
+          </button>
+        </div>
+      )}
 
       <div className={`${cardBg} border ${cardBorder} rounded-xl overflow-hidden`}>
         {loading ? (

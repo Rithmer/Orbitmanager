@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { CheckCircle2, Clock, AlertCircle, TrendingUp, Plus, ArrowUpRight } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 import { useAuth } from '../context/AuthContext'
@@ -18,6 +18,7 @@ export function Dashboard() {
   const [projects, setProjects] = useState<Project[]>([])
   const [risks, setRisks] = useState<ProjectRiskOutput[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   const pageBg = isDark ? 'bg-[#1c2534]' : 'bg-[#f5f6fa]'
   const cardBg = isDark ? 'bg-[#273142]' : 'bg-white'
@@ -26,29 +27,33 @@ export function Dashboard() {
   const textSecondary = isDark ? 'text-[#94a3b8]' : 'text-[#737373]'
   const dividerColor = isDark ? 'border-[#313d4f]' : 'border-gray-100'
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [tasksRes, projectsRes] = await Promise.all([
-          tasksApi.list({ limit: 10, sort: '-createdAt' }),
-          projectsApi.list({ limit: 10 }),
-        ])
-        setTasks(tasksRes.items)
-        setProjects(projectsRes.items)
+  const loadData = useCallback(async () => {
+    setError('')
+    try {
+      const [tasksRes, projectsRes] = await Promise.all([
+        tasksApi.list({ limit: 10, sort: '-createdAt' }),
+        projectsApi.list({ limit: 10 }),
+      ])
+      setTasks(tasksRes.items)
+      setProjects(projectsRes.items)
 
-        const riskPromises = projectsRes.items.slice(0, 3).map((p) =>
-          riskApi.getProjectRisk(p.id).catch(() => null),
-        )
-        const riskResults = await Promise.all(riskPromises)
-        setRisks(riskResults.filter(Boolean) as ProjectRiskOutput[])
-      } catch {
-        /* API might not be available yet */
-      } finally {
-        setLoading(false)
+      try {
+        const risksMap = await riskApi.getAllProjectsRisk()
+        setRisks(Object.values(risksMap))
+      } catch (e) {
+        console.warn('Failed to load project risks:', e)
       }
+    } catch (e) {
+      console.error('Dashboard: failed to load data:', e)
+      setError('Не удалось загрузить данные. Попробуйте обновить страницу.')
+    } finally {
+      setLoading(false)
     }
-    load()
   }, [])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const doneTasks = tasks.filter((t) => t.status === TaskStatus.DONE).length
   const inProgressTasks = tasks.filter((t) => t.status === TaskStatus.IN_PROGRESS).length
@@ -163,11 +168,26 @@ export function Dashboard() {
     )
   }
 
+  if (error) {
+    return (
+      <div className={`${pageBg} min-h-full p-8`}>
+        <div className="flex flex-col items-center justify-center py-20 gap-4">
+          <AlertCircle className="w-10 h-10 text-red-500" />
+          <p className={`text-lg font-bold ${textPrimary}`}>Ошибка загрузки</p>
+          <p className={`text-sm ${textSecondary} text-center max-w-md`}>{error}</p>
+          <button onClick={() => { setLoading(true); loadData() }} className="bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2.5 rounded-lg text-sm font-semibold">
+            Повторить
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className={`${pageBg} min-h-full p-8`}>
-      <div className="flex items-center justify-between mb-8">
+    <div className={`${pageBg} min-h-full p-4 md:p-8`}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 md:mb-8">
         <div>
-          <h1 className={`text-2xl font-bold ${textPrimary}`}>
+          <h1 className={`text-xl md:text-2xl font-bold ${textPrimary}`}>
             Добро пожаловать, {user?.fullName?.split(' ')[0] || 'Пользователь'}!
           </h1>
           <p className={`mt-1 text-sm ${textSecondary}`}>
@@ -176,16 +196,16 @@ export function Dashboard() {
         </div>
         <button
           onClick={() => navigate('/projects')}
-          className="flex items-center gap-2 bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors duration-150"
+          className="flex items-center gap-2 bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors duration-150 self-start sm:self-auto btn-fizzy"
         >
           <Plus className="w-4 h-4" />
           Создать проект
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-5 mb-6 md:mb-8">
         {stats.map((stat, i) => (
-          <div key={i} className={`${cardBg} border ${cardBorder} rounded-xl p-5`}>
+          <div key={i} className={`${cardBg} border ${cardBorder} rounded-xl p-5 card-hover`}>
             <div className="flex items-center gap-4">
               <div className={`w-12 h-12 ${stat.iconBg} rounded-xl flex items-center justify-center shrink-0`}>
                 <stat.icon className={`w-6 h-6 ${stat.iconColor}`} />
@@ -203,8 +223,8 @@ export function Dashboard() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div className={`${cardBg} border ${cardBorder} rounded-xl p-6 xl:col-span-2`}>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">
+        <div className={`${cardBg} border ${cardBorder} rounded-xl card-hover p-6 xl:col-span-2`}>
           <div className="flex items-center justify-between mb-5">
             <h2 className={`font-bold ${textPrimary}`}>Последние задачи</h2>
             <button
@@ -238,7 +258,7 @@ export function Dashboard() {
           )}
         </div>
 
-        <div className={`${cardBg} border ${cardBorder} rounded-xl p-6`}>
+        <div className={`${cardBg} border ${cardBorder} rounded-xl card-hover p-6`}>
           <div className="flex items-center gap-2 mb-5">
             <span className="text-[#4880ff] text-lg">&#10022;</span>
             <h2 className={`font-bold ${textPrimary}`}>AI Аналитика рисков</h2>

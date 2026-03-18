@@ -38,6 +38,7 @@ export function Projects() {
   const [teamMembersMap, setTeamMembersMap] = useState<Record<number, TeamMember[]>>({})
   const [projectRisks, setProjectRisks] = useState<Record<number, ProjectRiskOutput>>({})
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
 
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -92,6 +93,7 @@ export function Projects() {
   }
 
   const loadData = useCallback(async () => {
+    setError('')
     try {
       const [projectsRes, teamsRes, usersRes] = await Promise.all([
         projectsApi.list({ limit: 100 }),
@@ -102,41 +104,28 @@ export function Projects() {
       setTeams(teamsRes.items)
       setAllUsers(usersRes.items)
 
-      const membersMap: Record<number, ProjectMember[]> = {}
-      const tmMap: Record<number, TeamMember[]> = {}
-
-      await Promise.all([
-        ...projectsRes.items.map(async (p) => {
-          try {
-            membersMap[p.id] = await projectsApi.getMembers(p.id)
-          } catch {
-            membersMap[p.id] = []
-          }
+      const [membersMap, tmMap] = await Promise.all([
+        projectsApi.getAllMembersBatch().catch((e) => {
+          console.warn('Failed to load project members batch:', e)
+          return {} as Record<number, ProjectMember[]>
         }),
-        ...teamsRes.items.map(async (t) => {
-          try {
-            tmMap[t.id] = await teamsApi.getMembers(t.id)
-          } catch {
-            tmMap[t.id] = []
-          }
+        teamsApi.getAllMembersBatch().catch((e) => {
+          console.warn('Failed to load team members batch:', e)
+          return {} as Record<number, TeamMember[]>
         }),
       ])
       setProjectMembers(membersMap)
       setTeamMembersMap(tmMap)
 
-      const risksMap: Record<number, ProjectRiskOutput> = {}
-      await Promise.all(
-        projectsRes.items.map(async (p) => {
-          try {
-            risksMap[p.id] = await riskApi.getProjectRisk(p.id)
-          } catch {
-            /* skip */
-          }
-        }),
-      )
-      setProjectRisks(risksMap)
-    } catch {
-      /* silently fail */
+      try {
+        const risksMap = await riskApi.getAllProjectsRisk()
+        setProjectRisks(risksMap)
+      } catch (e) {
+        console.warn('Failed to load project risks:', e)
+      }
+    } catch (e) {
+      console.error('Projects: failed to load data:', e)
+      setError('Не удалось загрузить данные проектов. Попробуйте обновить страницу.')
     } finally {
       setLoading(false)
     }
@@ -240,11 +229,26 @@ export function Projects() {
     )
   }
 
+  if (error) {
+    return (
+      <div className={`${pageBg} min-h-full p-8`}>
+        <div className="flex flex-col items-center justify-center py-20 gap-4">
+          <AlertTriangle className="w-10 h-10 text-red-500" />
+          <p className={`text-lg font-bold ${textPrimary}`}>Ошибка загрузки</p>
+          <p className={`text-sm ${textSecondary} text-center max-w-md`}>{error}</p>
+          <button onClick={() => { setLoading(true); loadData() }} className="bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2.5 rounded-lg text-sm font-semibold">
+            Повторить
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className={`${pageBg} min-h-full p-8`}>
-      <div className="flex items-center justify-between mb-6">
+    <div className={`${pageBg} min-h-full p-4 md:p-8`}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className={`text-2xl font-bold ${textPrimary}`}>Проекты</h1>
+          <h1 className={`text-xl md:text-2xl font-bold ${textPrimary}`}>Проекты</h1>
           <p className={`mt-1 text-sm ${textSecondary}`}>{projects.length} проектов</p>
         </div>
         <button
@@ -256,7 +260,7 @@ export function Projects() {
             setFormError('')
             setShowCreateModal(true)
           }}
-          className="flex items-center gap-2 bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors duration-150"
+          className="flex items-center gap-2 bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors duration-150 self-start sm:self-auto btn-fizzy"
         >
           <Plus className="w-4 h-4" />
           Новый проект
@@ -274,7 +278,7 @@ export function Projects() {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
         {filteredProjects.length > 0 ? (
           filteredProjects.map((project, idx) => {
             const ci = idx % colors.length
@@ -285,7 +289,7 @@ export function Projects() {
             return (
               <div
                 key={project.id}
-                className={`${cardBg} border ${cardBorder} rounded-xl p-6 cursor-pointer hover:shadow-lg transition-all duration-200 group`}
+                className={`${cardBg} border ${cardBorder} rounded-xl p-6 cursor-pointer card-hover transition-all duration-200 group`}
               >
                 <div className="flex items-start justify-between mb-4">
                   <div
@@ -332,7 +336,7 @@ export function Projects() {
                     </button>
                     {openMenuId === project.id && (
                       <div
-                        className={`absolute right-0 top-8 z-10 w-52 rounded-xl shadow-xl border overflow-hidden ${
+                        className={`absolute right-0 top-8 z-10 w-52 rounded-xl shadow-xl border overflow-hidden dropdown-enter ${
                           isDark ? 'bg-[#273142] border-[#313d4f]' : 'bg-white border-[#e8e8e8]'
                         }`}
                       >
