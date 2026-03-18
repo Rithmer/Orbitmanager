@@ -1,8 +1,16 @@
-import { Task } from '@/domain/models/task.model';
-import { TaskRiskInput } from '@/domain/services/risk-assessment.interface';
+import { TaskRiskInput } from '../risk.types';
+
+interface TaskRiskSource {
+  id: number;
+  difficulty: number;
+  deadline: string | Date;
+  createdAt: string | Date;
+  status: string;
+  assigneeId: number | null;
+}
 
 export function buildTaskRiskInput(
-  task: Task,
+  task: TaskRiskSource,
   statusChangesCount: number,
   assigneeLoad: number,
 ): TaskRiskInput {
@@ -19,8 +27,8 @@ export function buildTaskRiskInput(
   return {
     taskId: task.id,
     difficulty: task.difficulty,
-    deadline: task.deadline,
-    createdAt: task.createdAt,
+    deadline: deadline.toISOString(),
+    createdAt: created.toISOString(),
     status: task.status,
     assigneeCount: task.assigneeId ? 1 : 0,
     assigneeLoad,

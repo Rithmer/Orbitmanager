@@ -50,21 +50,17 @@ export class AuditLogsController {
     @Query('limit') limit?: string,
     @Query('sort') sort?: string,
   ) {
-    return this.auditService.findAll(
-      {
-        search,
-        page: page ? parseInt(page, 10) : undefined,
-        limit: limit ? parseInt(limit, 10) : undefined,
-        sort,
-      },
-      {
-        userId: userId ? parseInt(userId, 10) : undefined,
-        entityType,
-        entityId: entityId ? parseInt(entityId, 10) : undefined,
-        action,
-        from,
-        to,
-      },
-    );
+    return this.auditService.findAll({
+      userId: userId ? parseInt(userId, 10) : undefined,
+      entityType,
+      entityId: entityId ? parseInt(entityId, 10) : undefined,
+      action,
+      from,
+      to,
+      search,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      sort,
+    });
   }
 }

@@ -46,7 +46,7 @@ export class AuthService {
     return this.generateTokens({
       sub: user.id,
       login: user.login,
-      accountRole: user.accountRole,
+      accountRole: user.accountRole as AccountRole,
     });
   }
 
@@ -70,7 +70,7 @@ export class AuthService {
     return this.generateTokens({
       sub: user.id,
       login: user.login,
-      accountRole: user.accountRole,
+      accountRole: user.accountRole as AccountRole,
     });
   }
 
@@ -96,7 +96,7 @@ export class AuthService {
     return this.generateTokens({
       sub: user.id,
       login: user.login,
-      accountRole: user.accountRole,
+      accountRole: user.accountRole as AccountRole,
     });
   }
 

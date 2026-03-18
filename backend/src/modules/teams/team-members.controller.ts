@@ -20,11 +20,8 @@ import {
 import { TeamsService } from './teams.service';
 import { AddTeamMemberDto, UpdateTeamMemberDto } from './dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
-import { TeamRolesGuard } from '@/common/guards/team-roles.guard';
-import { TeamRoles } from '@/common/decorators/team-roles.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
-import { TeamRole } from '@/common/enums/team-role.enum';
 
 @ApiTags('Team Members')
 @ApiBearerAuth()
@@ -34,20 +31,18 @@ export class TeamMembersController {
   constructor(private readonly teamsService: TeamsService) {}
 
   @Get('teams/:teamId/members')
-  @ApiOperation({ summary: 'Получить участников команды' })
-  @ApiResponse({ status: 200, description: 'Список участников' })
-  @ApiResponse({ status: 404, description: 'Команда не найдена' })
+  @ApiOperation({ summary: 'РџРѕР»СѓС‡РёС‚СЊ СѓС‡Р°СЃС‚РЅРёРєРѕРІ РєРѕРјР°РЅРґС‹' })
+  @ApiResponse({ status: 200, description: 'РЎРїРёСЃРѕРє СѓС‡Р°СЃС‚РЅРёРєРѕРІ' })
+  @ApiResponse({ status: 404, description: 'РљРѕРјР°РЅРґР° РЅРµ РЅР°Р№РґРµРЅР°' })
   findMembers(@Param('teamId', ParseIntPipe) teamId: number) {
     return this.teamsService.findMembers(teamId);
   }
 
   @Post('teams/:teamId/members')
-  @UseGuards(TeamRolesGuard)
-  @TeamRoles(TeamRole.OWNER)
-  @ApiOperation({ summary: 'Добавить участника в команду (только owner)' })
-  @ApiResponse({ status: 201, description: 'Участник добавлен' })
-  @ApiResponse({ status: 403, description: 'Нет прав' })
-  @ApiResponse({ status: 409, description: 'Участник уже в команде' })
+  @ApiOperation({ summary: 'Р”РѕР±Р°РІРёС‚СЊ СѓС‡Р°СЃС‚РЅРёРєР° РІ РєРѕРјР°РЅРґСѓ (С‚РѕР»СЊРєРѕ owner)' })
+  @ApiResponse({ status: 201, description: 'РЈС‡Р°СЃС‚РЅРёРє РґРѕР±Р°РІР»РµРЅ' })
+  @ApiResponse({ status: 403, description: 'РќРµС‚ РїСЂР°РІ' })
+  @ApiResponse({ status: 409, description: 'РЈС‡Р°СЃС‚РЅРёРє СѓР¶Рµ РІ РєРѕРјР°РЅРґРµ' })
   addMember(
     @Param('teamId', ParseIntPipe) teamId: number,
     @Body() dto: AddTeamMemberDto,
@@ -58,10 +53,10 @@ export class TeamMembersController {
   }
 
   @Patch('team-members/:id')
-  @ApiOperation({ summary: 'Изменить роль участника (только owner)' })
-  @ApiResponse({ status: 200, description: 'Роль обновлена' })
-  @ApiResponse({ status: 403, description: 'Нет прав' })
-  @ApiResponse({ status: 404, description: 'Участник не найден' })
+  @ApiOperation({ summary: 'РР·РјРµРЅРёС‚СЊ СЂРѕР»СЊ СѓС‡Р°СЃС‚РЅРёРєР° (С‚РѕР»СЊРєРѕ owner)' })
+  @ApiResponse({ status: 200, description: 'Р РѕР»СЊ РѕР±РЅРѕРІР»РµРЅР°' })
+  @ApiResponse({ status: 403, description: 'РќРµС‚ РїСЂР°РІ' })
+  @ApiResponse({ status: 404, description: 'РЈС‡Р°СЃС‚РЅРёРє РЅРµ РЅР°Р№РґРµРЅ' })
   updateMember(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateTeamMemberDto,
@@ -73,10 +68,10 @@ export class TeamMembersController {
 
   @Delete('team-members/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Удалить участника из команды (только owner)' })
-  @ApiResponse({ status: 204, description: 'Участник удалён' })
-  @ApiResponse({ status: 403, description: 'Нет прав / единственный owner' })
-  @ApiResponse({ status: 404, description: 'Участник не найден' })
+  @ApiOperation({ summary: 'РЈРґР°Р»РёС‚СЊ СѓС‡Р°СЃС‚РЅРёРєР° РёР· РєРѕРјР°РЅРґС‹ (С‚РѕР»СЊРєРѕ owner)' })
+  @ApiResponse({ status: 204, description: 'РЈС‡Р°СЃС‚РЅРёРє СѓРґР°Р»С‘РЅ' })
+  @ApiResponse({ status: 403, description: 'РќРµС‚ РїСЂР°РІ / РµРґРёРЅСЃС‚РІРµРЅРЅС‹Р№ owner' })
+  @ApiResponse({ status: 404, description: 'РЈС‡Р°СЃС‚РЅРёРє РЅРµ РЅР°Р№РґРµРЅ' })
   removeMember(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('id') userId: number,

@@ -1,90 +1,101 @@
 import {
   Injectable,
-  Inject,
   NotFoundException,
   ForbiddenException,
   ConflictException,
 } from '@nestjs/common';
-import type { ITeamRepository } from '@/domain/repositories/team.repository';
-import { TEAM_REPOSITORY } from '@/domain/repositories/team.repository';
-import type { ITeamMemberRepository } from '@/domain/repositories/team-member.repository';
-import { TEAM_MEMBER_REPOSITORY } from '@/domain/repositories/team-member.repository';
-import type { IUserRepository } from '@/domain/repositories/user.repository';
-import { USER_REPOSITORY } from '@/domain/repositories/user.repository';
-import type { IProjectRepository } from '@/domain/repositories/project.repository';
-import { PROJECT_REPOSITORY } from '@/domain/repositories/project.repository';
-import type { IProjectMemberRepository } from '@/domain/repositories/project-member.repository';
-import { PROJECT_MEMBER_REPOSITORY } from '@/domain/repositories/project-member.repository';
-import type { ITaskRepository } from '@/domain/repositories/task.repository';
-import { TASK_REPOSITORY } from '@/domain/repositories/task.repository';
-import { Team } from '@/domain/models/team.model';
-import { TeamMember } from '@/domain/models/team-member.model';
+import { Prisma, type Team, type TeamMember } from '@prisma/client';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { TeamRole } from '@/common/enums/team-role.enum';
 import { ProjectRole } from '@/common/enums/project-role.enum';
 import { AccountRole } from '@/common/enums/account-role.enum';
+import {
+  PaginatedResult,
+  buildPaginatedResult,
+  normalizePagination,
+  parseSortField,
+} from '@/common/query/pagination';
 import { CreateTeamDto } from './dto/create-team.dto';
 import { UpdateTeamDto } from './dto/update-team.dto';
 import { AddTeamMemberDto } from './dto/add-team-member.dto';
 import { UpdateTeamMemberDto } from './dto/update-team-member.dto';
-import {
-  QueryHelper,
-  QueryParams,
-  PaginatedResult,
-} from '@/common/helpers/query.helper';
 import { AuditService } from '@/modules/audit-logs/audit.service';
 import { AuditAction } from '@/common/enums/audit-action.enum';
+
+export interface TeamsListParams {
+  search?: string;
+  sort?: string;
+  page?: number;
+  limit?: number;
+}
 
 @Injectable()
 export class TeamsService {
   constructor(
-    @Inject(TEAM_REPOSITORY)
-    private readonly teamRepository: ITeamRepository,
-    @Inject(TEAM_MEMBER_REPOSITORY)
-    private readonly teamMemberRepository: ITeamMemberRepository,
-    @Inject(USER_REPOSITORY)
-    private readonly userRepository: IUserRepository,
-    @Inject(PROJECT_REPOSITORY)
-    private readonly projectRepository: IProjectRepository,
-    @Inject(PROJECT_MEMBER_REPOSITORY)
-    private readonly projectMemberRepository: IProjectMemberRepository,
-    @Inject(TASK_REPOSITORY)
-    private readonly taskRepository: ITaskRepository,
+    private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
   ) {}
 
-  async findAll(params: QueryParams): Promise<PaginatedResult<Team>> {
-    const teams = await this.teamRepository.findAll();
-    return QueryHelper.apply(teams, {
-      ...params,
-      searchFields: params.searchFields ?? ['name', 'description'],
-    });
+  async findAll(params: TeamsListParams): Promise<PaginatedResult<Team>> {
+    const pagination = normalizePagination(params.page, params.limit);
+    const where = this.buildWhere(params);
+    const orderBy = this.buildOrderBy(params.sort);
+
+    const [total, teams] = await Promise.all([
+      this.prisma.team.count({ where }),
+      this.prisma.team.findMany({
+        where,
+        orderBy,
+        skip: pagination.skip,
+        take: pagination.limit,
+      }),
+    ]);
+
+    return buildPaginatedResult(
+      teams,
+      total,
+      pagination.page,
+      pagination.limit,
+    );
   }
 
   async findById(id: number): Promise<Team> {
-    const team = await this.teamRepository.findById(id);
-    if (!team) throw new NotFoundException(`Команда #${id} не найдена`);
+    const team = await this.prisma.team.findUnique({ where: { id } });
+    if (!team) {
+      throw new NotFoundException(`РљРѕРјР°РЅРґР° #${id} РЅРµ РЅР°Р№РґРµРЅР°`);
+    }
+
     return team;
   }
 
-  async create(
-    dto: CreateTeamDto,
-    userId: number,
-  ): Promise<Team> {
-    const now = new Date().toISOString();
-    const team = await this.teamRepository.create({
-      name: dto.name,
-      description: dto.description ?? '',
-      createdAt: now,
-      createdById: userId,
+  async create(dto: CreateTeamDto, userId: number): Promise<Team> {
+    const team = await this.prisma.$transaction(async (tx) => {
+      const createdTeam = await tx.team.create({
+        data: {
+          name: dto.name,
+          description: dto.description ?? '',
+          createdById: userId,
+        },
+      });
+
+      await tx.teamMember.create({
+        data: {
+          userId,
+          teamId: createdTeam.id,
+          teamRole: TeamRole.OWNER,
+        },
+      });
+
+      return createdTeam;
     });
 
-    await this.teamMemberRepository.create({
+    await this.auditService.log(
       userId,
-      teamId: team.id,
-      teamRole: TeamRole.OWNER,
-    });
-
-    await this.auditService.log(userId, AuditAction.CREATE, 'team', team.id, `Создана команда "${team.name}"`);
+      AuditAction.CREATE,
+      'team',
+      team.id,
+      `РЎРѕР·РґР°РЅР° РєРѕРјР°РЅРґР° "${team.name}"`,
+    );
 
     return team;
   }
@@ -98,12 +109,23 @@ export class TeamsService {
     await this.findById(id);
     await this.assertOwnerOrAdmin(userId, id, userRole);
 
-    const updated = await this.teamRepository.update(id, {
-      ...dto,
+    const updated = await this.prisma.team.update({
+      where: { id },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.description !== undefined
+          ? { description: dto.description }
+          : {}),
+      },
     });
-    if (!updated) throw new NotFoundException(`Команда #${id} не найдена`);
 
-    await this.auditService.log(userId, AuditAction.UPDATE, 'team', id, `Обновлена команда "${updated.name}"`);
+    await this.auditService.log(
+      userId,
+      AuditAction.UPDATE,
+      'team',
+      id,
+      `РћР±РЅРѕРІР»РµРЅР° РєРѕРјР°РЅРґР° "${updated.name}"`,
+    );
 
     return updated;
   }
@@ -116,14 +138,24 @@ export class TeamsService {
     await this.findById(id);
     await this.assertOwnerOrAdmin(userId, id, userRole);
 
-    await this.teamRepository.delete(id);
+    await this.prisma.team.delete({ where: { id } });
 
-    await this.auditService.log(userId, AuditAction.DELETE, 'team', id, `Удалена команда #${id}`);
+    await this.auditService.log(
+      userId,
+      AuditAction.DELETE,
+      'team',
+      id,
+      `РЈРґР°Р»РµРЅР° РєРѕРјР°РЅРґР° #${id}`,
+    );
   }
 
   async findMembers(teamId: number): Promise<TeamMember[]> {
     await this.findById(teamId);
-    return this.teamMemberRepository.findByTeam(teamId);
+
+    return this.prisma.teamMember.findMany({
+      where: { teamId },
+      orderBy: { id: 'asc' },
+    });
   }
 
   async addMember(
@@ -135,26 +167,45 @@ export class TeamsService {
     await this.findById(teamId);
     await this.assertOwnerOrAdmin(userId, teamId, userRole);
 
-    const user = await this.userRepository.findById(dto.userId);
-    if (!user) throw new NotFoundException(`Пользователь #${dto.userId} не найден`);
-
-    const existing = await this.teamMemberRepository.findByUserAndTeam(
-      dto.userId,
-      teamId,
-    );
-    if (existing) {
-      throw new ConflictException(
-        `Пользователь #${dto.userId} уже является участником команды #${teamId}`,
+    const user = await this.prisma.user.findUnique({
+      where: { id: dto.userId },
+      select: { id: true },
+    });
+    if (!user) {
+      throw new NotFoundException(
+        `РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ #${dto.userId} РЅРµ РЅР°Р№РґРµРЅ`,
       );
     }
 
-    const member = await this.teamMemberRepository.create({
-      userId: dto.userId,
-      teamId,
-      teamRole: dto.teamRole,
+    const existing = await this.prisma.teamMember.findUnique({
+      where: {
+        userId_teamId: {
+          userId: dto.userId,
+          teamId,
+        },
+      },
+    });
+    if (existing) {
+      throw new ConflictException(
+        `РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ #${dto.userId} СѓР¶Рµ СЏРІР»СЏРµС‚СЃСЏ СѓС‡Р°СЃС‚РЅРёРєРѕРј РєРѕРјР°РЅРґС‹ #${teamId}`,
+      );
+    }
+
+    const member = await this.prisma.teamMember.create({
+      data: {
+        userId: dto.userId,
+        teamId,
+        teamRole: dto.teamRole,
+      },
     });
 
-    await this.auditService.log(userId, AuditAction.ASSIGN, 'team_member', member.id, `Пользователь #${dto.userId} добавлен в команду #${teamId} с ролью ${dto.teamRole}`);
+    await this.auditService.log(
+      userId,
+      AuditAction.ASSIGN,
+      'team_member',
+      member.id,
+      `РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ #${dto.userId} РґРѕР±Р°РІР»РµРЅ РІ РєРѕРјР°РЅРґСѓ #${teamId} СЃ СЂРѕР»СЊСЋ ${dto.teamRole}`,
+    );
 
     return member;
   }
@@ -175,13 +226,20 @@ export class TeamsService {
       await this.syncProjectRolesForObserver(member.userId, member.teamId, userId);
     }
 
-    const updated = await this.teamMemberRepository.update(memberId, {
-      teamRole: dto.teamRole,
+    const updated = await this.prisma.teamMember.update({
+      where: { id: memberId },
+      data: { teamRole: dto.teamRole },
     });
-    if (!updated)
-      throw new NotFoundException(`Участник #${memberId} не найден`);
 
-    await this.auditService.log(userId, AuditAction.UPDATE, 'team_member', memberId, `Роль участника #${memberId} изменена на ${dto.teamRole}`, member.teamRole, dto.teamRole);
+    await this.auditService.log(
+      userId,
+      AuditAction.UPDATE,
+      'team_member',
+      memberId,
+      `Р РѕР»СЊ СѓС‡Р°СЃС‚РЅРёРєР° #${memberId} РёР·РјРµРЅРµРЅР° РЅР° ${dto.teamRole}`,
+      member.teamRole,
+      dto.teamRole,
+    );
 
     return updated;
   }
@@ -195,31 +253,37 @@ export class TeamsService {
     await this.assertOwnerOrAdmin(userId, member.teamId, userRole);
 
     if (member.teamRole === TeamRole.OWNER) {
-      const teamMembers = await this.teamMemberRepository.findByTeam(
-        member.teamId,
-      );
-      const owners = teamMembers.filter((m) => m.teamRole === TeamRole.OWNER);
-      if (owners.length <= 1) {
+      const ownersCount = await this.prisma.teamMember.count({
+        where: {
+          teamId: member.teamId,
+          teamRole: TeamRole.OWNER,
+        },
+      });
+      if (ownersCount <= 1) {
         throw new ForbiddenException(
-          'Нельзя удалить единственного владельца команды',
+          'РќРµР»СЊР·СЏ СѓРґР°Р»РёС‚СЊ РµРґРёРЅСЃС‚РІРµРЅРЅРѕРіРѕ РІР»Р°РґРµР»СЊС†Р° РєРѕРјР°РЅРґС‹',
         );
       }
     }
 
-    await this.detachUserFromTeamProjects(
-      member.userId,
-      member.teamId,
+    await this.detachUserFromTeamProjects(member.userId, member.teamId, userId);
+    await this.prisma.teamMember.delete({ where: { id: memberId } });
+
+    await this.auditService.log(
       userId,
+      AuditAction.DELETE,
+      'team_member',
+      memberId,
+      `РЈС‡Р°СЃС‚РЅРёРє #${member.userId} СѓРґР°Р»С‘РЅ РёР· РєРѕРјР°РЅРґС‹ #${member.teamId}`,
     );
-
-    await this.teamMemberRepository.delete(memberId);
-
-    await this.auditService.log(userId, AuditAction.DELETE, 'team_member', memberId, `Участник #${member.userId} удалён из команды #${member.teamId}`);
   }
 
   private async findMemberById(id: number): Promise<TeamMember> {
-    const member = await this.teamMemberRepository.findById(id);
-    if (!member) throw new NotFoundException(`Участник #${id} не найден`);
+    const member = await this.prisma.teamMember.findUnique({ where: { id } });
+    if (!member) {
+      throw new NotFoundException(`РЈС‡Р°СЃС‚РЅРёРє #${id} РЅРµ РЅР°Р№РґРµРЅ`);
+    }
+
     return member;
   }
 
@@ -228,15 +292,21 @@ export class TeamsService {
     teamId: number,
     accountRole: AccountRole,
   ): Promise<void> {
-    if (accountRole === AccountRole.ADMIN) return;
+    if (accountRole === AccountRole.ADMIN) {
+      return;
+    }
 
-    const membership = await this.teamMemberRepository.findByUserAndTeam(
-      userId,
-      teamId,
-    );
+    const membership = await this.prisma.teamMember.findUnique({
+      where: {
+        userId_teamId: {
+          userId,
+          teamId,
+        },
+      },
+    });
     if (!membership || membership.teamRole !== TeamRole.OWNER) {
       throw new ForbiddenException(
-        'Только владелец команды может выполнить это действие',
+        'РўРѕР»СЊРєРѕ РІР»Р°РґРµР»РµС† РєРѕРјР°РЅРґС‹ РјРѕР¶РµС‚ РІС‹РїРѕР»РЅРёС‚СЊ СЌС‚Рѕ РґРµР№СЃС‚РІРёРµ',
       );
     }
   }
@@ -247,15 +317,36 @@ export class TeamsService {
     actorUserId: number,
   ): Promise<void> {
     const teamProjectIds = await this.getTeamProjectIds(teamId);
+    if (teamProjectIds.length === 0) {
+      return;
+    }
 
-    if (teamProjectIds.length === 0) return;
+    const projectMemberships = await this.prisma.projectMember.findMany({
+      where: {
+        userId,
+        projectId: { in: teamProjectIds },
+      },
+      orderBy: { id: 'asc' },
+    });
 
-    await this.taskRepository.clearAssigneeByUserAndProjects(userId, teamProjectIds);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.task.updateMany({
+        where: {
+          assigneeId: userId,
+          projectId: { in: teamProjectIds },
+        },
+        data: {
+          assigneeId: null,
+        },
+      });
 
-    const projectMemberships = (await this.projectMemberRepository.findByUser(userId))
-      .filter((membership) => teamProjectIds.includes(membership.projectId));
-
-    await this.projectMemberRepository.deleteByUserAndProjects(userId, teamProjectIds);
+      await tx.projectMember.deleteMany({
+        where: {
+          userId,
+          projectId: { in: teamProjectIds },
+        },
+      });
+    });
 
     for (const membership of projectMemberships) {
       await this.auditService.log(
@@ -263,7 +354,7 @@ export class TeamsService {
         AuditAction.DELETE,
         'project_member',
         membership.id,
-        `Участник #${userId} автоматически удалён из проекта #${membership.projectId} после удаления из команды #${teamId}`,
+        `РЈС‡Р°СЃС‚РЅРёРє #${userId} Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё СѓРґР°Р»С‘РЅ РёР· РїСЂРѕРµРєС‚Р° #${membership.projectId} РїРѕСЃР»Рµ СѓРґР°Р»РµРЅРёСЏ РёР· РєРѕРјР°РЅРґС‹ #${teamId}`,
       );
     }
   }
@@ -274,28 +365,31 @@ export class TeamsService {
     actorUserId: number,
   ): Promise<void> {
     const teamProjectIds = await this.getTeamProjectIds(teamId);
-    if (teamProjectIds.length === 0) return;
+    if (teamProjectIds.length === 0) {
+      return;
+    }
 
-    const memberships = (await this.projectMemberRepository.findByUser(userId))
-      .filter(
-        (membership) =>
-          teamProjectIds.includes(membership.projectId) &&
-          membership.role !== ProjectRole.OBSERVER,
-      );
+    const memberships = await this.prisma.projectMember.findMany({
+      where: {
+        userId,
+        projectId: { in: teamProjectIds },
+        role: { not: ProjectRole.OBSERVER },
+      },
+      orderBy: { id: 'asc' },
+    });
 
     for (const membership of memberships) {
-      const updated = await this.projectMemberRepository.update(membership.id, {
-        role: ProjectRole.OBSERVER,
+      await this.prisma.projectMember.update({
+        where: { id: membership.id },
+        data: { role: ProjectRole.OBSERVER },
       });
-
-      if (!updated) continue;
 
       await this.auditService.log(
         actorUserId,
         AuditAction.UPDATE,
         'project_member',
         membership.id,
-        `Роль участника #${membership.id} автоматически изменена на observer после перевода в observer в команде #${teamId}`,
+        `Р РѕР»СЊ СѓС‡Р°СЃС‚РЅРёРєР° #${membership.id} Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё РёР·РјРµРЅРµРЅР° РЅР° observer РїРѕСЃР»Рµ РїРµСЂРµРІРѕРґР° РІ observer РІ РєРѕРјР°РЅРґРµ #${teamId}`,
         membership.role,
         ProjectRole.OBSERVER,
       );
@@ -303,7 +397,35 @@ export class TeamsService {
   }
 
   private async getTeamProjectIds(teamId: number): Promise<number[]> {
-    const teamProjects = await this.projectRepository.findByTeam(teamId);
+    const teamProjects = await this.prisma.project.findMany({
+      where: { teamId },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+    });
+
     return teamProjects.map((project) => project.id);
+  }
+
+  private buildWhere(params: TeamsListParams): Prisma.TeamWhereInput {
+    if (!params.search) {
+      return {};
+    }
+
+    return {
+      OR: [
+        { name: { contains: params.search, mode: 'insensitive' } },
+        { description: { contains: params.search, mode: 'insensitive' } },
+      ],
+    };
+  }
+
+  private buildOrderBy(sort?: string): Prisma.TeamOrderByWithRelationInput {
+    const { field, direction } = parseSortField(
+      sort,
+      ['id', 'name', 'description', 'createdAt', 'createdById'],
+      'id',
+    );
+
+    return { [field]: direction };
   }
 }

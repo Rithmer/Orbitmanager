@@ -1,10 +1,11 @@
 import {
   Injectable,
-  Inject,
   NotFoundException,
   ConflictException,
   BadRequestException,
 } from '@nestjs/common';
+import { Prisma, type Project, type ProjectMember } from '@prisma/client';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { ProjectAccessService } from '@/common/access/project-access.service';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { AuditAction } from '@/common/enums/audit-action.enum';
@@ -13,58 +14,67 @@ import { ProjectStatus } from '@/common/enums/project-status.enum';
 import { TeamRole } from '@/common/enums/team-role.enum';
 import {
   PaginatedResult,
-  QueryHelper,
-  QueryParams,
-} from '@/common/helpers/query.helper';
-import { ProjectMember } from '@/domain/models/project-member.model';
-import { Project } from '@/domain/models/project.model';
-import type { IProjectMemberRepository } from '@/domain/repositories/project-member.repository';
-import { PROJECT_MEMBER_REPOSITORY } from '@/domain/repositories/project-member.repository';
-import type { IProjectRepository } from '@/domain/repositories/project.repository';
-import { PROJECT_REPOSITORY } from '@/domain/repositories/project.repository';
-import type { ITaskRepository } from '@/domain/repositories/task.repository';
-import { TASK_REPOSITORY } from '@/domain/repositories/task.repository';
-import type { ITeamMemberRepository } from '@/domain/repositories/team-member.repository';
-import { TEAM_MEMBER_REPOSITORY } from '@/domain/repositories/team-member.repository';
-import type { ITeamRepository } from '@/domain/repositories/team.repository';
-import { TEAM_REPOSITORY } from '@/domain/repositories/team.repository';
+  buildPaginatedResult,
+  normalizePagination,
+  parseSortField,
+} from '@/common/query/pagination';
 import { AuditService } from '../audit-logs/audit.service';
 import { AddProjectMemberDto } from './dto/add-project-member.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectMemberDto } from './dto/update-project-member.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 
+export interface ProjectsListParams {
+  search?: string;
+  sort?: string;
+  page?: number;
+  limit?: number;
+  teamId?: number;
+  status?: string;
+}
+
 @Injectable()
 export class ProjectsService {
   constructor(
-    @Inject(PROJECT_REPOSITORY)
-    private readonly projectRepository: IProjectRepository,
-    @Inject(PROJECT_MEMBER_REPOSITORY)
-    private readonly projectMemberRepository: IProjectMemberRepository,
-    @Inject(TEAM_MEMBER_REPOSITORY)
-    private readonly teamMemberRepository: ITeamMemberRepository,
-    @Inject(TASK_REPOSITORY)
-    private readonly taskRepository: ITaskRepository,
-    @Inject(TEAM_REPOSITORY)
-    private readonly teamRepository: ITeamRepository,
+    private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly projectAccessService: ProjectAccessService,
   ) {}
 
   async findAll(
-    params: QueryParams,
+    params: ProjectsListParams,
     userId: number,
     userRole: AccountRole,
   ): Promise<PaginatedResult<Project>> {
-    const projects =
+    const pagination = normalizePagination(params.page, params.limit);
+    const visibleProjectIds =
       userRole === AccountRole.ADMIN
-        ? await this.projectRepository.findAll()
-        : await this.projectAccessService.getVisibleProjects(userId);
+        ? null
+        : await this.projectAccessService.getVisibleProjectIds(userId);
 
-    return QueryHelper.apply(projects, {
-      ...params,
-      searchFields: params.searchFields ?? ['name', 'description'],
-    });
+    if (visibleProjectIds && visibleProjectIds.length === 0) {
+      return buildPaginatedResult([], 0, pagination.page, pagination.limit);
+    }
+
+    const where = this.buildWhere(params, visibleProjectIds);
+    const orderBy = this.buildOrderBy(params.sort);
+
+    const [total, projects] = await Promise.all([
+      this.prisma.project.count({ where }),
+      this.prisma.project.findMany({
+        where,
+        orderBy,
+        skip: pagination.skip,
+        take: pagination.limit,
+      }),
+    ]);
+
+    return buildPaginatedResult(
+      projects,
+      total,
+      pagination.page,
+      pagination.limit,
+    );
   }
 
   async findById(
@@ -72,9 +82,9 @@ export class ProjectsService {
     userId: number,
     userRole: AccountRole,
   ): Promise<Project> {
-    const project = await this.projectRepository.findById(id);
+    const project = await this.prisma.project.findUnique({ where: { id } });
     if (!project) {
-      throw new NotFoundException(`Проект #${id} не найден`);
+      throw new NotFoundException(`РџСЂРѕРµРєС‚ #${id} РЅРµ РЅР°Р№РґРµРЅ`);
     }
 
     if (userRole !== AccountRole.ADMIN) {
@@ -89,9 +99,12 @@ export class ProjectsService {
     userId: number,
     userRole: AccountRole,
   ): Promise<Project> {
-    const team = await this.teamRepository.findById(dto.teamId);
+    const team = await this.prisma.team.findUnique({
+      where: { id: dto.teamId },
+      select: { id: true },
+    });
     if (!team) {
-      throw new NotFoundException(`Команда #${dto.teamId} не найдена`);
+      throw new NotFoundException(`РљРѕРјР°РЅРґР° #${dto.teamId} РЅРµ РЅР°Р№РґРµРЅР°`);
     }
 
     await this.projectAccessService.assertTeamOwnerOrAdmin(
@@ -100,14 +113,13 @@ export class ProjectsService {
       userRole,
     );
 
-    const now = new Date().toISOString();
-    const project = await this.projectRepository.create({
-      teamId: dto.teamId,
-      name: dto.name,
-      description: dto.description ?? '',
-      status: dto.status ?? ProjectStatus.ACTIVE,
-      createdAt: now,
-      updatedAt: now,
+    const project = await this.prisma.project.create({
+      data: {
+        teamId: dto.teamId,
+        name: dto.name,
+        description: dto.description ?? '',
+        status: dto.status ?? ProjectStatus.ACTIVE,
+      },
     });
 
     await this.auditService.log(
@@ -115,7 +127,7 @@ export class ProjectsService {
       AuditAction.CREATE,
       'project',
       project.id,
-      `Создан проект "${project.name}"`,
+      `РЎРѕР·РґР°РЅ РїСЂРѕРµРєС‚ "${project.name}"`,
     );
 
     return project;
@@ -135,20 +147,23 @@ export class ProjectsService {
       userRole,
     );
 
-    const updated = await this.projectRepository.update(id, {
-      ...dto,
-      updatedAt: new Date().toISOString(),
+    const updated = await this.prisma.project.update({
+      where: { id },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.description !== undefined
+          ? { description: dto.description }
+          : {}),
+        ...(dto.status !== undefined ? { status: dto.status } : {}),
+      },
     });
-    if (!updated) {
-      throw new NotFoundException(`Проект #${id} не найден`);
-    }
 
     await this.auditService.log(
       userId,
       AuditAction.UPDATE,
       'project',
       id,
-      `Обновлён проект "${updated.name}"`,
+      `РћР±РЅРѕРІР»С‘РЅ РїСЂРѕРµРєС‚ "${updated.name}"`,
     );
 
     return updated;
@@ -167,14 +182,14 @@ export class ProjectsService {
       userRole,
     );
 
-    await this.projectRepository.delete(id);
+    await this.prisma.project.delete({ where: { id } });
 
     await this.auditService.log(
       userId,
       AuditAction.DELETE,
       'project',
       id,
-      `Удалён проект "${project.name}"`,
+      `РЈРґР°Р»С‘РЅ РїСЂРѕРµРєС‚ "${project.name}"`,
     );
   }
 
@@ -189,7 +204,10 @@ export class ProjectsService {
       await this.projectAccessService.assertProjectVisibility(project, userId);
     }
 
-    return this.projectMemberRepository.findByProject(projectId);
+    return this.prisma.projectMember.findMany({
+      where: { projectId },
+      orderBy: { id: 'asc' },
+    });
   }
 
   async addMember(
@@ -206,33 +224,42 @@ export class ProjectsService {
       userRole,
     );
 
-    const teamMembership = await this.teamMemberRepository.findByUserAndTeam(
-      dto.userId,
-      project.teamId,
-    );
+    const teamMembership = await this.prisma.teamMember.findUnique({
+      where: {
+        userId_teamId: {
+          userId: dto.userId,
+          teamId: project.teamId,
+        },
+      },
+    });
     if (!teamMembership) {
       throw new BadRequestException(
-        `Пользователь #${dto.userId} не является участником команды #${project.teamId}`,
+        `РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ #${dto.userId} РЅРµ СЏРІР»СЏРµС‚СЃСЏ СѓС‡Р°СЃС‚РЅРёРєРѕРј РєРѕРјР°РЅРґС‹ #${project.teamId}`,
       );
     }
 
     this.validateProjectRole(teamMembership.teamRole, dto.role);
 
-    const existing = await this.projectMemberRepository.findByUserAndProject(
-      dto.userId,
-      projectId,
-    );
+    const existing = await this.prisma.projectMember.findUnique({
+      where: {
+        projectId_userId: {
+          projectId,
+          userId: dto.userId,
+        },
+      },
+    });
     if (existing) {
       throw new ConflictException(
-        `Пользователь #${dto.userId} уже является участником проекта #${projectId}`,
+        `РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ #${dto.userId} СѓР¶Рµ СЏРІР»СЏРµС‚СЃСЏ СѓС‡Р°СЃС‚РЅРёРєРѕРј РїСЂРѕРµРєС‚Р° #${projectId}`,
       );
     }
 
-    const member = await this.projectMemberRepository.create({
-      projectId,
-      userId: dto.userId,
-      role: dto.role,
-      assignedAt: new Date().toISOString(),
+    const member = await this.prisma.projectMember.create({
+      data: {
+        projectId,
+        userId: dto.userId,
+        role: dto.role,
+      },
     });
 
     await this.auditService.log(
@@ -240,7 +267,7 @@ export class ProjectsService {
       AuditAction.ASSIGN,
       'project_member',
       member.id,
-      `Пользователь #${dto.userId} добавлен в проект #${projectId} с ролью ${dto.role}`,
+      `РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ #${dto.userId} РґРѕР±Р°РІР»РµРЅ РІ РїСЂРѕРµРєС‚ #${projectId} СЃ СЂРѕР»СЊСЋ ${dto.role}`,
     );
 
     return member;
@@ -261,27 +288,29 @@ export class ProjectsService {
       userRole,
     );
 
-    const teamMembership = await this.teamMemberRepository.findByUserAndTeam(
-      member.userId,
-      project.teamId,
-    );
+    const teamMembership = await this.prisma.teamMember.findUnique({
+      where: {
+        userId_teamId: {
+          userId: member.userId,
+          teamId: project.teamId,
+        },
+      },
+    });
     if (teamMembership) {
       this.validateProjectRole(teamMembership.teamRole, dto.role);
     }
 
-    const updated = await this.projectMemberRepository.update(memberId, {
-      role: dto.role,
+    const updated = await this.prisma.projectMember.update({
+      where: { id: memberId },
+      data: { role: dto.role },
     });
-    if (!updated) {
-      throw new NotFoundException(`Участник проекта #${memberId} не найден`);
-    }
 
     await this.auditService.log(
       userId,
       AuditAction.UPDATE,
       'project_member',
       memberId,
-      `Роль участника #${memberId} изменена на ${dto.role}`,
+      `Р РѕР»СЊ СѓС‡Р°СЃС‚РЅРёРєР° #${memberId} РёР·РјРµРЅРµРЅР° РЅР° ${dto.role}`,
       member.role,
       dto.role,
     );
@@ -303,49 +332,82 @@ export class ProjectsService {
       userRole,
     );
 
-    await this.taskRepository.clearAssigneeByUserAndProjects(member.userId, [
-      member.projectId,
-    ]);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.task.updateMany({
+        where: {
+          assigneeId: member.userId,
+          projectId: member.projectId,
+        },
+        data: { assigneeId: null },
+      });
 
-    await this.projectMemberRepository.delete(memberId);
+      await tx.projectMember.delete({ where: { id: memberId } });
+    });
 
     await this.auditService.log(
       userId,
       AuditAction.DELETE,
       'project_member',
       memberId,
-      `Участник #${member.userId} удалён из проекта #${member.projectId}`,
+      `РЈС‡Р°СЃС‚РЅРёРє #${member.userId} СѓРґР°Р»С‘РЅ РёР· РїСЂРѕРµРєС‚Р° #${member.projectId}`,
     );
   }
 
   private async findMemberById(id: number): Promise<ProjectMember> {
-    const member = await this.projectMemberRepository.findById(id);
+    const member = await this.prisma.projectMember.findUnique({ where: { id } });
     if (!member) {
-      throw new NotFoundException(`Участник проекта #${id} не найден`);
+      throw new NotFoundException(`РЈС‡Р°СЃС‚РЅРёРє РїСЂРѕРµРєС‚Р° #${id} РЅРµ РЅР°Р№РґРµРЅ`);
     }
 
     return member;
   }
 
-  private validateProjectRole(
-    teamRole: TeamRole,
-    projectRole: ProjectRole,
-  ): void {
+  private validateProjectRole(teamRole: string, projectRole: string): void {
     if (teamRole === TeamRole.MEMBER) {
       if (
         projectRole !== ProjectRole.TEAM_LEAD &&
         projectRole !== ProjectRole.DEVELOPER
       ) {
         throw new BadRequestException(
-          'Участник команды (member) может получить роль team_lead или developer в проекте',
+          'РЈС‡Р°СЃС‚РЅРёРє РєРѕРјР°РЅРґС‹ (member) РјРѕР¶РµС‚ РїРѕР»СѓС‡РёС‚СЊ СЂРѕР»СЊ team_lead РёР»Рё developer РІ РїСЂРѕРµРєС‚Рµ',
         );
       }
     } else if (teamRole === TeamRole.OBSERVER) {
       if (projectRole !== ProjectRole.OBSERVER) {
         throw new BadRequestException(
-          'Наблюдатель команды (observer) может получить только роль observer в проекте',
+          'РќР°Р±Р»СЋРґР°С‚РµР»СЊ РєРѕРјР°РЅРґС‹ (observer) РјРѕР¶РµС‚ РїРѕР»СѓС‡РёС‚СЊ С‚РѕР»СЊРєРѕ СЂРѕР»СЊ observer РІ РїСЂРѕРµРєС‚Рµ',
         );
       }
     }
+  }
+
+  private buildWhere(
+    params: ProjectsListParams,
+    visibleProjectIds: number[] | null,
+  ): Prisma.ProjectWhereInput {
+    const where: Prisma.ProjectWhereInput = {
+      ...(visibleProjectIds ? { id: { in: visibleProjectIds } } : {}),
+      ...(params.teamId !== undefined ? { teamId: params.teamId } : {}),
+      ...(params.status ? { status: params.status } : {}),
+    };
+
+    if (params.search) {
+      where.OR = [
+        { name: { contains: params.search, mode: 'insensitive' } },
+        { description: { contains: params.search, mode: 'insensitive' } },
+      ];
+    }
+
+    return where;
+  }
+
+  private buildOrderBy(sort?: string): Prisma.ProjectOrderByWithRelationInput {
+    const { field, direction } = parseSortField(
+      sort,
+      ['id', 'teamId', 'name', 'description', 'status', 'createdAt', 'updatedAt'],
+      'id',
+    );
+
+    return { [field]: direction };
   }
 }

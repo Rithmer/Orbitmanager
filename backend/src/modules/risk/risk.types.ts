@@ -25,11 +25,3 @@ export interface ProjectRiskOutput {
   tasksAtRisk: { taskId: number; taskName: string; delayProbability: number }[];
   summary: string;
 }
-
-export interface IRiskAssessmentService {
-  assessTask(input: TaskRiskInput): Promise<TaskRiskOutput>;
-  assessProject(projectId: number): Promise<ProjectRiskOutput>;
-  loadModel?(): Promise<void>;
-}
-
-export const RISK_ASSESSMENT_SERVICE = Symbol('RISK_ASSESSMENT_SERVICE');

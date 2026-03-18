@@ -1,37 +1,28 @@
-import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
+import type { Project, TeamMember } from '@prisma/client';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { ProjectRole } from '@/common/enums/project-role.enum';
 import { TeamRole } from '@/common/enums/team-role.enum';
-import type { Project } from '@/domain/models/project.model';
-import type { TeamMember } from '@/domain/models/team-member.model';
-import type { IProjectRepository } from '@/domain/repositories/project.repository';
-import { PROJECT_REPOSITORY } from '@/domain/repositories/project.repository';
-import type { IProjectMemberRepository } from '@/domain/repositories/project-member.repository';
-import { PROJECT_MEMBER_REPOSITORY } from '@/domain/repositories/project-member.repository';
-import type { ITeamMemberRepository } from '@/domain/repositories/team-member.repository';
-import { TEAM_MEMBER_REPOSITORY } from '@/domain/repositories/team-member.repository';
 
 @Injectable()
 export class ProjectAccessService {
-  constructor(
-    @Inject(PROJECT_REPOSITORY)
-    private readonly projectRepository: IProjectRepository,
-    @Inject(PROJECT_MEMBER_REPOSITORY)
-    private readonly projectMemberRepository: IProjectMemberRepository,
-    @Inject(TEAM_MEMBER_REPOSITORY)
-    private readonly teamMemberRepository: ITeamMemberRepository,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async getVisibleProjects(userId: number): Promise<Project[]> {
-    const teamMemberships = await this.teamMemberRepository.findByUser(userId);
+    const teamMemberships = await this.prisma.teamMember.findMany({
+      where: { userId },
+      orderBy: { id: 'asc' },
+    });
     if (teamMemberships.length === 0) {
       return [];
     }
 
-    const teamIds = [
-      ...new Set(teamMemberships.map((membership) => membership.teamId)),
-    ];
-    const allTeamProjects = await this.projectRepository.findByTeams(teamIds);
+    const teamIds = [...new Set(teamMemberships.map((membership) => membership.teamId))];
+    const allTeamProjects = await this.prisma.project.findMany({
+      where: { teamId: { in: teamIds } },
+      orderBy: { id: 'asc' },
+    });
     if (allTeamProjects.length === 0) {
       return [];
     }
@@ -42,9 +33,7 @@ export class ProjectAccessService {
       allTeamProjects,
     );
 
-    return this.dedupeProjects(
-      allTeamProjects.filter((project) => visibleProjectIds.has(project.id)),
-    );
+    return allTeamProjects.filter((project) => visibleProjectIds.has(project.id));
   }
 
   async getVisibleProjectIds(userId: number): Promise<number[]> {
@@ -52,18 +41,19 @@ export class ProjectAccessService {
     return projects.map((project) => project.id);
   }
 
-  async assertProjectVisibility(
-    project: Project,
-    userId: number,
-  ): Promise<void> {
-    const teamMembership = await this.teamMemberRepository.findByUserAndTeam(
-      userId,
-      project.teamId,
-    );
+  async assertProjectVisibility(project: Pick<Project, 'id' | 'teamId'>, userId: number): Promise<void> {
+    const teamMembership = await this.prisma.teamMember.findUnique({
+      where: {
+        userId_teamId: {
+          userId,
+          teamId: project.teamId,
+        },
+      },
+    });
 
     if (!teamMembership) {
       throw new ForbiddenException(
-        'Вы не являетесь участником команды этого проекта',
+        'Р’С‹ РЅРµ СЏРІР»СЏРµС‚РµСЃСЊ СѓС‡Р°СЃС‚РЅРёРєРѕРј РєРѕРјР°РЅРґС‹ СЌС‚РѕРіРѕ РїСЂРѕРµРєС‚Р°',
       );
     }
 
@@ -71,14 +61,17 @@ export class ProjectAccessService {
       return;
     }
 
-    const projectMembership =
-      await this.projectMemberRepository.findByUserAndProject(
-        userId,
-        project.id,
-      );
+    const projectMembership = await this.prisma.projectMember.findUnique({
+      where: {
+        projectId_userId: {
+          projectId: project.id,
+          userId,
+        },
+      },
+    });
 
     if (!projectMembership) {
-      throw new ForbiddenException('У вас нет доступа к этому проекту');
+      throw new ForbiddenException('РЈ РІР°СЃ РЅРµС‚ РґРѕСЃС‚СѓРїР° Рє СЌС‚РѕРјСѓ РїСЂРѕРµРєС‚Сѓ');
     }
   }
 
@@ -91,20 +84,24 @@ export class ProjectAccessService {
       return;
     }
 
-    const membership = await this.teamMemberRepository.findByUserAndTeam(
-      userId,
-      teamId,
-    );
+    const membership = await this.prisma.teamMember.findUnique({
+      where: {
+        userId_teamId: {
+          userId,
+          teamId,
+        },
+      },
+    });
 
     if (!membership || membership.teamRole !== TeamRole.OWNER) {
       throw new ForbiddenException(
-        'Только владелец команды может выполнить это действие',
+        'РўРѕР»СЊРєРѕ РІР»Р°РґРµР»РµС† РєРѕРјР°РЅРґС‹ РјРѕР¶РµС‚ РІС‹РїРѕР»РЅРёС‚СЊ СЌС‚Рѕ РґРµР№СЃС‚РІРёРµ',
       );
     }
   }
 
   async assertCanManageProject(
-    project: Project,
+    project: Pick<Project, 'id' | 'teamId'>,
     userId: number,
     accountRole: AccountRole,
   ): Promise<void> {
@@ -113,7 +110,7 @@ export class ProjectAccessService {
       project.teamId,
       project.id,
       accountRole,
-      'Только владелец команды или тимлид проекта может выполнить это действие',
+      'РўРѕР»СЊРєРѕ РІР»Р°РґРµР»РµС† РєРѕРјР°РЅРґС‹ РёР»Рё С‚РёРјР»РёРґ РїСЂРѕРµРєС‚Р° РјРѕР¶РµС‚ РІС‹РїРѕР»РЅРёС‚СЊ СЌС‚Рѕ РґРµР№СЃС‚РІРёРµ',
     );
   }
 
@@ -122,7 +119,7 @@ export class ProjectAccessService {
     teamId: number,
     projectId: number,
     accountRole: AccountRole,
-    errorMessage = 'Только владелец команды или тимлид проекта может выполнить это действие',
+    errorMessage = 'РўРѕР»СЊРєРѕ РІР»Р°РґРµР»РµС† РєРѕРјР°РЅРґС‹ РёР»Рё С‚РёРјР»РёРґ РїСЂРѕРµРєС‚Р° РјРѕР¶РµС‚ РІС‹РїРѕР»РЅРёС‚СЊ СЌС‚Рѕ РґРµР№СЃС‚РІРёРµ',
   ): Promise<void> {
     const canManage = await this.hasTeamOwnershipOrProjectLead(
       userId,
@@ -146,20 +143,27 @@ export class ProjectAccessService {
       return true;
     }
 
-    const teamMembership = await this.teamMemberRepository.findByUserAndTeam(
-      userId,
-      teamId,
-    );
+    const teamMembership = await this.prisma.teamMember.findUnique({
+      where: {
+        userId_teamId: {
+          userId,
+          teamId,
+        },
+      },
+    });
 
     if (teamMembership?.teamRole === TeamRole.OWNER) {
       return true;
     }
 
-    const projectMembership =
-      await this.projectMemberRepository.findByUserAndProject(
-        userId,
-        projectId,
-      );
+    const projectMembership = await this.prisma.projectMember.findUnique({
+      where: {
+        projectId_userId: {
+          projectId,
+          userId,
+        },
+      },
+    });
 
     return projectMembership?.role === ProjectRole.TEAM_LEAD;
   }
@@ -171,9 +175,7 @@ export class ProjectAccessService {
   ): Promise<Set<number>> {
     const ownerOrMemberTeams = new Set(
       teamMemberships
-        .filter((membership) =>
-          this.canViewAllTeamProjects(membership.teamRole),
-        )
+        .filter((membership) => this.canViewAllTeamProjects(membership.teamRole))
         .map((membership) => membership.teamId),
     );
 
@@ -191,8 +193,10 @@ export class ProjectAccessService {
       );
     }
 
-    const projectMemberships =
-      await this.projectMemberRepository.findByUser(userId);
+    const projectMemberships = await this.prisma.projectMember.findMany({
+      where: { userId },
+      select: { projectId: true },
+    });
     const assignedProjectIds = new Set(
       projectMemberships.map((membership) => membership.projectId),
     );
@@ -209,20 +213,7 @@ export class ProjectAccessService {
     );
   }
 
-  private canViewAllTeamProjects(teamRole: TeamRole): boolean {
+  private canViewAllTeamProjects(teamRole: string): boolean {
     return teamRole === TeamRole.OWNER || teamRole === TeamRole.MEMBER;
-  }
-
-  private dedupeProjects(projects: Project[]): Project[] {
-    const seen = new Set<number>();
-
-    return projects.filter((project) => {
-      if (seen.has(project.id)) {
-        return false;
-      }
-
-      seen.add(project.id);
-      return true;
-    });
   }
 }

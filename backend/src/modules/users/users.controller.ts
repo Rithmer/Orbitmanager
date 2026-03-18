@@ -54,7 +54,7 @@ export class UsersController {
       sort,
       page: page ? parseInt(page, 10) : undefined,
       limit: limit ? parseInt(limit, 10) : undefined,
-      filters: accountRole ? { accountRole } : undefined,
+      accountRole,
     });
   }
 

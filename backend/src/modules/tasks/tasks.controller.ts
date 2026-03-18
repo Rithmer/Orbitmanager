@@ -34,7 +34,7 @@ export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Получить список задач' })
+  @ApiOperation({ summary: 'РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє Р·Р°РґР°С‡' })
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'projectId', required: false, type: Number })
   @ApiQuery({ name: 'status', required: false, enum: TaskStatus })
@@ -43,7 +43,7 @@ export class TasksController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'sort', required: false })
-  @ApiResponse({ status: 200, description: 'Список задач' })
+  @ApiResponse({ status: 200, description: 'РЎРїРёСЃРѕРє Р·Р°РґР°С‡' })
   findAll(
     @CurrentUser('id') userId: number,
     @CurrentUser('accountRole') userRole: AccountRole,
@@ -62,12 +62,10 @@ export class TasksController {
         sort,
         page: page ? parseInt(page, 10) : undefined,
         limit: limit ? parseInt(limit, 10) : undefined,
-        filters: {
-          ...(projectId ? { projectId: parseInt(projectId, 10) } : {}),
-          ...(status ? { status } : {}),
-          ...(difficulty ? { difficulty: parseInt(difficulty, 10) } : {}),
-          ...(assigneeId ? { assigneeId: parseInt(assigneeId, 10) } : {}),
-        },
+        projectId: projectId ? parseInt(projectId, 10) : undefined,
+        status,
+        difficulty: difficulty ? parseInt(difficulty, 10) : undefined,
+        assigneeId: assigneeId ? parseInt(assigneeId, 10) : undefined,
       },
       userId,
       userRole,
@@ -75,9 +73,9 @@ export class TasksController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Получить задачу по ID' })
-  @ApiResponse({ status: 200, description: 'Задача найдена' })
-  @ApiResponse({ status: 404, description: 'Задача не найдена' })
+  @ApiOperation({ summary: 'РџРѕР»СѓС‡РёС‚СЊ Р·Р°РґР°С‡Сѓ РїРѕ ID' })
+  @ApiResponse({ status: 200, description: 'Р—Р°РґР°С‡Р° РЅР°Р№РґРµРЅР°' })
+  @ApiResponse({ status: 404, description: 'Р—Р°РґР°С‡Р° РЅРµ РЅР°Р№РґРµРЅР°' })
   findOne(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('id') userId: number,
@@ -87,11 +85,11 @@ export class TasksController {
   }
 
   @Post()
-  @ApiOperation({ summary: 'Создать задачу (БП1: owner / team_lead)' })
-  @ApiResponse({ status: 201, description: 'Задача создана' })
-  @ApiResponse({ status: 400, description: 'Ошибка валидации' })
-  @ApiResponse({ status: 403, description: 'Нет прав' })
-  @ApiResponse({ status: 404, description: 'Проект не найден' })
+  @ApiOperation({ summary: 'РЎРѕР·РґР°С‚СЊ Р·Р°РґР°С‡Сѓ (Р‘Рџ1: owner / team_lead)' })
+  @ApiResponse({ status: 201, description: 'Р—Р°РґР°С‡Р° СЃРѕР·РґР°РЅР°' })
+  @ApiResponse({ status: 400, description: 'РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё' })
+  @ApiResponse({ status: 403, description: 'РќРµС‚ РїСЂР°РІ' })
+  @ApiResponse({ status: 404, description: 'РџСЂРѕРµРєС‚ РЅРµ РЅР°Р№РґРµРЅ' })
   create(
     @Body() dto: CreateTaskDto,
     @CurrentUser('id') userId: number,
@@ -101,11 +99,11 @@ export class TasksController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Обновить задачу / изменить статус (БП2)' })
-  @ApiResponse({ status: 200, description: 'Задача обновлена' })
-  @ApiResponse({ status: 422, description: 'Недопустимый переход статуса' })
-  @ApiResponse({ status: 403, description: 'Нет прав' })
-  @ApiResponse({ status: 404, description: 'Задача не найдена' })
+  @ApiOperation({ summary: 'РћР±РЅРѕРІРёС‚СЊ Р·Р°РґР°С‡Сѓ / РёР·РјРµРЅРёС‚СЊ СЃС‚Р°С‚СѓСЃ (Р‘Рџ2)' })
+  @ApiResponse({ status: 200, description: 'Р—Р°РґР°С‡Р° РѕР±РЅРѕРІР»РµРЅР°' })
+  @ApiResponse({ status: 422, description: 'РќРµРґРѕРїСѓСЃС‚РёРјС‹Р№ РїРµСЂРµС…РѕРґ СЃС‚Р°С‚СѓСЃР°' })
+  @ApiResponse({ status: 403, description: 'РќРµС‚ РїСЂР°РІ' })
+  @ApiResponse({ status: 404, description: 'Р—Р°РґР°С‡Р° РЅРµ РЅР°Р№РґРµРЅР°' })
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateTaskDto,
@@ -117,10 +115,10 @@ export class TasksController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Удалить задачу (owner / team_lead)' })
-  @ApiResponse({ status: 204, description: 'Задача удалена' })
-  @ApiResponse({ status: 403, description: 'Нет прав' })
-  @ApiResponse({ status: 404, description: 'Задача не найдена' })
+  @ApiOperation({ summary: 'РЈРґР°Р»РёС‚СЊ Р·Р°РґР°С‡Сѓ (owner / team_lead)' })
+  @ApiResponse({ status: 204, description: 'Р—Р°РґР°С‡Р° РѕСѓРґР°Р»РµРЅР°' })
+  @ApiResponse({ status: 403, description: 'РќРµС‚ РїСЂР°РІ' })
+  @ApiResponse({ status: 404, description: 'Р—Р°РґР°С‡Р° РЅРµ РЅР°Р№РґРµРЅР°' })
   remove(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('id') userId: number,
