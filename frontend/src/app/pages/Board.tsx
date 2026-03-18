@@ -48,6 +48,7 @@ export function Board() {
   const [allUsers, setAllUsers] = useState<User[]>([])
   const [taskRisks, setTaskRisks] = useState<Record<number, TaskRiskOutput>>({})
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
 
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -77,11 +78,12 @@ export function Board() {
       setLoading(false)
       return
     }
+    setLoadError('')
     try {
       const [proj, tasksRes, membersRes, usersRes] = await Promise.all([
         projectsApi.getById(projectId),
         tasksApi.list({ projectId, limit: 200 }),
-        projectsApi.getMembers(projectId).catch(() => []),
+        projectsApi.getMembers(projectId),
         usersApi.list({ limit: 100 }),
       ])
       setProject(proj)
@@ -90,18 +92,15 @@ export function Board() {
       setAllUsers(usersRes.items)
 
       const risksMap: Record<number, TaskRiskOutput> = {}
-      await Promise.all(
-        tasksRes.items.map(async (t) => {
-          try {
-            risksMap[t.id] = await riskApi.getTaskRisk(t.id)
-          } catch {
-            /* skip */
-          }
-        }),
+      const taskRiskList = await Promise.all(
+        tasksRes.items.map((task) => riskApi.getTaskRisk(task.id)),
       )
+      tasksRes.items.forEach((task, index) => {
+        risksMap[task.id] = taskRiskList[index] as TaskRiskOutput
+      })
       setTaskRisks(risksMap)
-    } catch {
-      /* silently fail */
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Ошибка загрузки данных')
     } finally {
       setLoading(false)
     }
@@ -264,6 +263,8 @@ export function Board() {
           Добавить задачу
         </button>
       </div>
+
+      <ErrorMessage message={loadError} />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 items-start">
         {COLUMNS.map((col) => {

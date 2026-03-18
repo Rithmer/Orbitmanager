@@ -38,6 +38,7 @@ export function Projects() {
   const [teamMembersMap, setTeamMembersMap] = useState<Record<number, TeamMember[]>>({})
   const [projectRisks, setProjectRisks] = useState<Record<number, ProjectRiskOutput>>({})
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
 
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -92,6 +93,7 @@ export function Projects() {
   }
 
   const loadData = useCallback(async () => {
+    setLoadError('')
     try {
       const [projectsRes, teamsRes, usersRes] = await Promise.all([
         projectsApi.list({ limit: 100 }),
@@ -104,39 +106,30 @@ export function Projects() {
 
       const membersMap: Record<number, ProjectMember[]> = {}
       const tmMap: Record<number, TeamMember[]> = {}
-
-      await Promise.all([
-        ...projectsRes.items.map(async (p) => {
-          try {
-            membersMap[p.id] = await projectsApi.getMembers(p.id)
-          } catch {
-            membersMap[p.id] = []
-          }
-        }),
-        ...teamsRes.items.map(async (t) => {
-          try {
-            tmMap[t.id] = await teamsApi.getMembers(t.id)
-          } catch {
-            tmMap[t.id] = []
-          }
-        }),
+      const [projectMembersList, teamMembersList] = await Promise.all([
+        Promise.all(projectsRes.items.map((project) => projectsApi.getMembers(project.id))),
+        Promise.all(teamsRes.items.map((team) => teamsApi.getMembers(team.id))),
       ])
+
+      projectsRes.items.forEach((project, index) => {
+        membersMap[project.id] = projectMembersList[index] || []
+      })
+      teamsRes.items.forEach((team, index) => {
+        tmMap[team.id] = teamMembersList[index] || []
+      })
       setProjectMembers(membersMap)
       setTeamMembersMap(tmMap)
 
       const risksMap: Record<number, ProjectRiskOutput> = {}
-      await Promise.all(
-        projectsRes.items.map(async (p) => {
-          try {
-            risksMap[p.id] = await riskApi.getProjectRisk(p.id)
-          } catch {
-            /* skip */
-          }
-        }),
+      const projectRisksList = await Promise.all(
+        projectsRes.items.map((project) => riskApi.getProjectRisk(project.id)),
       )
+      projectsRes.items.forEach((project, index) => {
+        risksMap[project.id] = projectRisksList[index] as ProjectRiskOutput
+      })
       setProjectRisks(risksMap)
-    } catch {
-      /* silently fail */
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Ошибка загрузки данных')
     } finally {
       setLoading(false)
     }
@@ -262,6 +255,8 @@ export function Projects() {
           Новый проект
         </button>
       </div>
+
+      <ErrorMessage message={loadError} />
 
       <div className="relative mb-6">
         <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${textSecondary}`} />

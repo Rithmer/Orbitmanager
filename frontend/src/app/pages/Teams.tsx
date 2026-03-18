@@ -69,6 +69,7 @@ export function Teams() {
   ]
 
   const loadData = useCallback(async () => {
+    setError('')
     try {
       const [teamsRes, usersRes] = await Promise.all([
         teamsApi.list({ limit: 100 }),
@@ -78,18 +79,15 @@ export function Teams() {
       setAllUsers(usersRes.items)
 
       const membersMap: Record<number, TeamMember[]> = {}
-      await Promise.all(
-        teamsRes.items.map(async (t) => {
-          try {
-            membersMap[t.id] = await teamsApi.getMembers(t.id)
-          } catch {
-            membersMap[t.id] = []
-          }
-        }),
+      const membersList = await Promise.all(
+        teamsRes.items.map((team) => teamsApi.getMembers(team.id)),
       )
+      teamsRes.items.forEach((team, index) => {
+        membersMap[team.id] = membersList[index] || []
+      })
       setTeamMembers(membersMap)
-    } catch {
-      setError('Не удалось загрузить данные')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось загрузить данные')
     } finally {
       setLoading(false)
     }
