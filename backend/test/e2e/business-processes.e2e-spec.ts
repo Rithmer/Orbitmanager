@@ -106,7 +106,11 @@ async function resetDatabase(): Promise<void> {
   }
 }
 
-function decodeJwtPayload(token: string): { sub: number; login: string; accountRole: string } {
+function decodeJwtPayload(token: string): {
+  sub: number;
+  login: string;
+  accountRole: string;
+} {
   const base64 = token.split('.')[1];
   return JSON.parse(Buffer.from(base64, 'base64').toString('utf-8'));
 }
@@ -157,7 +161,7 @@ async function insertRawUser(
       [login, hashedPassword, fullName, 'Developer'],
     );
 
-    return result.rows[0]!.id;
+    return result.rows[0].id;
   });
 }
 
@@ -194,7 +198,11 @@ describe('Business Processes (e2e)', () => {
 
   const server = () => request(app.getHttpServer());
 
-  async function registerUser(login: string, password: string, fullName: string) {
+  async function registerUser(
+    login: string,
+    password: string,
+    fullName: string,
+  ) {
     const res = await server()
       .post('/auth/register')
       .send({ login, password, fullName, profession: 'Developer' })
@@ -268,7 +276,11 @@ describe('Business Processes (e2e)', () => {
       const res = await server()
         .post('/projects')
         .set('Authorization', `Bearer ${token}`)
-        .send({ teamId, name: 'MVP Project', description: 'Minimum viable product' })
+        .send({
+          teamId,
+          name: 'MVP Project',
+          description: 'Minimum viable product',
+        })
         .expect(201);
 
       projectId = res.body.id;

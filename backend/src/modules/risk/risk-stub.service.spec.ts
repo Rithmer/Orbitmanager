@@ -5,15 +5,20 @@ import { TASK_REPOSITORY } from '@/domain/repositories/task.repository';
 import { PROJECT_REPOSITORY } from '@/domain/repositories/project.repository';
 import { AUDIT_LOG_REPOSITORY } from '@/domain/repositories/audit-log.repository';
 import { TaskStatus } from '@/common/enums/task-status.enum';
-import { AuditAction } from '@/common/enums/audit-action.enum';
 import type { TaskRiskInput } from '@/domain/services/risk-assessment.interface';
 import type { Task } from '@/domain/models/task.model';
 
 const now = new Date();
 const isoNow = now.toISOString();
-const futureDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
-const pastDate = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString();
-const nearDate = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000).toISOString();
+const futureDate = new Date(
+  now.getTime() + 30 * 24 * 60 * 60 * 1000,
+).toISOString();
+const pastDate = new Date(
+  now.getTime() - 5 * 24 * 60 * 60 * 1000,
+).toISOString();
+const nearDate = new Date(
+  now.getTime() + 1 * 24 * 60 * 60 * 1000,
+).toISOString();
 
 const mockTaskRepository = {
   findAll: jest.fn(),
@@ -65,7 +70,9 @@ describe('RiskStubService', () => {
         taskId: 1,
         difficulty: 3,
         deadline: pastDate,
-        createdAt: new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+        createdAt: new Date(
+          now.getTime() - 10 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
         status: TaskStatus.IN_PROGRESS,
         assigneeCount: 1,
         assigneeLoad: 2,
@@ -85,7 +92,9 @@ describe('RiskStubService', () => {
         taskId: 2,
         difficulty: 3,
         deadline: nearDate,
-        createdAt: new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+        createdAt: new Date(
+          now.getTime() - 10 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
         status: TaskStatus.IN_PROGRESS,
         assigneeCount: 1,
         assigneeLoad: 2,
@@ -97,7 +106,9 @@ describe('RiskStubService', () => {
       const result = await service.assessTask(input);
       expect(result.delayProbability).toBe(0.7);
       expect(result.riskLevel).toBe('high');
-      expect(result.riskFactors).toContain('До дедлайна менее 2 дней, задача не на ревью');
+      expect(result.riskFactors).toContain(
+        'До дедлайна менее 2 дней, задача не на ревью',
+      );
     });
 
     it('should return medium risk when difficulty ≥ 4 and high assignee load', async () => {
@@ -118,16 +129,22 @@ describe('RiskStubService', () => {
       expect(result.delayProbability).toBe(0.6);
       expect(result.riskLevel).toBe('medium');
       expect(result.riskFactors).toContain('Высокая сложность задачи');
-      expect(result.riskFactors).toContain('Высокая нагрузка на исполнителя (более 5 задач)');
+      expect(result.riskFactors).toContain(
+        'Высокая нагрузка на исполнителя (более 5 задач)',
+      );
     });
 
     it('should return medium risk when difficulty ≥ 3 and ≤5 days until deadline', async () => {
-      const nearish = new Date(now.getTime() + 4 * 24 * 60 * 60 * 1000).toISOString();
+      const nearish = new Date(
+        now.getTime() + 4 * 24 * 60 * 60 * 1000,
+      ).toISOString();
       const input: TaskRiskInput = {
         taskId: 4,
         difficulty: 3,
         deadline: nearish,
-        createdAt: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+        createdAt: new Date(
+          now.getTime() - 5 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
         status: TaskStatus.IN_PROGRESS,
         assigneeCount: 1,
         assigneeLoad: 2,
@@ -194,7 +211,9 @@ describe('RiskStubService', () => {
       };
 
       const result = await service.assessTask(input);
-      expect(result.riskFactors).toContain('Частые изменения статуса (возможная нестабильность)');
+      expect(result.riskFactors).toContain(
+        'Частые изменения статуса (возможная нестабильность)',
+      );
     });
 
     it('should return predictedCompletionDate and recommendation', async () => {
@@ -224,11 +243,17 @@ describe('RiskStubService', () => {
     it('should throw NotFoundException for non-existent project', async () => {
       mockProjectRepository.findById.mockResolvedValue(null);
 
-      await expect(service.assessProject(999)).rejects.toThrow(NotFoundException);
+      await expect(service.assessProject(999)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should return low risk for project with no active tasks', async () => {
-      mockProjectRepository.findById.mockResolvedValue({ id: 1, teamId: 1, name: 'Test' });
+      mockProjectRepository.findById.mockResolvedValue({
+        id: 1,
+        teamId: 1,
+        name: 'Test',
+      });
       mockTaskRepository.findByProject.mockResolvedValue([
         { id: 1, status: TaskStatus.DONE },
         { id: 2, status: TaskStatus.CANCELLED },
@@ -242,7 +267,11 @@ describe('RiskStubService', () => {
     });
 
     it('should calculate project risk from active tasks', async () => {
-      mockProjectRepository.findById.mockResolvedValue({ id: 1, teamId: 1, name: 'Test' });
+      mockProjectRepository.findById.mockResolvedValue({
+        id: 1,
+        teamId: 1,
+        name: 'Test',
+      });
 
       const tasks: Partial<Task>[] = [
         {
@@ -252,7 +281,9 @@ describe('RiskStubService', () => {
           status: TaskStatus.IN_PROGRESS,
           difficulty: 4,
           deadline: pastDate,
-          createdAt: new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+          createdAt: new Date(
+            now.getTime() - 15 * 24 * 60 * 60 * 1000,
+          ).toISOString(),
           assigneeId: 1,
         },
         {
@@ -278,21 +309,37 @@ describe('RiskStubService', () => {
     });
 
     it('should sort tasksAtRisk by delayProbability descending', async () => {
-      mockProjectRepository.findById.mockResolvedValue({ id: 1, teamId: 1, name: 'Test' });
+      mockProjectRepository.findById.mockResolvedValue({
+        id: 1,
+        teamId: 1,
+        name: 'Test',
+      });
 
       const tasks: Partial<Task>[] = [
         {
-          id: 1, projectId: 1, name: 'Medium risk',
-          status: TaskStatus.IN_PROGRESS, difficulty: 3,
-          deadline: new Date(now.getTime() + 4 * 24 * 60 * 60 * 1000).toISOString(),
-          createdAt: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+          id: 1,
+          projectId: 1,
+          name: 'Medium risk',
+          status: TaskStatus.IN_PROGRESS,
+          difficulty: 3,
+          deadline: new Date(
+            now.getTime() + 4 * 24 * 60 * 60 * 1000,
+          ).toISOString(),
+          createdAt: new Date(
+            now.getTime() - 5 * 24 * 60 * 60 * 1000,
+          ).toISOString(),
           assigneeId: 1,
         },
         {
-          id: 2, projectId: 1, name: 'High risk',
-          status: TaskStatus.IN_PROGRESS, difficulty: 4,
+          id: 2,
+          projectId: 1,
+          name: 'High risk',
+          status: TaskStatus.IN_PROGRESS,
+          difficulty: 4,
           deadline: pastDate,
-          createdAt: new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+          createdAt: new Date(
+            now.getTime() - 10 * 24 * 60 * 60 * 1000,
+          ).toISOString(),
           assigneeId: 2,
         },
       ];

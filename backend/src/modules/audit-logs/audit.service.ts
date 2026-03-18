@@ -69,9 +69,13 @@ export class AuditService {
       logs = logs.filter((l) => l.timestamp <= filters.to!);
     }
 
-    return QueryHelper.apply(
-      logs,
-      { ...params, searchFields: params.searchFields ?? ['description', 'entityType', 'action'] },
-    );
+    return QueryHelper.apply(logs, {
+      ...params,
+      searchFields: params.searchFields ?? [
+        'description',
+        'entityType',
+        'action',
+      ],
+    });
   }
 }

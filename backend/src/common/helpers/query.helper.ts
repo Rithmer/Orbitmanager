@@ -15,6 +15,20 @@ export interface PaginatedResult<T> {
   totalPages: number;
 }
 
+export function parseOptionalInt(value?: string): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(trimmed, 10);
+  return Number.isNaN(parsed) ? undefined : parsed;
+}
+
 export class QueryHelper {
   static apply<T extends object>(
     items: T[],
@@ -110,8 +124,8 @@ export class QueryHelper {
     page?: number,
     limit?: number,
   ): PaginatedResult<T> {
-    const safePage = Math.max(1, page ?? 1);
-    const safeLimit = Math.min(100, Math.max(1, limit ?? 20));
+    const safePage = QueryHelper.normalizePositiveInteger(page, 1);
+    const safeLimit = QueryHelper.normalizePositiveInteger(limit, 20, 100);
     const total = items.length;
     const totalPages = Math.ceil(total / safeLimit) || 1;
     const offset = (safePage - 1) * safeLimit;
@@ -176,5 +190,18 @@ export class QueryHelper {
       default:
         return null;
     }
+  }
+
+  private static normalizePositiveInteger(
+    value: number | undefined,
+    fallback: number,
+    max?: number,
+  ): number {
+    if (!Number.isFinite(value)) {
+      return fallback;
+    }
+
+    const normalized = Math.max(1, Math.trunc(value as number));
+    return typeof max === 'number' ? Math.min(max, normalized) : normalized;
   }
 }

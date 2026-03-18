@@ -4,6 +4,10 @@ export interface IAuditLogRepository {
   findAll(): Promise<AuditLog[]>;
   findById(id: number): Promise<AuditLog | null>;
   findByEntity(entityType: string, entityId: number): Promise<AuditLog[]>;
+  findByEntityIds(
+    entityType: string,
+    entityIds: number[],
+  ): Promise<AuditLog[]>;
   findByUser(userId: number): Promise<AuditLog[]>;
   create(log: Omit<AuditLog, 'id'>): Promise<AuditLog>;
 }

@@ -4,13 +4,23 @@ export interface IProjectMemberRepository {
   findAll(): Promise<ProjectMember[]>;
   findById(id: number): Promise<ProjectMember | null>;
   findByProject(projectId: number): Promise<ProjectMember[]>;
+  findByProjects(projectIds: number[]): Promise<ProjectMember[]>;
   findByUser(userId: number): Promise<ProjectMember[]>;
-  findByUserAndProject(userId: number, projectId: number): Promise<ProjectMember | null>;
+  findByUserAndProject(
+    userId: number,
+    projectId: number,
+  ): Promise<ProjectMember | null>;
   create(member: Omit<ProjectMember, 'id'>): Promise<ProjectMember>;
-  update(id: number, partial: Partial<ProjectMember>): Promise<ProjectMember | null>;
+  update(
+    id: number,
+    partial: Partial<ProjectMember>,
+  ): Promise<ProjectMember | null>;
   delete(id: number): Promise<boolean>;
   deleteByProject(projectId: number): Promise<number>;
-  deleteByUserAndProjects(userId: number, projectIds: number[]): Promise<number>;
+  deleteByUserAndProjects(
+    userId: number,
+    projectIds: number[],
+  ): Promise<number>;
 }
 
 export const PROJECT_MEMBER_REPOSITORY = Symbol('PROJECT_MEMBER_REPOSITORY');

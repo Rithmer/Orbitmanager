@@ -9,8 +9,10 @@ export class AuditLogsPrismaRepository implements IAuditLogRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(): Promise<AuditLog[]> {
-    const rows = await this.prisma.auditLog.findMany({ orderBy: { id: 'asc' } });
-    return rows.map(this.toDomain);
+    const rows = await this.prisma.auditLog.findMany({
+      orderBy: { id: 'asc' },
+    });
+    return rows.map((r) => this.toDomain(r));
   }
 
   async findById(id: number): Promise<AuditLog | null> {
@@ -18,12 +20,27 @@ export class AuditLogsPrismaRepository implements IAuditLogRepository {
     return row ? this.toDomain(row) : null;
   }
 
-  async findByEntity(entityType: string, entityId: number): Promise<AuditLog[]> {
+  async findByEntity(
+    entityType: string,
+    entityId: number,
+  ): Promise<AuditLog[]> {
     const rows = await this.prisma.auditLog.findMany({
       where: { entityType, entityId },
       orderBy: { id: 'asc' },
     });
-    return rows.map(this.toDomain);
+    return rows.map((r) => this.toDomain(r));
+  }
+
+  async findByEntityIds(
+    entityType: string,
+    entityIds: number[],
+  ): Promise<AuditLog[]> {
+    if (entityIds.length === 0) return [];
+    const rows = await this.prisma.auditLog.findMany({
+      where: { entityType, entityId: { in: entityIds } },
+      orderBy: { id: 'asc' },
+    });
+    return rows.map((r) => this.toDomain(r));
   }
 
   async findByUser(userId: number): Promise<AuditLog[]> {
@@ -31,7 +48,7 @@ export class AuditLogsPrismaRepository implements IAuditLogRepository {
       where: { userId },
       orderBy: { id: 'asc' },
     });
-    return rows.map(this.toDomain);
+    return rows.map((r) => this.toDomain(r));
   }
 
   async create(log: Omit<AuditLog, 'id'>): Promise<AuditLog> {

@@ -66,25 +66,43 @@ export class TeamsService {
     return team;
   }
 
-  async create(
-    dto: CreateTeamDto,
-    userId: number,
-  ): Promise<Team> {
+  async create(dto: CreateTeamDto, userId: number): Promise<Team> {
     const now = new Date().toISOString();
-    const team = await this.teamRepository.create({
-      name: dto.name,
-      description: dto.description ?? '',
-      createdAt: now,
-      createdById: userId,
-    });
+    let team: Team | null = null;
 
-    await this.teamMemberRepository.create({
+    try {
+      team = await this.teamRepository.create({
+        name: dto.name,
+        description: dto.description ?? '',
+        createdAt: now,
+        createdById: userId,
+      });
+
+      await this.teamMemberRepository.create({
+        userId,
+        teamId: team.id,
+        teamRole: TeamRole.OWNER,
+      });
+    } catch (error) {
+      if (team) {
+        // Best-effort rollback to avoid orphan teams if owner membership creation fails.
+        try {
+          await this.teamRepository.delete(team.id);
+        } catch {
+          // ignore rollback errors and rethrow the original failure below
+        }
+      }
+
+      throw error;
+    }
+
+    await this.auditService.log(
       userId,
-      teamId: team.id,
-      teamRole: TeamRole.OWNER,
-    });
-
-    await this.auditService.log(userId, AuditAction.CREATE, 'team', team.id, `Создана команда "${team.name}"`);
+      AuditAction.CREATE,
+      'team',
+      team.id,
+      `Создана команда "${team.name}"`,
+    );
 
     return team;
   }
@@ -103,7 +121,13 @@ export class TeamsService {
     });
     if (!updated) throw new NotFoundException(`Команда #${id} не найдена`);
 
-    await this.auditService.log(userId, AuditAction.UPDATE, 'team', id, `Обновлена команда "${updated.name}"`);
+    await this.auditService.log(
+      userId,
+      AuditAction.UPDATE,
+      'team',
+      id,
+      `Обновлена команда "${updated.name}"`,
+    );
 
     return updated;
   }
@@ -118,12 +142,32 @@ export class TeamsService {
 
     await this.teamRepository.delete(id);
 
-    await this.auditService.log(userId, AuditAction.DELETE, 'team', id, `Удалена команда #${id}`);
+    await this.auditService.log(
+      userId,
+      AuditAction.DELETE,
+      'team',
+      id,
+      `Удалена команда #${id}`,
+    );
   }
 
   async findMembers(teamId: number): Promise<TeamMember[]> {
     await this.findById(teamId);
     return this.teamMemberRepository.findByTeam(teamId);
+  }
+
+  async findAllMembersBatch(): Promise<Record<number, TeamMember[]>> {
+    const teams = await this.teamRepository.findAll();
+    const teamIds = teams.map((t) => t.id);
+    const allMembers = await this.teamMemberRepository.findByTeams(teamIds);
+
+    const result: Record<number, TeamMember[]> = {};
+    for (const id of teamIds) result[id] = [];
+    for (const m of allMembers) {
+      if (!result[m.teamId]) result[m.teamId] = [];
+      result[m.teamId].push(m);
+    }
+    return result;
   }
 
   async addMember(
@@ -136,7 +180,8 @@ export class TeamsService {
     await this.assertOwnerOrAdmin(userId, teamId, userRole);
 
     const user = await this.userRepository.findById(dto.userId);
-    if (!user) throw new NotFoundException(`Пользователь #${dto.userId} не найден`);
+    if (!user)
+      throw new NotFoundException(`Пользователь #${dto.userId} не найден`);
 
     const existing = await this.teamMemberRepository.findByUserAndTeam(
       dto.userId,
@@ -154,7 +199,13 @@ export class TeamsService {
       teamRole: dto.teamRole,
     });
 
-    await this.auditService.log(userId, AuditAction.ASSIGN, 'team_member', member.id, `Пользователь #${dto.userId} добавлен в команду #${teamId} с ролью ${dto.teamRole}`);
+    await this.auditService.log(
+      userId,
+      AuditAction.ASSIGN,
+      'team_member',
+      member.id,
+      `Пользователь #${dto.userId} добавлен в команду #${teamId} с ролью ${dto.teamRole}`,
+    );
 
     return member;
   }
@@ -172,7 +223,11 @@ export class TeamsService {
       dto.teamRole === TeamRole.OBSERVER &&
       member.teamRole !== TeamRole.OBSERVER
     ) {
-      await this.syncProjectRolesForObserver(member.userId, member.teamId, userId);
+      await this.syncProjectRolesForObserver(
+        member.userId,
+        member.teamId,
+        userId,
+      );
     }
 
     const updated = await this.teamMemberRepository.update(memberId, {
@@ -181,7 +236,15 @@ export class TeamsService {
     if (!updated)
       throw new NotFoundException(`Участник #${memberId} не найден`);
 
-    await this.auditService.log(userId, AuditAction.UPDATE, 'team_member', memberId, `Роль участника #${memberId} изменена на ${dto.teamRole}`, member.teamRole, dto.teamRole);
+    await this.auditService.log(
+      userId,
+      AuditAction.UPDATE,
+      'team_member',
+      memberId,
+      `Роль участника #${memberId} изменена на ${dto.teamRole}`,
+      member.teamRole,
+      dto.teamRole,
+    );
 
     return updated;
   }
@@ -206,15 +269,17 @@ export class TeamsService {
       }
     }
 
-    await this.detachUserFromTeamProjects(
-      member.userId,
-      member.teamId,
-      userId,
-    );
+    await this.detachUserFromTeamProjects(member.userId, member.teamId, userId);
 
     await this.teamMemberRepository.delete(memberId);
 
-    await this.auditService.log(userId, AuditAction.DELETE, 'team_member', memberId, `Участник #${member.userId} удалён из команды #${member.teamId}`);
+    await this.auditService.log(
+      userId,
+      AuditAction.DELETE,
+      'team_member',
+      memberId,
+      `Участник #${member.userId} удалён из команды #${member.teamId}`,
+    );
   }
 
   private async findMemberById(id: number): Promise<TeamMember> {
@@ -250,12 +315,19 @@ export class TeamsService {
 
     if (teamProjectIds.length === 0) return;
 
-    await this.taskRepository.clearAssigneeByUserAndProjects(userId, teamProjectIds);
+    await this.taskRepository.clearAssigneeByUserAndProjects(
+      userId,
+      teamProjectIds,
+    );
 
-    const projectMemberships = (await this.projectMemberRepository.findByUser(userId))
-      .filter((membership) => teamProjectIds.includes(membership.projectId));
+    const projectMemberships = (
+      await this.projectMemberRepository.findByUser(userId)
+    ).filter((membership) => teamProjectIds.includes(membership.projectId));
 
-    await this.projectMemberRepository.deleteByUserAndProjects(userId, teamProjectIds);
+    await this.projectMemberRepository.deleteByUserAndProjects(
+      userId,
+      teamProjectIds,
+    );
 
     for (const membership of projectMemberships) {
       await this.auditService.log(
@@ -276,12 +348,13 @@ export class TeamsService {
     const teamProjectIds = await this.getTeamProjectIds(teamId);
     if (teamProjectIds.length === 0) return;
 
-    const memberships = (await this.projectMemberRepository.findByUser(userId))
-      .filter(
-        (membership) =>
-          teamProjectIds.includes(membership.projectId) &&
-          membership.role !== ProjectRole.OBSERVER,
-      );
+    const memberships = (
+      await this.projectMemberRepository.findByUser(userId)
+    ).filter(
+      (membership) =>
+        teamProjectIds.includes(membership.projectId) &&
+        membership.role !== ProjectRole.OBSERVER,
+    );
 
     for (const membership of memberships) {
       const updated = await this.projectMemberRepository.update(membership.id, {

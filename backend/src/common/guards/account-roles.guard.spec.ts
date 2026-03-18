@@ -4,26 +4,14 @@ import { AccountRolesGuard } from './account-roles.guard';
 import { AccountRole } from '../enums/account-role.enum';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 
-const makeContext = (user: unknown, requiredRoles: AccountRole[] | undefined): ExecutionContext => {
-  const mockReflector = {
-    getAllAndOverride: jest.fn().mockReturnValue(requiredRoles),
-  } as unknown as Reflector;
-
-  const mockRequest = { user };
-  const mockContext = {
-    switchToHttp: () => ({ getRequest: () => mockRequest }),
-    getHandler: () => ({}),
-    getClass: () => ({}),
-  } as unknown as ExecutionContext;
-
-  return { context: mockContext, reflector: mockReflector } as unknown as ExecutionContext;
-};
-
 describe('AccountRolesGuard', () => {
   let guard: AccountRolesGuard;
   let reflector: Reflector;
 
-  const buildGuard = (requiredRoles: AccountRole[] | undefined, user: unknown) => {
+  const buildGuard = (
+    requiredRoles: AccountRole[] | undefined,
+    user: unknown,
+  ) => {
     reflector = {
       getAllAndOverride: jest.fn().mockReturnValue(requiredRoles),
     } as unknown as Reflector;
@@ -50,17 +38,23 @@ describe('AccountRolesGuard', () => {
   });
 
   it('should pass when user has the required role', () => {
-    const ctx = buildGuard([AccountRole.ADMIN], { accountRole: AccountRole.ADMIN });
+    const ctx = buildGuard([AccountRole.ADMIN], {
+      accountRole: AccountRole.ADMIN,
+    });
     expect(guard.canActivate(ctx)).toBe(true);
   });
 
   it('should pass when user has one of multiple required roles', () => {
-    const ctx = buildGuard([AccountRole.ADMIN, AccountRole.MEMBER], { accountRole: AccountRole.MEMBER });
+    const ctx = buildGuard([AccountRole.ADMIN, AccountRole.MEMBER], {
+      accountRole: AccountRole.MEMBER,
+    });
     expect(guard.canActivate(ctx)).toBe(true);
   });
 
   it('should throw ForbiddenException when user lacks the required role', () => {
-    const ctx = buildGuard([AccountRole.ADMIN], { accountRole: AccountRole.MEMBER });
+    const ctx = buildGuard([AccountRole.ADMIN], {
+      accountRole: AccountRole.MEMBER,
+    });
     expect(() => guard.canActivate(ctx)).toThrow(ForbiddenException);
   });
 
@@ -75,8 +69,13 @@ describe('AccountRolesGuard', () => {
   });
 
   it('should use ROLES_KEY to read metadata', () => {
-    const ctx = buildGuard([AccountRole.ADMIN], { accountRole: AccountRole.ADMIN });
+    const ctx = buildGuard([AccountRole.ADMIN], {
+      accountRole: AccountRole.ADMIN,
+    });
     guard.canActivate(ctx);
-    expect(reflector.getAllAndOverride).toHaveBeenCalledWith(ROLES_KEY, expect.any(Array));
+    expect(reflector.getAllAndOverride).toHaveBeenCalledWith(
+      ROLES_KEY,
+      expect.any(Array),
+    );
   });
 });

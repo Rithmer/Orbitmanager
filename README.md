@@ -1,58 +1,26 @@
 # Сервис управления проектами и задачами
 
-Fullstack-курсовой и pet-проект для управления командами, проектами и задачами. Основная реализованная часть системы находится в backend: NestJS API, PostgreSQL через Prisma, JWT-аутентификация, RBAC, аудит действий и базовая оценка рисков. Frontend присутствует в репозитории, но пока остаётся каркасом на React/Vite.
+Fullstack-курсовой проект для управления командами, проектами, задачами и календарными событиями. Репозиторий содержит NestJS backend с PostgreSQL/Prisma, JWT-аутентификацией, RBAC, аудитом и модулем оценки рисков, а также React/Vite frontend с экранами авторизации, проектов, канбан-доски, календаря и административных разделов.
 
-Полное техническое описание и расширенная документация вынесены в [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md). История решений и эволюции проекта сохранена в [WORKPLAN.md](WORKPLAN.md).
+## Стек
 
-## Текущий статус
+- Backend: NestJS, Prisma, PostgreSQL, JWT, Swagger, Jest
+- Frontend: React, TypeScript, Vite
+- Infra: Docker, Docker Compose, Nginx
 
-| Компонент | Статус | Комментарий |
-| --- | --- | --- |
-| Backend | Реализован | NestJS + Prisma + PostgreSQL, JWT auth, RBAC, audit, unit/e2e |
-| Frontend | Прототип / каркас | Vite + React, предметный UI пока не реализован |
-| Risk / AI | Stub | Есть API и rule-based логика оценки, `retrain` пока заглушка |
-| Infra / Docker | Реализовано | Docker Compose, migrations, auto-seed, backup/restore |
+## Что реализовано
 
-## Что есть сейчас
+- Пользователи, команды, проекты и задачи
+- Роли на уровне аккаунта, команды и проекта
+- Канбан-доска проекта
+- Календарь событий и дедлайнов
+- Аудит действий
+- Risk API с rule-based/stub логикой
+- Docker-окружение для локального запуска
 
-- PostgreSQL - единственное runtime-хранилище backend.
-- Основной рабочий интерфейс на текущем этапе - Swagger и HTTP API.
-- Поддерживаются пользователи, команды, проекты, задачи, аудит и risk endpoints.
-- Есть unit- и e2e-тесты backend.
-- Docker Compose поднимает `postgres`, `backend` и `frontend`.
+## Быстрый старт
 
-Ключевые текущие контракты backend:
-
-- `POST /auth/refresh` возвращает `401`, если refresh-токен невалиден, пользователь удалён или аккаунт заблокирован.
-- `DELETE /users/:id` возвращает `409`, если у пользователя есть блокирующие зависимости.
-- Недопустимый переход статуса задачи возвращает `422`.
-- При удалении участника из проекта или команды backend автоматически очищает `tasks.assigneeId`.
-
-## Архитектура
-
-```text
-Frontend (React/Vite scaffold)
-        |
-        v
-Backend (NestJS REST API, Swagger, RBAC, Audit, Risk Stub)
-        |
-        v
-PostgreSQL (Prisma)
-```
-
-Структура репозитория:
-
-- [backend](backend) - основной API, Prisma, тесты и скрипты.
-- [frontend](frontend) - клиентский каркас на React/Vite.
-- [docker-compose.yml](docker-compose.yml) - основной инфраструктурный контур.
-- [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md) - полная документация и описание проекта.
-- [WORKPLAN.md](WORKPLAN.md) - история реализации и эволюции решений.
-
-## Запуск после `git clone`
-
-### Самый быстрый вариант
-
-Если нужен почти мгновенный старт после клонирования, достаточно Docker Desktop / Docker Engine с Compose plugin.
+Самый простой запуск:
 
 Unix/macOS:
 
@@ -66,67 +34,37 @@ Windows:
 scripts\bootstrap.cmd
 ```
 
-Что делает bootstrap:
+Bootstrap-скрипты создают `.env` из [.env.example](.env.example), при необходимости создают `backend/.env` из [backend/.env.example](backend/.env.example) и запускают `docker compose up -d --build`.
 
-- создаёт root `.env` из [.env.example](.env.example), если его ещё нет;
-- создаёт `backend/.env` из [backend/.env.example](backend/.env.example), если его ещё нет;
-- запускает `docker compose up -d --build`.
-
-После запуска автоматически выполняются:
-
-- миграции Prisma;
-- seed начальных данных;
-- старт backend и frontend.
-
-Доступные адреса:
-
-- Swagger: `http://localhost:3000/api/docs`
-- Frontend scaffold: `http://localhost:5173`
-
-Seed-пользователь по умолчанию:
-
-- login: `admin`
-- password: `Admin123!`
-
-### Запуск без bootstrap-скрипта
-
-Если не хочется использовать скрипты, можно обойтись одной командой:
+Если скрипты не нужны, можно запустить стек напрямую:
 
 ```bash
 docker compose up -d --build
 ```
 
-Это тоже работает, потому что в `docker-compose.yml` уже заданы dev-friendly значения по умолчанию.
+После запуска доступны:
+
+- Frontend: `http://localhost:5173`
+- Backend API: `http://localhost:3000`
+- Swagger: `http://localhost:5173/api/docs`
+- PostgreSQL: `localhost:5433`
 
 ## Переменные окружения
 
-Root [.env.example](.env.example) нужен для `docker compose` и уже содержит рекомендуемые dev-настройки.
+Root [.env.example](.env.example) используется `docker compose` и уже содержит dev-friendly значения по умолчанию.
 
-Минимальный root `.env`:
+Ключевые переменные:
 
-```env
-DB_PORT=5433
-DB_NAME=task_manager
-DB_USERNAME=postgres
-DB_PASSWORD=postgres
-PORT=3000
-JWT_ACCESS_SECRET=dev-access-secret-change-me-in-production
-JWT_REFRESH_SECRET=dev-refresh-secret-change-me-in-production
-JWT_ACCESS_EXPIRES_IN=15m
-JWT_REFRESH_EXPIRES_IN=7d
-THROTTLE_TTL=60000
-THROTTLE_LIMIT=60
-CORS_ORIGIN=http://localhost:5173,http://localhost:3000
-LOG_LEVEL=info
-AUTO_SEED=true
-```
+- `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`, `DB_PORT`
+- `E2E_DB_NAME`, `E2E_DB_USERNAME`, `E2E_DB_PASSWORD`, `E2E_DB_PORT`
+- `PORT`, `NODE_ENV`
+- `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`
+- `CORS_ORIGIN`
+- `THROTTLE_TTL`, `THROTTLE_LIMIT`
+- `DB_POOL_MAX`, `DB_POOL_IDLE_TIMEOUT`, `DB_POOL_CONNECTION_TIMEOUT`
+- `AUTO_SEED`
 
-Важно:
-
-- root `.env` использует `docker compose`;
-- `backend/.env` используют host-side команды backend и Prisma;
-- по умолчанию для Docker рекомендуется `DB_PORT=5433`, чтобы не конфликтовать с локальными инсталляциями PostgreSQL;
-- если `.env` не создан, `docker-compose.yml` всё равно поднимет dev-контур через встроенные fallback-значения.
+Файл [backend/.env.example](backend/.env.example) нужен для локального запуска backend-команд вне Docker.
 
 ## Основные команды
 
@@ -134,12 +72,10 @@ Backend:
 
 ```bash
 cd backend
+npm run db:generate
 npm run build
 npm run test
 npm run test:e2e
-npm run db:generate
-npm run db:migrate:deploy
-npm run seed
 ```
 
 Frontend:
@@ -150,29 +86,36 @@ npm run dev
 npm run build
 ```
 
-## API overview
+## E2E-контур
 
-Источник правды по API - Swagger: `http://localhost:3000/api/docs`.
+Для изолированного e2e-окружения используется [docker-compose.e2e.yml](docker-compose.e2e.yml).
 
-Основные группы endpoints:
+Запуск:
 
-- `Auth`: `/auth/register`, `/auth/login`, `/auth/refresh`
-- `Users`: `/users`
-- `Teams`: `/teams`, `/teams/:teamId/members`, `/team-members/:id`
-- `Projects`: `/projects`, `/projects/:projectId/members`, `/project-members/:id`
-- `Tasks`: `/tasks`
-- `Audit`: `/audit-logs`
-- `Risk`: `/tasks/:id/risk`, `/projects/:id/risk`, `/risk/retrain`
+```bash
+docker compose -f docker-compose.e2e.yml up -d --build
+```
+
+Остановка:
+
+```bash
+docker compose -f docker-compose.e2e.yml down
+```
+
+Полный сброс e2e-базы:
+
+```bash
+docker compose -f docker-compose.e2e.yml down -v
+```
+
+## Структура
+
+- [backend](backend) - NestJS API, Prisma, тесты и скрипты
+- [frontend](frontend) - React/Vite клиент
+- [docker-compose.yml](docker-compose.yml) - основной docker-стек
+- [docker-compose.e2e.yml](docker-compose.e2e.yml) - изолированный e2e-стек
 
 ## Ограничения
 
-- Frontend пока не реализует полноценный предметный UI.
-- `Risk / AI` пока не является production-ML модулем.
-- Детальная учебная постановка, подробная спецификация API и полное описание архитектуры вынесены из `README` в отдельный документ.
-
-## Куда смотреть дальше
-
-- [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md) - полная документация и описание проекта.
-- [WORKPLAN.md](WORKPLAN.md) - что планировалось изначально и как проект развивался.
-- [backend/.env.example](backend/.env.example) - актуальный env-шаблон для backend.
-- [backend/prisma/schema.prisma](backend/prisma/schema.prisma) - текущая схема данных.
+- Модуль оценки рисков пока использует stub/rule-based реализацию, а не production ML.
+- UI уже рабочий, но остаётся учебным и продолжает дорабатываться.

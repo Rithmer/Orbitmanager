@@ -1,8 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { USER_REPOSITORY } from '@/domain/repositories/user.repository';
 import { TEAM_REPOSITORY } from '@/domain/repositories/team.repository';
@@ -28,12 +25,16 @@ const mockUserRepository = {
   findAll: jest.fn().mockResolvedValue([mockUser]),
   findById: jest.fn().mockResolvedValue(mockUser),
   findByLogin: jest.fn().mockResolvedValue(null),
-  create: jest.fn().mockImplementation((data: Omit<User, 'id'>) =>
-    Promise.resolve({ ...data, id: 2 }),
-  ),
-  update: jest.fn().mockImplementation((id: number, partial: Partial<User>) =>
-    Promise.resolve({ ...mockUser, ...partial }),
-  ),
+  create: jest
+    .fn()
+    .mockImplementation((data: Omit<User, 'id'>) =>
+      Promise.resolve({ ...data, id: 2 }),
+    ),
+  update: jest
+    .fn()
+    .mockImplementation((id: number, partial: Partial<User>) =>
+      Promise.resolve({ ...mockUser, ...partial }),
+    ),
   delete: jest.fn().mockResolvedValue(true),
 };
 
@@ -93,7 +94,9 @@ describe('UsersService', () => {
     it('should return paginated users without passwords', async () => {
       const result = await service.findAll({});
       expect(result.items).toHaveLength(1);
-      expect((result.items[0] as Record<string, unknown>)['password']).toBeUndefined();
+      expect(
+        (result.items[0] as Record<string, unknown>)['password'],
+      ).toBeUndefined();
     });
   });
 

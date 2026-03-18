@@ -31,7 +31,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         error = (resp['error'] as string) ?? HttpStatus[statusCode] ?? 'Error';
         message = Array.isArray(resp['message'])
           ? (resp['message'] as string[]).join('; ')
-          : (resp['message'] as string) ?? exception.message;
+          : ((resp['message'] as string) ?? exception.message);
         details = (resp['details'] as unknown[]) ?? [];
       } else {
         error = HttpStatus[statusCode] ?? 'Error';

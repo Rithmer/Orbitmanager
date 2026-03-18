@@ -21,7 +21,6 @@ const mockProject = {
   name: 'Test Project',
   description: '',
   status: ProjectStatus.ACTIVE,
-  deadline: '2030-01-01T00:00:00.000Z',
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
@@ -69,21 +68,29 @@ describe('ProjectRolesGuard', () => {
 
   it('should pass when no roles are required', async () => {
     await buildModule(undefined);
-    const ctx = makeMockContext({ id: USER_ID, accountRole: AccountRole.MEMBER }, { id: String(PROJECT_ID) });
+    const ctx = makeMockContext(
+      { id: USER_ID, accountRole: AccountRole.MEMBER },
+      { id: String(PROJECT_ID) },
+    );
     await expect(guard.canActivate(ctx)).resolves.toBe(true);
     expect(projectRepo.findById).not.toHaveBeenCalled();
   });
 
   it('should pass for admin bypassing all project checks', async () => {
     await buildModule([ProjectRole.TEAM_LEAD]);
-    const ctx = makeMockContext({ id: USER_ID, accountRole: AccountRole.ADMIN }, { id: String(PROJECT_ID) });
+    const ctx = makeMockContext(
+      { id: USER_ID, accountRole: AccountRole.ADMIN },
+      { id: String(PROJECT_ID) },
+    );
     await expect(guard.canActivate(ctx)).resolves.toBe(true);
     expect(projectRepo.findById).not.toHaveBeenCalled();
   });
 
   it('should pass for team owner bypassing project member check', async () => {
     await buildModule([ProjectRole.TEAM_LEAD]);
-    teamMemberRepo.findByUserAndTeam.mockResolvedValue({ teamRole: TeamRole.OWNER });
+    teamMemberRepo.findByUserAndTeam.mockResolvedValue({
+      teamRole: TeamRole.OWNER,
+    });
     const ctx = makeMockContext(
       { id: USER_ID, accountRole: AccountRole.MEMBER },
       { id: String(PROJECT_ID) },
@@ -94,8 +101,12 @@ describe('ProjectRolesGuard', () => {
 
   it('should pass when user has the required project role', async () => {
     await buildModule([ProjectRole.TEAM_LEAD]);
-    teamMemberRepo.findByUserAndTeam.mockResolvedValue({ teamRole: TeamRole.MEMBER });
-    projectMemberRepo.findByUserAndProject.mockResolvedValue({ role: ProjectRole.TEAM_LEAD });
+    teamMemberRepo.findByUserAndTeam.mockResolvedValue({
+      teamRole: TeamRole.MEMBER,
+    });
+    projectMemberRepo.findByUserAndProject.mockResolvedValue({
+      role: ProjectRole.TEAM_LEAD,
+    });
     const ctx = makeMockContext(
       { id: USER_ID, accountRole: AccountRole.MEMBER },
       { id: String(PROJECT_ID) },
@@ -105,8 +116,12 @@ describe('ProjectRolesGuard', () => {
 
   it('should pass when user role matches one of multiple required roles', async () => {
     await buildModule([ProjectRole.TEAM_LEAD, ProjectRole.DEVELOPER]);
-    teamMemberRepo.findByUserAndTeam.mockResolvedValue({ teamRole: TeamRole.MEMBER });
-    projectMemberRepo.findByUserAndProject.mockResolvedValue({ role: ProjectRole.DEVELOPER });
+    teamMemberRepo.findByUserAndTeam.mockResolvedValue({
+      teamRole: TeamRole.MEMBER,
+    });
+    projectMemberRepo.findByUserAndProject.mockResolvedValue({
+      role: ProjectRole.DEVELOPER,
+    });
     const ctx = makeMockContext(
       { id: USER_ID, accountRole: AccountRole.MEMBER },
       { projectId: String(PROJECT_ID) },
@@ -116,8 +131,12 @@ describe('ProjectRolesGuard', () => {
 
   it('should throw ForbiddenException when user lacks required project role', async () => {
     await buildModule([ProjectRole.TEAM_LEAD]);
-    teamMemberRepo.findByUserAndTeam.mockResolvedValue({ teamRole: TeamRole.MEMBER });
-    projectMemberRepo.findByUserAndProject.mockResolvedValue({ role: ProjectRole.OBSERVER });
+    teamMemberRepo.findByUserAndTeam.mockResolvedValue({
+      teamRole: TeamRole.MEMBER,
+    });
+    projectMemberRepo.findByUserAndProject.mockResolvedValue({
+      role: ProjectRole.OBSERVER,
+    });
     const ctx = makeMockContext(
       { id: USER_ID, accountRole: AccountRole.MEMBER },
       { id: String(PROJECT_ID) },
@@ -127,7 +146,9 @@ describe('ProjectRolesGuard', () => {
 
   it('should throw ForbiddenException when user is not a project member', async () => {
     await buildModule([ProjectRole.TEAM_LEAD]);
-    teamMemberRepo.findByUserAndTeam.mockResolvedValue({ teamRole: TeamRole.MEMBER });
+    teamMemberRepo.findByUserAndTeam.mockResolvedValue({
+      teamRole: TeamRole.MEMBER,
+    });
     projectMemberRepo.findByUserAndProject.mockResolvedValue(null);
     const ctx = makeMockContext(
       { id: USER_ID, accountRole: AccountRole.MEMBER },
@@ -155,12 +176,17 @@ describe('ProjectRolesGuard', () => {
 
   it('should read metadata with PROJECT_ROLES_KEY', async () => {
     await buildModule([ProjectRole.TEAM_LEAD]);
-    teamMemberRepo.findByUserAndTeam.mockResolvedValue({ teamRole: TeamRole.OWNER });
+    teamMemberRepo.findByUserAndTeam.mockResolvedValue({
+      teamRole: TeamRole.OWNER,
+    });
     const ctx = makeMockContext(
       { id: USER_ID, accountRole: AccountRole.MEMBER },
       { id: String(PROJECT_ID) },
     );
     await guard.canActivate(ctx);
-    expect(reflector.getAllAndOverride).toHaveBeenCalledWith(PROJECT_ROLES_KEY, expect.any(Array));
+    expect(reflector.getAllAndOverride).toHaveBeenCalledWith(
+      PROJECT_ROLES_KEY,
+      expect.any(Array),
+    );
   });
 });

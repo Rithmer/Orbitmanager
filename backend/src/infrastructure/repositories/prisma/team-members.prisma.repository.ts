@@ -9,8 +9,10 @@ export class TeamMembersPrismaRepository implements ITeamMemberRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(): Promise<TeamMember[]> {
-    const rows = await this.prisma.teamMember.findMany({ orderBy: { id: 'asc' } });
-    return rows.map(this.toDomain);
+    const rows = await this.prisma.teamMember.findMany({
+      orderBy: { id: 'asc' },
+    });
+    return rows.map((r) => this.toDomain(r));
   }
 
   async findById(id: number): Promise<TeamMember | null> {
@@ -19,16 +21,34 @@ export class TeamMembersPrismaRepository implements ITeamMemberRepository {
   }
 
   async findByTeam(teamId: number): Promise<TeamMember[]> {
-    const rows = await this.prisma.teamMember.findMany({ where: { teamId }, orderBy: { id: 'asc' } });
-    return rows.map(this.toDomain);
+    const rows = await this.prisma.teamMember.findMany({
+      where: { teamId },
+      orderBy: { id: 'asc' },
+    });
+    return rows.map((r) => this.toDomain(r));
+  }
+
+  async findByTeams(teamIds: number[]): Promise<TeamMember[]> {
+    if (teamIds.length === 0) return [];
+    const rows = await this.prisma.teamMember.findMany({
+      where: { teamId: { in: teamIds } },
+      orderBy: { id: 'asc' },
+    });
+    return rows.map((r) => this.toDomain(r));
   }
 
   async findByUser(userId: number): Promise<TeamMember[]> {
-    const rows = await this.prisma.teamMember.findMany({ where: { userId }, orderBy: { id: 'asc' } });
-    return rows.map(this.toDomain);
+    const rows = await this.prisma.teamMember.findMany({
+      where: { userId },
+      orderBy: { id: 'asc' },
+    });
+    return rows.map((r) => this.toDomain(r));
   }
 
-  async findByUserAndTeam(userId: number, teamId: number): Promise<TeamMember | null> {
+  async findByUserAndTeam(
+    userId: number,
+    teamId: number,
+  ): Promise<TeamMember | null> {
     const row = await this.prisma.teamMember.findUnique({
       where: { userId_teamId: { userId, teamId } },
     });
@@ -50,7 +70,10 @@ export class TeamMembersPrismaRepository implements ITeamMemberRepository {
    * Оптимизация: убран предварительный findUnique.
    * Prisma P2025 = запись не найдена → возвращаем null.
    */
-  async update(id: number, partial: Partial<TeamMember>): Promise<TeamMember | null> {
+  async update(
+    id: number,
+    partial: Partial<TeamMember>,
+  ): Promise<TeamMember | null> {
     const { id: _id, ...data } = partial as Record<string, unknown>;
     try {
       const row = await this.prisma.teamMember.update({ where: { id }, data });

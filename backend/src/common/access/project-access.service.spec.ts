@@ -2,18 +2,20 @@ import { ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { ProjectRole } from '@/common/enums/project-role.enum';
+import { ProjectStatus } from '@/common/enums/project-status.enum';
 import { TeamRole } from '@/common/enums/team-role.enum';
 import { PROJECT_REPOSITORY } from '@/domain/repositories/project.repository';
 import { PROJECT_MEMBER_REPOSITORY } from '@/domain/repositories/project-member.repository';
 import { TEAM_MEMBER_REPOSITORY } from '@/domain/repositories/team-member.repository';
+import type { Project } from '@/domain/models/project.model';
 import { ProjectAccessService } from './project-access.service';
 
-const project = {
+const project: Project = {
   id: 10,
   teamId: 1,
   name: 'Project',
   description: '',
-  status: 'active',
+  status: ProjectStatus.ACTIVE,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };

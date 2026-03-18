@@ -43,12 +43,16 @@ const mockMember: TeamMember = {
 const mockTeamRepository = {
   findAll: jest.fn().mockResolvedValue([mockTeam]),
   findById: jest.fn().mockResolvedValue(mockTeam),
-  create: jest.fn().mockImplementation((data: Omit<Team, 'id'>) =>
-    Promise.resolve({ ...data, id: 2 }),
-  ),
-  update: jest.fn().mockImplementation((_id: number, partial: Partial<Team>) =>
-    Promise.resolve({ ...mockTeam, ...partial }),
-  ),
+  create: jest
+    .fn()
+    .mockImplementation((data: Omit<Team, 'id'>) =>
+      Promise.resolve({ ...data, id: 2 }),
+    ),
+  update: jest
+    .fn()
+    .mockImplementation((_id: number, partial: Partial<Team>) =>
+      Promise.resolve({ ...mockTeam, ...partial }),
+    ),
   delete: jest.fn().mockResolvedValue(true),
 };
 
@@ -58,12 +62,16 @@ const mockTeamMemberRepository = {
   findByTeam: jest.fn().mockResolvedValue([mockOwner, mockMember]),
   findByUser: jest.fn().mockResolvedValue([mockOwner]),
   findByUserAndTeam: jest.fn().mockResolvedValue(mockOwner),
-  create: jest.fn().mockImplementation((data: Omit<TeamMember, 'id'>) =>
-    Promise.resolve({ ...data, id: 3 }),
-  ),
-  update: jest.fn().mockImplementation((_id: number, partial: Partial<TeamMember>) =>
-    Promise.resolve({ ...mockMember, ...partial }),
-  ),
+  create: jest
+    .fn()
+    .mockImplementation((data: Omit<TeamMember, 'id'>) =>
+      Promise.resolve({ ...data, id: 3 }),
+    ),
+  update: jest
+    .fn()
+    .mockImplementation((_id: number, partial: Partial<TeamMember>) =>
+      Promise.resolve({ ...mockMember, ...partial }),
+    ),
   delete: jest.fn().mockResolvedValue(true),
 };
 
@@ -124,7 +132,10 @@ describe('TeamsService', () => {
         { provide: TEAM_MEMBER_REPOSITORY, useValue: mockTeamMemberRepository },
         { provide: USER_REPOSITORY, useValue: mockUserRepository },
         { provide: PROJECT_REPOSITORY, useValue: mockProjectRepository },
-        { provide: PROJECT_MEMBER_REPOSITORY, useValue: mockProjectMemberRepository },
+        {
+          provide: PROJECT_MEMBER_REPOSITORY,
+          useValue: mockProjectMemberRepository,
+        },
         { provide: TASK_REPOSITORY, useValue: mockTaskRepository },
         { provide: AuditService, useValue: mockAuditService },
       ],
@@ -177,7 +188,12 @@ describe('TeamsService', () => {
 
   describe('update', () => {
     it('should update team if caller is owner', async () => {
-      const result = await service.update(1, { name: 'Updated' }, 10, AccountRole.MEMBER);
+      const result = await service.update(
+        1,
+        { name: 'Updated' },
+        10,
+        AccountRole.MEMBER,
+      );
       expect(result.name).toBe('Updated');
     });
 
@@ -229,7 +245,9 @@ describe('TeamsService', () => {
 
   describe('remove', () => {
     it('should delete team if caller is owner', async () => {
-      await expect(service.remove(1, 10, AccountRole.MEMBER)).resolves.not.toThrow();
+      await expect(
+        service.remove(1, 10, AccountRole.MEMBER),
+      ).resolves.not.toThrow();
     });
 
     it('should throw NotFoundException if team does not exist', async () => {
@@ -260,17 +278,21 @@ describe('TeamsService', () => {
         },
       ]);
 
-      await service.removeMember(mockMember.id, mockOwner.userId, AccountRole.MEMBER);
+      await service.removeMember(
+        mockMember.id,
+        mockOwner.userId,
+        AccountRole.MEMBER,
+      );
 
-      expect(mockTaskRepository.clearAssigneeByUserAndProjects).toHaveBeenCalledWith(
-        mockMember.userId,
-        [100],
+      expect(
+        mockTaskRepository.clearAssigneeByUserAndProjects,
+      ).toHaveBeenCalledWith(mockMember.userId, [100]);
+      expect(
+        mockProjectMemberRepository.deleteByUserAndProjects,
+      ).toHaveBeenCalledWith(mockMember.userId, [100]);
+      expect(mockTeamMemberRepository.delete).toHaveBeenCalledWith(
+        mockMember.id,
       );
-      expect(mockProjectMemberRepository.deleteByUserAndProjects).toHaveBeenCalledWith(
-        mockMember.userId,
-        [100],
-      );
-      expect(mockTeamMemberRepository.delete).toHaveBeenCalledWith(mockMember.id);
     });
   });
 
@@ -278,10 +300,19 @@ describe('TeamsService', () => {
 
   describe('addMember', () => {
     it('should throw ConflictException if user already a member', async () => {
-      mockTeamMemberRepository.findByUserAndTeam.mockResolvedValueOnce(mockOwner); // caller = owner
-      mockTeamMemberRepository.findByUserAndTeam.mockResolvedValueOnce(mockMember); // target already member
+      mockTeamMemberRepository.findByUserAndTeam.mockResolvedValueOnce(
+        mockOwner,
+      ); // caller = owner
+      mockTeamMemberRepository.findByUserAndTeam.mockResolvedValueOnce(
+        mockMember,
+      ); // target already member
       await expect(
-        service.addMember(1, { userId: 20, teamRole: TeamRole.MEMBER }, 10, AccountRole.MEMBER),
+        service.addMember(
+          1,
+          { userId: 20, teamRole: TeamRole.MEMBER },
+          10,
+          AccountRole.MEMBER,
+        ),
       ).rejects.toThrow(ConflictException);
     });
   });

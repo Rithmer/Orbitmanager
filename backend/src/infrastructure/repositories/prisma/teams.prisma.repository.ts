@@ -10,7 +10,7 @@ export class TeamsPrismaRepository implements ITeamRepository {
 
   async findAll(): Promise<Team[]> {
     const rows = await this.prisma.team.findMany({ orderBy: { id: 'asc' } });
-    return rows.map(this.toDomain);
+    return rows.map((r) => this.toDomain(r));
   }
 
   async findById(id: number): Promise<Team | null> {
@@ -23,7 +23,7 @@ export class TeamsPrismaRepository implements ITeamRepository {
       where: { createdById: userId },
       orderBy: { id: 'asc' },
     });
-    return rows.map(this.toDomain);
+    return rows.map((r) => this.toDomain(r));
   }
 
   async create(team: Omit<Team, 'id'>): Promise<Team> {
@@ -43,7 +43,12 @@ export class TeamsPrismaRepository implements ITeamRepository {
    * Это сокращает количество запросов к БД с 2 до 1.
    */
   async update(id: number, partial: Partial<Team>): Promise<Team | null> {
-    const { id: _id, createdAt: _ca, createdById: _cb, ...data } = partial as Record<string, unknown>;
+    const {
+      id: _id,
+      createdAt: _ca,
+      createdById: _cb,
+      ...data
+    } = partial as Record<string, unknown>;
     try {
       const row = await this.prisma.team.update({ where: { id }, data });
       return this.toDomain(row);

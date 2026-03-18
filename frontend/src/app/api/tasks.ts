@@ -1,0 +1,41 @@
+import { api, buildQuery } from './client'
+import type { Task, PaginatedResult, QueryParams } from '../types'
+
+export const tasksApi = {
+  list(params: QueryParams = {}): Promise<PaginatedResult<Task>> {
+    return api.get(`/tasks${buildQuery(params)}`)
+  },
+
+  getById(id: number): Promise<Task> {
+    return api.get(`/tasks/${id}`)
+  },
+
+  create(dto: {
+    projectId: number
+    name: string
+    description?: string
+    deadline: string
+    difficulty: number
+    assigneeId?: number
+  }): Promise<Task> {
+    return api.post('/tasks', dto)
+  },
+
+  update(
+    id: number,
+    dto: Partial<{
+      name: string
+      description: string
+      deadline: string
+      difficulty: number
+      status: string
+      assigneeId: number | null
+    }>,
+  ): Promise<Task> {
+    return api.patch(`/tasks/${id}`, dto)
+  },
+
+  delete(id: number): Promise<void> {
+    return api.delete(`/tasks/${id}`)
+  },
+}

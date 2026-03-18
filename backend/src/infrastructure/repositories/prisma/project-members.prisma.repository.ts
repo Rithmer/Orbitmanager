@@ -9,8 +9,10 @@ export class ProjectMembersPrismaRepository implements IProjectMemberRepository 
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(): Promise<ProjectMember[]> {
-    const rows = await this.prisma.projectMember.findMany({ orderBy: { id: 'asc' } });
-    return rows.map(this.toDomain);
+    const rows = await this.prisma.projectMember.findMany({
+      orderBy: { id: 'asc' },
+    });
+    return rows.map((r) => this.toDomain(r));
   }
 
   async findById(id: number): Promise<ProjectMember | null> {
@@ -19,16 +21,34 @@ export class ProjectMembersPrismaRepository implements IProjectMemberRepository 
   }
 
   async findByProject(projectId: number): Promise<ProjectMember[]> {
-    const rows = await this.prisma.projectMember.findMany({ where: { projectId }, orderBy: { id: 'asc' } });
-    return rows.map(this.toDomain);
+    const rows = await this.prisma.projectMember.findMany({
+      where: { projectId },
+      orderBy: { id: 'asc' },
+    });
+    return rows.map((r) => this.toDomain(r));
+  }
+
+  async findByProjects(projectIds: number[]): Promise<ProjectMember[]> {
+    if (projectIds.length === 0) return [];
+    const rows = await this.prisma.projectMember.findMany({
+      where: { projectId: { in: projectIds } },
+      orderBy: { id: 'asc' },
+    });
+    return rows.map((r) => this.toDomain(r));
   }
 
   async findByUser(userId: number): Promise<ProjectMember[]> {
-    const rows = await this.prisma.projectMember.findMany({ where: { userId }, orderBy: { id: 'asc' } });
-    return rows.map(this.toDomain);
+    const rows = await this.prisma.projectMember.findMany({
+      where: { userId },
+      orderBy: { id: 'asc' },
+    });
+    return rows.map((r) => this.toDomain(r));
   }
 
-  async findByUserAndProject(userId: number, projectId: number): Promise<ProjectMember | null> {
+  async findByUserAndProject(
+    userId: number,
+    projectId: number,
+  ): Promise<ProjectMember | null> {
     const row = await this.prisma.projectMember.findUnique({
       where: { projectId_userId: { projectId, userId } },
     });
@@ -50,10 +70,20 @@ export class ProjectMembersPrismaRepository implements IProjectMemberRepository 
    * Оптимизация: убран предварительный findUnique.
    * Prisma P2025 = запись не найдена → возвращаем null.
    */
-  async update(id: number, partial: Partial<ProjectMember>): Promise<ProjectMember | null> {
-    const { id: _id, assignedAt: _aa, ...data } = partial as Record<string, unknown>;
+  async update(
+    id: number,
+    partial: Partial<ProjectMember>,
+  ): Promise<ProjectMember | null> {
+    const {
+      id: _id,
+      assignedAt: _aa,
+      ...data
+    } = partial as Record<string, unknown>;
     try {
-      const row = await this.prisma.projectMember.update({ where: { id }, data });
+      const row = await this.prisma.projectMember.update({
+        where: { id },
+        data,
+      });
       return this.toDomain(row);
     } catch (e: unknown) {
       const prismaError = e as { code?: string };
@@ -74,11 +104,16 @@ export class ProjectMembersPrismaRepository implements IProjectMemberRepository 
   }
 
   async deleteByProject(projectId: number): Promise<number> {
-    const result = await this.prisma.projectMember.deleteMany({ where: { projectId } });
+    const result = await this.prisma.projectMember.deleteMany({
+      where: { projectId },
+    });
     return result.count;
   }
 
-  async deleteByUserAndProjects(userId: number, projectIds: number[]): Promise<number> {
+  async deleteByUserAndProjects(
+    userId: number,
+    projectIds: number[],
+  ): Promise<number> {
     const result = await this.prisma.projectMember.deleteMany({
       where: { userId, projectId: { in: projectIds } },
     });

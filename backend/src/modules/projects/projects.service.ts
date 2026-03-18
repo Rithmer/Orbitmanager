@@ -192,6 +192,27 @@ export class ProjectsService {
     return this.projectMemberRepository.findByProject(projectId);
   }
 
+  async findAllMembersBatch(
+    userId: number,
+    userRole: AccountRole,
+  ): Promise<Record<number, ProjectMember[]>> {
+    const projects =
+      userRole === AccountRole.ADMIN
+        ? await this.projectRepository.findAll()
+        : await this.projectAccessService.getVisibleProjects(userId);
+    const projectIds = projects.map((p) => p.id);
+    const allMembers =
+      await this.projectMemberRepository.findByProjects(projectIds);
+
+    const result: Record<number, ProjectMember[]> = {};
+    for (const id of projectIds) result[id] = [];
+    for (const m of allMembers) {
+      if (!result[m.projectId]) result[m.projectId] = [];
+      result[m.projectId].push(m);
+    }
+    return result;
+  }
+
   async addMember(
     projectId: number,
     dto: AddProjectMemberDto,

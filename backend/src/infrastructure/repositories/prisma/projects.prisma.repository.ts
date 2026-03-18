@@ -10,7 +10,7 @@ export class ProjectsPrismaRepository implements IProjectRepository {
 
   async findAll(): Promise<Project[]> {
     const rows = await this.prisma.project.findMany({ orderBy: { id: 'asc' } });
-    return rows.map(this.toDomain);
+    return rows.map((r) => this.toDomain(r));
   }
 
   async findById(id: number): Promise<Project | null> {
@@ -23,7 +23,7 @@ export class ProjectsPrismaRepository implements IProjectRepository {
       where: { teamId },
       orderBy: { id: 'asc' },
     });
-    return rows.map(this.toDomain);
+    return rows.map((r) => this.toDomain(r));
   }
 
   async findByTeams(teamIds: number[]): Promise<Project[]> {
@@ -31,7 +31,7 @@ export class ProjectsPrismaRepository implements IProjectRepository {
       where: { teamId: { in: teamIds } },
       orderBy: { id: 'asc' },
     });
-    return rows.map(this.toDomain);
+    return rows.map((r) => this.toDomain(r));
   }
 
   async create(project: Omit<Project, 'id'>): Promise<Project> {
@@ -51,7 +51,12 @@ export class ProjectsPrismaRepository implements IProjectRepository {
    * Prisma P2025 = запись не найдена → возвращаем null.
    */
   async update(id: number, partial: Partial<Project>): Promise<Project | null> {
-    const { id: _id, createdAt: _ca, updatedAt: _ua, ...data } = partial as Record<string, unknown>;
+    const {
+      id: _id,
+      createdAt: _ca,
+      updatedAt: _ua,
+      ...data
+    } = partial as Record<string, unknown>;
     try {
       const row = await this.prisma.project.update({ where: { id }, data });
       return this.toDomain(row);

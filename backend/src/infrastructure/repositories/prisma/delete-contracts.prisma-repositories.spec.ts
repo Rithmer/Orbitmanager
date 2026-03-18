@@ -8,7 +8,7 @@ import { ProjectMembersPrismaRepository } from './project-members.prisma.reposit
 type DeleteMock = jest.Mock<Promise<void>, [{ where: { id: number } }]>;
 
 function createDeleteCase<T>(
-  RepositoryClass: new (prisma: Record<string, unknown>) => T,
+  RepositoryClass: new (prisma: any) => T,
   prismaKey: string,
 ) {
   const deleteMock = jest.fn<Promise<void>, [{ where: { id: number } }]>();
@@ -49,12 +49,14 @@ describe('Prisma repository delete contracts', () => {
     {
       label: 'TeamMembersPrismaRepository',
       prismaKey: 'teamMember',
-      factory: () => createDeleteCase(TeamMembersPrismaRepository, 'teamMember'),
+      factory: () =>
+        createDeleteCase(TeamMembersPrismaRepository, 'teamMember'),
     },
     {
       label: 'ProjectMembersPrismaRepository',
       prismaKey: 'projectMember',
-      factory: () => createDeleteCase(ProjectMembersPrismaRepository, 'projectMember'),
+      factory: () =>
+        createDeleteCase(ProjectMembersPrismaRepository, 'projectMember'),
     },
   ];
 

@@ -39,7 +39,9 @@ export class UsersService {
     private readonly auditService: AuditService,
   ) {}
 
-  async findAll(params: QueryParams): Promise<PaginatedResult<Omit<User, 'password'>>> {
+  async findAll(
+    params: QueryParams,
+  ): Promise<PaginatedResult<Omit<User, 'password'>>> {
     const users = await this.userRepository.findAll();
     const safe = users.map((u) => this.omitPassword(u));
     return QueryHelper.apply(safe, {
@@ -62,7 +64,10 @@ export class UsersService {
     return this.userRepository.findById(id);
   }
 
-  async create(dto: CreateUserDto, callerUserId?: number): Promise<Omit<User, 'password'>> {
+  async create(
+    dto: CreateUserDto,
+    callerUserId?: number,
+  ): Promise<Omit<User, 'password'>> {
     const existing = await this.userRepository.findByLogin(dto.login);
     if (existing) {
       throw new ConflictException(`Логин "${dto.login}" уже занят`);

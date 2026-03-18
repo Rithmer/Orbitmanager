@@ -10,7 +10,7 @@ export class TasksPrismaRepository implements ITaskRepository {
 
   async findAll(): Promise<Task[]> {
     const rows = await this.prisma.task.findMany({ orderBy: { id: 'asc' } });
-    return rows.map(this.toDomain);
+    return rows.map((r) => this.toDomain(r));
   }
 
   async findById(id: number): Promise<Task | null> {
@@ -23,7 +23,7 @@ export class TasksPrismaRepository implements ITaskRepository {
       where: { projectId },
       orderBy: { id: 'asc' },
     });
-    return rows.map(this.toDomain);
+    return rows.map((r) => this.toDomain(r));
   }
 
   async findByProjects(projectIds: number[]): Promise<Task[]> {
@@ -31,7 +31,7 @@ export class TasksPrismaRepository implements ITaskRepository {
       where: { projectId: { in: projectIds } },
       orderBy: { id: 'asc' },
     });
-    return rows.map(this.toDomain);
+    return rows.map((r) => this.toDomain(r));
   }
 
   async findByCreator(userId: number): Promise<Task[]> {
@@ -39,7 +39,7 @@ export class TasksPrismaRepository implements ITaskRepository {
       where: { createdById: userId },
       orderBy: { id: 'asc' },
     });
-    return rows.map(this.toDomain);
+    return rows.map((r) => this.toDomain(r));
   }
 
   async clearAssigneeByUserAndProjects(
@@ -86,11 +86,15 @@ export class TasksPrismaRepository implements ITaskRepository {
   async update(id: number, partial: Partial<Task>): Promise<Task | null> {
     const data: Record<string, unknown> = {};
     if (partial.name !== undefined) data['name'] = partial.name;
-    if (partial.description !== undefined) data['description'] = partial.description;
-    if (partial.deadline !== undefined) data['deadline'] = new Date(partial.deadline);
+    if (partial.description !== undefined)
+      data['description'] = partial.description;
+    if (partial.deadline !== undefined)
+      data['deadline'] = new Date(partial.deadline);
     if (partial.status !== undefined) data['status'] = partial.status;
-    if (partial.difficulty !== undefined) data['difficulty'] = partial.difficulty;
-    if (partial.assigneeId !== undefined) data['assigneeId'] = partial.assigneeId;
+    if (partial.difficulty !== undefined)
+      data['difficulty'] = partial.difficulty;
+    if (partial.assigneeId !== undefined)
+      data['assigneeId'] = partial.assigneeId;
 
     try {
       const row = await this.prisma.task.update({ where: { id }, data });

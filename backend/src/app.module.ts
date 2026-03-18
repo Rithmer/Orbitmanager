@@ -13,6 +13,7 @@ import { ProjectsModule } from './modules/projects/projects.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { RiskModule } from './modules/risk/risk.module';
+import { CalendarModule } from './modules/calendar/calendar.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 @Module({
@@ -40,6 +41,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
     TasksModule,
     AuditLogsModule,
     RiskModule,
+    CalendarModule,
   ],
   controllers: [AppController],
   providers: [

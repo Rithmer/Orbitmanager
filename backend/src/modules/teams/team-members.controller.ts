@@ -33,6 +33,16 @@ import { TeamRole } from '@/common/enums/team-role.enum';
 export class TeamMembersController {
   constructor(private readonly teamsService: TeamsService) {}
 
+  @Get('teams/members/batch')
+  @ApiOperation({ summary: 'Получить участников всех команд' })
+  @ApiResponse({
+    status: 200,
+    description: 'Участники сгруппированные по teamId',
+  })
+  findAllMembersBatch() {
+    return this.teamsService.findAllMembersBatch();
+  }
+
   @Get('teams/:teamId/members')
   @ApiOperation({ summary: 'Получить участников команды' })
   @ApiResponse({ status: 200, description: 'Список участников' })

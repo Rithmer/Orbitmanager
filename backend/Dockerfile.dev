@@ -1,0 +1,9 @@
+FROM node:20-alpine
+WORKDIR /app
+RUN apk add --no-cache bash postgresql-client
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npx prisma generate
+EXPOSE 3000
+CMD ["sh", "-c", "npx prisma migrate deploy --config ./prisma/prisma.config.ts && npm run seed && npm run start:dev"]

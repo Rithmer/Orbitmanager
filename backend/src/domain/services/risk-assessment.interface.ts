@@ -1,9 +1,11 @@
+import type { TaskStatus } from '@/common/enums/task-status.enum';
+
 export interface TaskRiskInput {
   taskId: number;
   difficulty: number;
   deadline: string;
   createdAt: string;
-  status: string;
+  status: TaskStatus;
   assigneeCount: number;
   assigneeLoad: number;
   statusChangesCount: number;

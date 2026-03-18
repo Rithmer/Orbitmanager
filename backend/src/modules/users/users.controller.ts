@@ -26,6 +26,7 @@ import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
+import { parseOptionalInt } from '@/common/helpers/query.helper';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -52,8 +53,8 @@ export class UsersController {
     return this.usersService.findAll({
       search,
       sort,
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
+      page: parseOptionalInt(page),
+      limit: parseOptionalInt(limit),
       filters: accountRole ? { accountRole } : undefined,
     });
   }
@@ -71,10 +72,7 @@ export class UsersController {
   @ApiOperation({ summary: 'Создать пользователя (только admin)' })
   @ApiResponse({ status: 201, description: 'Пользователь создан' })
   @ApiResponse({ status: 409, description: 'Логин уже занят' })
-  create(
-    @CurrentUser('id') callerId: number,
-    @Body() dto: CreateUserDto,
-  ) {
+  create(@CurrentUser('id') callerId: number, @Body() dto: CreateUserDto) {
     return this.usersService.create(dto, callerId);
   }
 
@@ -96,7 +94,10 @@ export class UsersController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Удалить пользователя (только admin)' })
   @ApiResponse({ status: 204, description: 'Пользователь удалён' })
-  @ApiResponse({ status: 409, description: 'Пользователь имеет зависимые записи' })
+  @ApiResponse({
+    status: 409,
+    description: 'Пользователь имеет зависимые записи',
+  })
   @ApiResponse({ status: 404, description: 'Пользователь не найден' })
   remove(
     @CurrentUser('id') callerId: number,

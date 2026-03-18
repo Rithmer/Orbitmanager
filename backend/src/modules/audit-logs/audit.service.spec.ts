@@ -18,18 +18,41 @@ const makeLog = (overrides: Partial<AuditLog> = {}): AuditLog => ({
 });
 
 const seedLogs: AuditLog[] = [
-  makeLog({ id: 1, userId: 10, action: AuditAction.CREATE, entityType: 'project', entityId: 1, timestamp: '2026-03-01T10:00:00.000Z' }),
-  makeLog({ id: 2, userId: 10, action: AuditAction.UPDATE, entityType: 'project', entityId: 1, timestamp: '2026-03-02T10:00:00.000Z' }),
-  makeLog({ id: 3, userId: 20, action: AuditAction.DELETE, entityType: 'task',    entityId: 7, timestamp: '2026-03-03T10:00:00.000Z' }),
+  makeLog({
+    id: 1,
+    userId: 10,
+    action: AuditAction.CREATE,
+    entityType: 'project',
+    entityId: 1,
+    timestamp: '2026-03-01T10:00:00.000Z',
+  }),
+  makeLog({
+    id: 2,
+    userId: 10,
+    action: AuditAction.UPDATE,
+    entityType: 'project',
+    entityId: 1,
+    timestamp: '2026-03-02T10:00:00.000Z',
+  }),
+  makeLog({
+    id: 3,
+    userId: 20,
+    action: AuditAction.DELETE,
+    entityType: 'task',
+    entityId: 7,
+    timestamp: '2026-03-03T10:00:00.000Z',
+  }),
 ];
 
 const mockAuditLogRepository = {
   findAll: jest.fn().mockResolvedValue(seedLogs),
   findById: jest.fn(),
   findByEntity: jest.fn(),
-  create: jest.fn().mockImplementation((data: Omit<AuditLog, 'id'>) =>
-    Promise.resolve({ ...data, id: 99 }),
-  ),
+  create: jest
+    .fn()
+    .mockImplementation((data: Omit<AuditLog, 'id'>) =>
+      Promise.resolve({ ...data, id: 99 }),
+    ),
 };
 
 describe('AuditService', () => {
@@ -52,7 +75,15 @@ describe('AuditService', () => {
   describe('log', () => {
     it('should create an audit record with correct fields', async () => {
       mockAuditLogRepository.create.mockResolvedValueOnce({ id: 99 });
-      await service.log(10, AuditAction.CREATE, 'project', 3, 'desc', 'old', 'new');
+      await service.log(
+        10,
+        AuditAction.CREATE,
+        'project',
+        3,
+        'desc',
+        'old',
+        'new',
+      );
       expect(mockAuditLogRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: 10,
@@ -118,19 +149,28 @@ describe('AuditService', () => {
 
     it('filters by from date', async () => {
       mockAuditLogRepository.findAll.mockResolvedValueOnce(seedLogs);
-      const result = await service.findAll({}, { from: '2026-03-02T00:00:00.000Z' });
+      const result = await service.findAll(
+        {},
+        { from: '2026-03-02T00:00:00.000Z' },
+      );
       expect(result.items.length).toBe(2);
     });
 
     it('filters by to date', async () => {
       mockAuditLogRepository.findAll.mockResolvedValueOnce(seedLogs);
-      const result = await service.findAll({}, { to: '2026-03-01T23:59:59.000Z' });
+      const result = await service.findAll(
+        {},
+        { to: '2026-03-01T23:59:59.000Z' },
+      );
       expect(result.items.length).toBe(1);
     });
 
     it('combines multiple filters', async () => {
       mockAuditLogRepository.findAll.mockResolvedValueOnce(seedLogs);
-      const result = await service.findAll({}, { userId: 10, action: AuditAction.UPDATE });
+      const result = await service.findAll(
+        {},
+        { userId: 10, action: AuditAction.UPDATE },
+      );
       expect(result.items).toHaveLength(1);
       expect(result.items[0].id).toBe(2);
     });

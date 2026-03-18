@@ -14,10 +14,10 @@ services:
     networks:
       - app-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_NAME:-task_manager}"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   backend:
     build:
@@ -25,17 +25,23 @@ services:
       dockerfile: Dockerfile
     container_name: taskmanager-api
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
       PORT: ${PORT:-3000}
       NODE_ENV: ${NODE_ENV:-production}
-      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-change-me-in-production}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-me-in-production}
+      DATABASE_URL: postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-task_manager}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-change_me_access_secret_min_32_chars}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change_me_refresh_secret_min_32_chars}
       JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
-      DATABASE_URL: postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-task_manager}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173,http://localhost:3000}
       THROTTLE_TTL: ${THROTTLE_TTL:-60000}
       THROTTLE_LIMIT: ${THROTTLE_LIMIT:-60}
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173,http://localhost:3000}
+      DB_POOL_MAX: ${DB_POOL_MAX:-20}
+      DB_POOL_IDLE_TIMEOUT: ${DB_POOL_IDLE_TIMEOUT:-30000}
+      DB_POOL_CONNECTION_TIMEOUT: ${DB_POOL_CONNECTION_TIMEOUT:-5000}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       AUTO_SEED: ${AUTO_SEED:-true}
     ports:
@@ -43,9 +49,6 @@ services:
     volumes:
       - ./backend/logs:/app/logs
       - ./backend/backups:/app/backups
-    depends_on:
-      postgres:
-        condition: service_healthy
     networks:
       - app-network
     healthcheck:
@@ -61,11 +64,11 @@ services:
       dockerfile: Dockerfile
     container_name: taskmanager-frontend
     restart: unless-stopped
-    ports:
-      - "5173:80"
     depends_on:
       backend:
         condition: service_healthy
+    ports:
+      - "5173:80"
     networks:
       - app-network
 

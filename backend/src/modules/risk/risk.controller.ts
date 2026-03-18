@@ -79,11 +79,10 @@ export class RiskController {
       await this.projectAccessService.assertProjectVisibility(project, userId);
     }
 
-    const auditLogs = await this.auditLogRepository.findByEntity(
-      'task',
-      task.id,
-    );
-    const allTasks = await this.taskRepository.findByProject(task.projectId);
+    const [auditLogs, allTasks] = await Promise.all([
+      this.auditLogRepository.findByEntity('task', task.id),
+      this.taskRepository.findByProject(task.projectId),
+    ]);
 
     const statusChangesCount = auditLogs.filter(
       (log) => log.action === AuditAction.STATUS_CHANGE,
@@ -129,6 +128,84 @@ export class RiskController {
     }
 
     return this.riskService.assessProject(id);
+  }
+
+  @Get('projects/:id/tasks-risk')
+  @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
+  @ApiOperation({ summary: 'Оценка рисков всех задач проекта (пакетный)' })
+  @ApiResponse({ status: 200, description: 'Риски всех задач проекта' })
+  @ApiResponse({ status: 404, description: 'Проект не найден' })
+  async getProjectTasksRisk(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser('id') userId: number,
+    @CurrentUser('accountRole') userRole: AccountRole,
+  ): Promise<Record<number, TaskRiskOutputDto>> {
+    const project = await this.projectRepository.findById(id);
+    if (!project) {
+      throw new NotFoundException(`Проект #${id} не найден`);
+    }
+
+    if (userRole !== AccountRole.ADMIN) {
+      await this.projectAccessService.assertProjectVisibility(project, userId);
+    }
+
+    const allTasks = await this.taskRepository.findByProject(id);
+    if (allTasks.length === 0) return {};
+
+    const taskIds = allTasks.map((t) => t.id);
+    const auditLogs =
+      await this.auditLogRepository.findByEntityIds('task', taskIds);
+
+    const result: Record<number, TaskRiskOutputDto> = {};
+    for (const task of allTasks) {
+      const statusChangesCount = auditLogs.filter(
+        (log) =>
+          log.entityId === task.id &&
+          log.action === AuditAction.STATUS_CHANGE,
+      ).length;
+
+      const assigneeLoad = task.assigneeId
+        ? allTasks.filter(
+            (c) =>
+              c.assigneeId === task.assigneeId &&
+              c.status !== TaskStatus.DONE &&
+              c.status !== TaskStatus.CANCELLED &&
+              c.id !== task.id,
+          ).length
+        : 0;
+
+      const input = buildTaskRiskInput(task, statusChangesCount, assigneeLoad);
+      result[task.id] = await this.riskService.assessTask(input);
+    }
+
+    return result;
+  }
+
+  @Get('risks/projects')
+  @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
+  @ApiOperation({
+    summary: 'Оценка рисков всех видимых проектов (пакетный)',
+  })
+  @ApiResponse({ status: 200, description: 'Риски проектов' })
+  async getAllProjectsRisk(
+    @CurrentUser('id') userId: number,
+    @CurrentUser('accountRole') userRole: AccountRole,
+  ): Promise<Record<number, ProjectRiskOutputDto>> {
+    const projects =
+      userRole === AccountRole.ADMIN
+        ? await this.projectRepository.findAll()
+        : await this.projectAccessService.getVisibleProjects(userId);
+
+    const result: Record<number, ProjectRiskOutputDto> = {};
+    for (const project of projects) {
+      try {
+        result[project.id] = await this.riskService.assessProject(project.id);
+      } catch {
+        // skip individual project risk errors
+      }
+    }
+
+    return result;
   }
 
   @Post('risk/retrain')

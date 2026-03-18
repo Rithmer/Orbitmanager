@@ -11,6 +11,9 @@ async function bootstrap() {
   const logLevel = process.env['LOG_LEVEL'] ?? 'info';
   const isProduction = process.env['NODE_ENV'] === 'production';
 
+  const formatContext = (context: unknown): string =>
+    typeof context === 'string' && context.length > 0 ? context : 'App';
+
   const winstonTransports: winston.transport[] = [
     new winston.transports.Console({
       format: winston.format.combine(
@@ -19,8 +22,9 @@ async function bootstrap() {
           ? winston.format.json()
           : winston.format.combine(
               winston.format.colorize(),
-              winston.format.printf(({ timestamp, level, message, context }) =>
-                `${String(timestamp)} [${String(context ?? 'App')}] ${String(level)}: ${String(message)}`,
+              winston.format.printf(
+                ({ timestamp, level, message, context }) =>
+                  `${String(timestamp)} [${formatContext(context)}] ${String(level)}: ${String(message)}`,
               ),
             ),
       ),
@@ -74,7 +78,9 @@ async function bootstrap() {
 
   const config = new DocumentBuilder()
     .setTitle('Task Management API')
-    .setDescription('Сервис управления проектами и задачами — РТУ МИРЭА, ЭФБО-10-24')
+    .setDescription(
+      'Сервис управления проектами и задачами — РТУ МИРЭА, ЭФБО-10-24',
+    )
     .setVersion('1.0')
     .addBearerAuth()
     .build();
@@ -84,4 +90,7 @@ async function bootstrap() {
   const port = process.env['PORT'] ?? 3000;
   await app.listen(port);
 }
-bootstrap();
+void bootstrap().catch((err: unknown) => {
+  console.error(err);
+  process.exit(1);
+});
