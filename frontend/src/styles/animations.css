@@ -1,0 +1,476 @@
+/* ═══════════════════════════════════════
+   Global Smooth Transitions
+   ═══════════════════════════════════════ */
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Smooth scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ═══════════════════════════════════════
+   Button Press Effect (scale bounce)
+   ═══════════════════════════════════════ */
+
+.btn-press {
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.btn-press:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.btn-press:hover:not(:disabled) {
+  box-shadow: 0 4px 15px rgba(72, 128, 255, 0.3);
+}
+
+/* ═══════════════════════════════════════
+   Fizzy / Particle Button
+   ═══════════════════════════════════════ */
+
+.btn-fizzy {
+  position: relative;
+  overflow: visible;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+}
+
+.btn-fizzy:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.btn-fizzy:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(72, 128, 255, 0.35);
+}
+
+.btn-fizzy::before,
+.btn-fizzy::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  opacity: 0;
+  z-index: -1;
+  transition: opacity 0.4s ease;
+}
+
+.btn-fizzy::before {
+  background: radial-gradient(circle at 20% 50%, rgba(72, 128, 255, 0.4) 0%, transparent 50%),
+              radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.3) 0%, transparent 50%),
+              radial-gradient(circle at 50% 80%, rgba(16, 185, 129, 0.3) 0%, transparent 50%);
+  filter: blur(8px);
+}
+
+.btn-fizzy:hover:not(:disabled)::before {
+  opacity: 1;
+}
+
+@keyframes fizzy-burst {
+  0% {
+    box-shadow:
+      0 0 0 0 rgba(72, 128, 255, 0.4),
+      0 0 0 0 rgba(139, 92, 246, 0.3),
+      0 0 0 0 rgba(16, 185, 129, 0.3);
+  }
+  50% {
+    box-shadow:
+      -4px -8px 0 -2px rgba(72, 128, 255, 0.6),
+      8px -5px 0 -2px rgba(139, 92, 246, 0.5),
+      5px 8px 0 -2px rgba(16, 185, 129, 0.5),
+      -8px 4px 0 -2px rgba(245, 158, 11, 0.5),
+      0 -10px 0 -2px rgba(236, 72, 153, 0.4),
+      10px 2px 0 -2px rgba(6, 182, 212, 0.4);
+  }
+  100% {
+    box-shadow:
+      -6px -14px 0 -4px rgba(72, 128, 255, 0),
+      14px -10px 0 -4px rgba(139, 92, 246, 0),
+      10px 14px 0 -4px rgba(16, 185, 129, 0),
+      -14px 8px 0 -4px rgba(245, 158, 11, 0),
+      0 -18px 0 -4px rgba(236, 72, 153, 0),
+      18px 4px 0 -4px rgba(6, 182, 212, 0);
+  }
+}
+
+.btn-fizzy:active:not(:disabled) {
+  animation: fizzy-burst 0.5s ease-out;
+}
+
+/* ═══════════════════════════════════════
+   Ripple Effect
+   ═══════════════════════════════════════ */
+
+.btn-ripple {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.btn-ripple:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn-ripple .ripple-circle {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.35);
+  transform: scale(0);
+  animation: ripple-expand 0.5s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes ripple-expand {
+  to {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+/* ═══════════════════════════════════════
+   Modal Animations
+   ═══════════════════════════════════════ */
+
+@keyframes modal-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modal-overlay-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes modal-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes modal-slide-down {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(24px) scale(0.96);
+  }
+}
+
+.modal-overlay-enter {
+  animation: modal-overlay-in 0.35s ease-out forwards;
+}
+
+.modal-overlay-exit {
+  animation: modal-overlay-out 0.25s ease-in forwards;
+}
+
+.modal-content-enter {
+  animation: modal-slide-up 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.modal-content-exit {
+  animation: modal-slide-down 0.25s ease-in forwards;
+}
+
+/* ═══════════════════════════════════════
+   Sidebar Slide Animation
+   ═══════════════════════════════════════ */
+
+@keyframes slide-in-left {
+  from {
+    transform: translateX(-100%);
+    opacity: 0.5;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-out-left {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-100%);
+    opacity: 0.5;
+  }
+}
+
+.sidebar-slide-in {
+  animation: slide-in-left 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.sidebar-overlay-enter {
+  animation: modal-overlay-in 0.35s ease-out forwards;
+}
+
+/* ═══════════════════════════════════════
+   Dropdown Slide Down
+   ═══════════════════════════════════════ */
+
+@keyframes dropdown-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes dropdown-up-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.dropdown-enter {
+  animation: dropdown-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.dropdown-up-enter {
+  animation: dropdown-up-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* ═══════════════════════════════════════
+   Card Hover Effects
+   ═══════════════════════════════════════ */
+
+.card-hover {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+:is(.dark) .card-hover:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(72, 128, 255, 0.08);
+}
+
+/* ═══════════════════════════════════════
+   Nav Item Indicator Slide
+   ═══════════════════════════════════════ */
+
+.nav-item {
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%) scaleY(0);
+  width: 3px;
+  height: 60%;
+  border-radius: 0 4px 4px 0;
+  background: #4880ff;
+  transition: transform 0.5s cubic-bezier(0.34, 1.8, 0.64, 1);
+}
+
+.nav-item-active::before {
+  transform: translateY(-50%) scaleY(1);
+}
+
+/* ═══════════════════════════════════════
+   Logo Letter Bounce-Up
+   ═══════════════════════════════════════ */
+
+@keyframes letter-bounce-up {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+  75% {
+    transform: translateY(1px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.letter-bounce {
+  display: inline-block;
+  animation: letter-bounce-up 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* ═══════════════════════════════════════
+   Sidebar Nav Item Bounce-In (staggered)
+   ═══════════════════════════════════════ */
+
+@keyframes nav-bounce-in {
+  0% {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(4px);
+  }
+  70% {
+    transform: translateX(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.nav-bounce-item {
+  animation: nav-bounce-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* ═══════════════════════════════════════
+   Stagger Fade In (for lists)
+   ═══════════════════════════════════════ */
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-up {
+  animation: fade-in-up 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  opacity: 0;
+}
+
+/* ═══════════════════════════════════════
+   Icon Button Spin on Hover
+   ═══════════════════════════════════════ */
+
+.icon-btn-hover {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.15s ease;
+}
+
+.icon-btn-hover:hover {
+  transform: rotate(15deg);
+}
+
+.icon-btn-hover:active {
+  transform: rotate(0deg) scale(0.9);
+}
+
+/* ═══════════════════════════════════════
+   Smooth Theme Transition
+   ═══════════════════════════════════════ */
+
+body, .dark {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* ═══════════════════════════════════════
+   Tooltip / Badge Pulse
+   ═══════════════════════════════════════ */
+
+@keyframes soft-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.badge-pulse {
+  animation: soft-pulse 2s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════
+   Page Enter Animation
+   ═══════════════════════════════════════ */
+
+@keyframes page-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-enter {
+  animation: page-enter 1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* ═══════════════════════════════════════
+   Stagger Row Appearance
+   ═══════════════════════════════════════ */
+
+.stagger-row {
+  opacity: 0;
+  animation: fade-in-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* ═══════════════════════════════════════
+   Chart Reveal (left-to-right clip)
+   ═══════════════════════════════════════ */
+
+@keyframes chart-reveal-ltr {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+.chart-draw-ltr {
+  animation: chart-reveal-ltr 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* ═══════════════════════════════════════
+   Focus Ring Animation
+   ═══════════════════════════════════════ */
+
+input:focus, select:focus, textarea:focus {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 0 0 3px rgba(72, 128, 255, 0.15);
+}
+
+/* ═══════════════════════════════════════
+   Loading Skeleton Shimmer
+   ═══════════════════════════════════════ */
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}

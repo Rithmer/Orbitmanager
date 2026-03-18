@@ -1,4 +1,5 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useCallback, type ReactNode, type MouseEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 
@@ -30,20 +31,20 @@ export function Modal({ open, onClose, title, children, maxWidth = 'max-w-lg' }:
   const borderColor = isDark ? 'border-[#313d4f]' : 'border-gray-100'
   const textPrimary = isDark ? 'text-[#f4f3f2]' : 'text-[#202224]'
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 modal-overlay-enter"
       onClick={onClose}
     >
       <div
-        className={`${modalBg} rounded-2xl shadow-2xl w-full ${maxWidth} overflow-hidden`}
+        className={`${modalBg} rounded-2xl shadow-2xl w-full ${maxWidth} overflow-hidden modal-content-enter`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className={`flex items-center justify-between px-6 py-4 border-b ${borderColor}`}>
           <h2 className={`font-bold text-lg ${textPrimary}`}>{title}</h2>
           <button
             onClick={onClose}
-            className={`p-2 rounded-lg transition-colors ${
+            className={`p-2 rounded-lg transition-all duration-200 hover:rotate-90 ${
               isDark
                 ? 'hover:bg-[#1c2534] text-[#94a3b8]'
                 : 'hover:bg-gray-100 text-gray-400'
@@ -54,7 +55,8 @@ export function Modal({ open, onClose, title, children, maxWidth = 'max-w-lg' }:
         </div>
         <div className="px-6 py-4 max-h-[70vh] overflow-y-auto">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -95,7 +97,7 @@ export function InputField({
         placeholder={placeholder}
         required={required}
         disabled={disabled}
-        className={`w-full px-3 py-2 rounded-lg border text-sm transition-colors focus:outline-none focus:border-[#4880ff] ${inputBg} ${inputText} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+        className={`w-full px-3 py-2 rounded-lg border text-sm transition-all duration-200 focus:outline-none focus:border-[#4880ff] ${inputBg} ${inputText} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
       />
     </div>
   )
@@ -134,7 +136,7 @@ export function SelectField({
         onChange={(e) => onChange(e.target.value)}
         required={required}
         disabled={disabled}
-        className={`w-full px-3 py-2 rounded-lg border text-sm transition-colors focus:outline-none focus:border-[#4880ff] ${inputBg} ${inputText} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+        className={`w-full px-3 py-2 rounded-lg border text-sm transition-all duration-200 focus:outline-none focus:border-[#4880ff] ${inputBg} ${inputText} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
@@ -144,6 +146,19 @@ export function SelectField({
       </select>
     </div>
   )
+}
+
+function createRipple(e: MouseEvent<HTMLButtonElement>) {
+  const btn = e.currentTarget
+  const rect = btn.getBoundingClientRect()
+  const size = Math.max(rect.width, rect.height)
+  const circle = document.createElement('span')
+  circle.className = 'ripple-circle'
+  circle.style.width = circle.style.height = `${size}px`
+  circle.style.left = `${e.clientX - rect.left - size / 2}px`
+  circle.style.top = `${e.clientY - rect.top - size / 2}px`
+  btn.appendChild(circle)
+  circle.addEventListener('animationend', () => circle.remove())
 }
 
 export function SubmitButton({
@@ -162,12 +177,17 @@ export function SubmitButton({
       ? 'bg-red-500 hover:bg-red-600'
       : 'bg-[#4880ff] hover:bg-[#3a6fe0]'
 
+  const handleClick = useCallback((e: MouseEvent<HTMLButtonElement>) => {
+    createRipple(e)
+    onClick?.()
+  }, [onClick])
+
   return (
     <button
       type="submit"
-      onClick={onClick}
+      onClick={handleClick}
       disabled={loading}
-      className={`${bg} text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors duration-150 disabled:opacity-50 flex items-center gap-2`}
+      className={`${bg} text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 disabled:opacity-50 flex items-center gap-2 btn-fizzy btn-ripple`}
     >
       {loading && (
         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -180,7 +200,7 @@ export function SubmitButton({
 export function ErrorMessage({ message }: { message?: string | null }) {
   if (!message) return null
   return (
-    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-4">
+    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-4 fade-in-up">
       <p className="text-sm text-red-500">{message}</p>
     </div>
   )
