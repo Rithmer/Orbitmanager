@@ -22,6 +22,8 @@
     "test:e2e:jest": "jest --config ./test/jest-e2e.json",
     "seed": "ts-node prisma/seed.ts",
     "db:seed": "ts-node prisma/seed.ts",
+    "seed:e2e": "ts-node prisma/seed.e2e.ts",
+    "db:seed:e2e": "ts-node prisma/seed.e2e.ts",
     "db:migrate": "npx prisma migrate dev --config ./prisma/prisma.config.ts",
     "db:migrate:deploy": "npx prisma migrate deploy --config ./prisma/prisma.config.ts",
     "db:generate": "npx prisma generate --config ./prisma/prisma.config.ts",

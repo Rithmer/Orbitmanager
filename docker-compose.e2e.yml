@@ -42,6 +42,7 @@ services:
       CORS_ORIGIN: ${E2E_CORS_ORIGIN:-http://localhost:5174,http://localhost:3001}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       AUTO_SEED: ${E2E_AUTO_SEED:-true}
+      SEED_COMMAND: ${E2E_SEED_COMMAND:-npm run db:seed:e2e}
     ports:
       - "${E2E_BACKEND_PORT:-3001}:3000"
     volumes:

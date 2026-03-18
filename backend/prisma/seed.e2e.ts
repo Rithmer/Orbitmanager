@@ -1,0 +1,299 @@
+import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import pg from 'pg';
+import * as argon2 from 'argon2';
+
+const connectionString =
+  process.env['DATABASE_URL'] ??
+  'postgresql://postgres:postgres@127.0.0.1:5434/task_manager_e2e';
+
+const parsedUrl = new URL(connectionString);
+const databaseName = parsedUrl.pathname.replace(/^\/+/, '');
+
+if (!databaseName.endsWith('_e2e')) {
+  throw new Error(
+    `Refusing to seed non-e2e database "${databaseName || '<unknown>'}".`,
+  );
+}
+
+const pool = new pg.Pool({ connectionString });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
+
+const TEAM_COUNT = 10;
+const USERS_PER_TEAM = 6;
+const TASKS_PER_TEAM = 5;
+const TEST_PASSWORD = process.env['E2E_SEED_PASSWORD'] ?? 'Test123!';
+const TABLES = [
+  'audit_logs',
+  'project_members',
+  'team_members',
+  'tasks',
+  'projects',
+  'teams',
+  'users',
+];
+
+const projectStatuses = [
+  'active',
+  'active',
+  'on_hold',
+  'active',
+  'completed',
+  'active',
+  'archived',
+  'active',
+  'on_hold',
+  'active',
+] as const;
+
+const taskTemplates = [
+  { suffix: 'Backlog Grooming', difficulty: 1, status: 'new', deadlineShiftDays: 5 },
+  {
+    suffix: 'API Delivery',
+    difficulty: 3,
+    status: 'in_progress',
+    deadlineShiftDays: 9,
+  },
+  {
+    suffix: 'Frontend Handoff',
+    difficulty: 2,
+    status: 'review',
+    deadlineShiftDays: 4,
+  },
+  { suffix: 'Regression Fix', difficulty: 4, status: 'done', deadlineShiftDays: -2 },
+  {
+    suffix: 'Legacy Cleanup',
+    difficulty: 5,
+    status: 'cancelled',
+    deadlineShiftDays: 14,
+  },
+] as const;
+
+type SeedUser = {
+  login: string;
+  fullName: string;
+  profession: string;
+  accountRole: 'admin' | 'member';
+  teamIndex: number;
+  slot: number;
+};
+
+function buildUsers(): SeedUser[] {
+  const users: SeedUser[] = [];
+
+  for (let teamIndex = 1; teamIndex <= TEAM_COUNT; teamIndex += 1) {
+    const padded = String(teamIndex).padStart(2, '0');
+    users.push(
+      {
+        login: `team${padded}_owner`,
+        fullName: `Team ${padded} Owner`,
+        profession: 'Engineering Manager',
+        accountRole: teamIndex <= 2 ? 'admin' : 'member',
+        teamIndex,
+        slot: 0,
+      },
+      {
+        login: `team${padded}_lead`,
+        fullName: `Team ${padded} Lead`,
+        profession: 'Tech Lead',
+        accountRole: 'member',
+        teamIndex,
+        slot: 1,
+      },
+      {
+        login: `team${padded}_dev1`,
+        fullName: `Team ${padded} Developer 1`,
+        profession: 'Backend Developer',
+        accountRole: 'member',
+        teamIndex,
+        slot: 2,
+      },
+      {
+        login: `team${padded}_dev2`,
+        fullName: `Team ${padded} Developer 2`,
+        profession: 'Frontend Developer',
+        accountRole: 'member',
+        teamIndex,
+        slot: 3,
+      },
+      {
+        login: `team${padded}_dev3`,
+        fullName: `Team ${padded} Developer 3`,
+        profession: 'QA Engineer',
+        accountRole: 'member',
+        teamIndex,
+        slot: 4,
+      },
+      {
+        login: `team${padded}_observer`,
+        fullName: `Team ${padded} Observer`,
+        profession: 'Business Analyst',
+        accountRole: 'member',
+        teamIndex,
+        slot: 5,
+      },
+    );
+  }
+
+  return users;
+}
+
+function addDays(date: Date, days: number): Date {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+async function main(): Promise<void> {
+  const passwordHash = await argon2.hash(TEST_PASSWORD);
+  const seedUsers = buildUsers();
+
+  await prisma.$executeRawUnsafe(
+    `TRUNCATE TABLE ${TABLES.map((table) => `"${table}"`).join(', ')} RESTART IDENTITY CASCADE`,
+  );
+
+  await prisma.user.createMany({
+    data: seedUsers.map((user) => ({
+      login: user.login,
+      password: passwordHash,
+      fullName: user.fullName,
+      profession: user.profession,
+      accountStatus: 'active',
+      accountRole: user.accountRole,
+    })),
+  });
+
+  const users = await prisma.user.findMany({
+    where: { login: { in: seedUsers.map((user) => user.login) } },
+    orderBy: { id: 'asc' },
+  });
+
+  const userByLogin = new Map(users.map((user) => [user.login, user]));
+  const now = new Date();
+
+  for (let teamIndex = 1; teamIndex <= TEAM_COUNT; teamIndex += 1) {
+    const padded = String(teamIndex).padStart(2, '0');
+    const owner = userByLogin.get(`team${padded}_owner`);
+    const lead = userByLogin.get(`team${padded}_lead`);
+    const dev1 = userByLogin.get(`team${padded}_dev1`);
+    const dev2 = userByLogin.get(`team${padded}_dev2`);
+    const dev3 = userByLogin.get(`team${padded}_dev3`);
+    const observer = userByLogin.get(`team${padded}_observer`);
+
+    if (!owner || !lead || !dev1 || !dev2 || !dev3 || !observer) {
+      throw new Error(`Missing generated users for team ${padded}.`);
+    }
+
+    const members = [owner, lead, dev1, dev2, dev3, observer];
+
+    const team = await prisma.team.create({
+      data: {
+        name: `Team ${padded}`,
+        description: `Seeded team ${padded} for e2e and manual UI checks.`,
+        createdById: owner.id,
+      },
+    });
+
+    await prisma.teamMember.createMany({
+      data: [
+        { teamId: team.id, userId: owner.id, teamRole: 'owner' },
+        { teamId: team.id, userId: lead.id, teamRole: 'member' },
+        { teamId: team.id, userId: dev1.id, teamRole: 'member' },
+        { teamId: team.id, userId: dev2.id, teamRole: 'member' },
+        { teamId: team.id, userId: dev3.id, teamRole: 'member' },
+        { teamId: team.id, userId: observer.id, teamRole: 'observer' },
+      ],
+    });
+
+    const project = await prisma.project.create({
+      data: {
+        teamId: team.id,
+        name: `Project ${padded}`,
+        description: `Primary project for Team ${padded}.`,
+        status: projectStatuses[teamIndex - 1],
+      },
+    });
+
+    await prisma.projectMember.createMany({
+      data: [
+        { projectId: project.id, userId: owner.id, role: 'team_lead' },
+        { projectId: project.id, userId: lead.id, role: 'team_lead' },
+        { projectId: project.id, userId: dev1.id, role: 'developer' },
+        { projectId: project.id, userId: dev2.id, role: 'developer' },
+        { projectId: project.id, userId: dev3.id, role: 'developer' },
+        { projectId: project.id, userId: observer.id, role: 'observer' },
+      ],
+    });
+
+    const taskAssignees = [owner, lead, dev1, dev2, dev3];
+
+    await prisma.task.createMany({
+      data: taskTemplates.map((template, index) => ({
+        projectId: project.id,
+        name: `${team.name} ${template.suffix}`,
+        description: `Seeded task ${index + 1} for ${team.name}.`,
+        deadline: addDays(now, template.deadlineShiftDays + teamIndex),
+        status: template.status,
+        difficulty: template.difficulty,
+        assigneeId: taskAssignees[index]!.id,
+        createdById: owner.id,
+      })),
+    });
+
+    await prisma.auditLog.createMany({
+      data: [
+        {
+          userId: owner.id,
+          action: 'create',
+          entityType: 'team',
+          entityId: team.id,
+          description: `Seeded team ${team.name}`,
+        },
+        {
+          userId: owner.id,
+          action: 'create',
+          entityType: 'project',
+          entityId: project.id,
+          description: `Seeded project ${project.name}`,
+        },
+        ...taskTemplates.map((template, index) => ({
+          userId: owner.id,
+          action: 'create',
+          entityType: 'task',
+          entityId: teamIndex * TASKS_PER_TEAM - (TASKS_PER_TEAM - (index + 1)),
+          description: `Seeded task ${index + 1} for ${project.name}`,
+        })),
+      ],
+    });
+
+    const assignedLogins = members.map((member) => member.login).join(', ');
+    console.log(
+      `Seeded ${team.name}: users [${assignedLogins}], project ${project.name}, tasks ${TASKS_PER_TEAM}`,
+    );
+  }
+
+  const [usersCount, teamsCount, projectsCount, tasksCount] = await Promise.all([
+    prisma.user.count(),
+    prisma.team.count(),
+    prisma.project.count(),
+    prisma.task.count(),
+  ]);
+
+  console.log(`E2E seed complete for ${databaseName}`);
+  console.log(
+    `Users: ${usersCount}, teams: ${teamsCount}, projects: ${projectsCount}, tasks: ${tasksCount}`,
+  );
+  console.log(`Password for all seeded users: ${TEST_PASSWORD}`);
+  console.log('Admin-capable users: team01_owner, team02_owner');
+}
+
+main()
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+    await pool.end();
+  });
