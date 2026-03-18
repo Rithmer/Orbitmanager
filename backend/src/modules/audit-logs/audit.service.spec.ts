@@ -44,8 +44,16 @@ const seedLogs: AuditLog[] = [
   }),
 ];
 
+const paginated = (items: AuditLog[]) => ({
+  items,
+  total: items.length,
+  page: 1,
+  limit: 20,
+  totalPages: 1,
+});
+
 const mockAuditLogRepository = {
-  findAll: jest.fn().mockResolvedValue(seedLogs),
+  findPaginated: jest.fn().mockResolvedValue(paginated(seedLogs)),
   findById: jest.fn(),
   findByEntity: jest.fn(),
   create: jest
@@ -53,6 +61,7 @@ const mockAuditLogRepository = {
     .mockImplementation((data: Omit<AuditLog, 'id'>) =>
       Promise.resolve({ ...data, id: 99 }),
     ),
+  createMany: jest.fn(),
 };
 
 describe('AuditService', () => {
@@ -114,41 +123,60 @@ describe('AuditService', () => {
 
   describe('findAll', () => {
     it('returns all logs when no filters applied', async () => {
-      mockAuditLogRepository.findAll.mockResolvedValueOnce(seedLogs);
+      mockAuditLogRepository.findPaginated.mockResolvedValueOnce(
+        paginated(seedLogs),
+      );
       const result = await service.findAll({});
       expect(result.items).toHaveLength(3);
     });
 
     it('filters by userId', async () => {
-      mockAuditLogRepository.findAll.mockResolvedValueOnce(seedLogs);
+      const filtered = seedLogs.filter((l) => l.userId === 10);
+      mockAuditLogRepository.findPaginated.mockResolvedValueOnce(
+        paginated(filtered),
+      );
       const result = await service.findAll({}, { userId: 10 });
       expect(result.items.every((l) => l.userId === 10)).toBe(true);
       expect(result.items).toHaveLength(2);
     });
 
     it('filters by entityType', async () => {
-      mockAuditLogRepository.findAll.mockResolvedValueOnce(seedLogs);
+      const filtered = seedLogs.filter((l) => l.entityType === 'task');
+      mockAuditLogRepository.findPaginated.mockResolvedValueOnce(
+        paginated(filtered),
+      );
       const result = await service.findAll({}, { entityType: 'task' });
       expect(result.items).toHaveLength(1);
       expect(result.items[0].entityType).toBe('task');
     });
 
     it('filters by entityId', async () => {
-      mockAuditLogRepository.findAll.mockResolvedValueOnce(seedLogs);
+      const filtered = seedLogs.filter((l) => l.entityId === 7);
+      mockAuditLogRepository.findPaginated.mockResolvedValueOnce(
+        paginated(filtered),
+      );
       const result = await service.findAll({}, { entityId: 7 });
       expect(result.items).toHaveLength(1);
       expect(result.items[0].entityId).toBe(7);
     });
 
     it('filters by action', async () => {
-      mockAuditLogRepository.findAll.mockResolvedValueOnce(seedLogs);
+      const filtered = seedLogs.filter((l) => l.action === AuditAction.DELETE);
+      mockAuditLogRepository.findPaginated.mockResolvedValueOnce(
+        paginated(filtered),
+      );
       const result = await service.findAll({}, { action: AuditAction.DELETE });
       expect(result.items).toHaveLength(1);
       expect(result.items[0].action).toBe(AuditAction.DELETE);
     });
 
     it('filters by from date', async () => {
-      mockAuditLogRepository.findAll.mockResolvedValueOnce(seedLogs);
+      const filtered = seedLogs.filter(
+        (l) => l.timestamp >= '2026-03-02T00:00:00.000Z',
+      );
+      mockAuditLogRepository.findPaginated.mockResolvedValueOnce(
+        paginated(filtered),
+      );
       const result = await service.findAll(
         {},
         { from: '2026-03-02T00:00:00.000Z' },
@@ -157,7 +185,12 @@ describe('AuditService', () => {
     });
 
     it('filters by to date', async () => {
-      mockAuditLogRepository.findAll.mockResolvedValueOnce(seedLogs);
+      const filtered = seedLogs.filter(
+        (l) => l.timestamp <= '2026-03-01T23:59:59.000Z',
+      );
+      mockAuditLogRepository.findPaginated.mockResolvedValueOnce(
+        paginated(filtered),
+      );
       const result = await service.findAll(
         {},
         { to: '2026-03-01T23:59:59.000Z' },
@@ -166,7 +199,12 @@ describe('AuditService', () => {
     });
 
     it('combines multiple filters', async () => {
-      mockAuditLogRepository.findAll.mockResolvedValueOnce(seedLogs);
+      const filtered = seedLogs.filter(
+        (l) => l.userId === 10 && l.action === AuditAction.UPDATE,
+      );
+      mockAuditLogRepository.findPaginated.mockResolvedValueOnce(
+        paginated(filtered),
+      );
       const result = await service.findAll(
         {},
         { userId: 10, action: AuditAction.UPDATE },

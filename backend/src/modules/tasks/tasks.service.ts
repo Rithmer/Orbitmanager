@@ -14,9 +14,8 @@ import {
   TaskStatus,
 } from '@/common/enums/task-status.enum';
 import { BusinessException } from '@/common/exceptions/business.exception';
-import {
+import type {
   PaginatedResult,
-  QueryHelper,
   QueryParams,
 } from '@/common/helpers/query.helper';
 import { Task } from '@/domain/models/task.model';
@@ -48,23 +47,26 @@ export class TasksService {
     userId: number,
     userRole: AccountRole,
   ): Promise<PaginatedResult<Task>> {
-    let tasks: Task[];
-
     if (userRole === AccountRole.ADMIN) {
-      tasks = await this.taskRepository.findAll();
-    } else {
-      const visibleProjectIds =
-        await this.projectAccessService.getVisibleProjectIds(userId);
-      tasks =
-        visibleProjectIds.length > 0
-          ? await this.taskRepository.findByProjects(visibleProjectIds)
-          : [];
+      return this.taskRepository.findPaginated({
+        ...params,
+        searchFields: params.searchFields ?? ['name', 'description'],
+      });
     }
 
-    return QueryHelper.apply(tasks, {
-      ...params,
-      searchFields: params.searchFields ?? ['name', 'description'],
-    });
+    const visibleProjectIds =
+      await this.projectAccessService.getVisibleProjectIds(userId);
+    if (visibleProjectIds.length === 0) {
+      return { items: [], total: 0, page: 1, limit: params.limit ?? 20, totalPages: 1 };
+    }
+
+    return this.taskRepository.findPaginated(
+      {
+        ...params,
+        searchFields: params.searchFields ?? ['name', 'description'],
+      },
+      visibleProjectIds,
+    );
   }
 
   async findById(

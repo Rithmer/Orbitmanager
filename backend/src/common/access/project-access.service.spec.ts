@@ -1,5 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { TtlCacheService } from '@/common/cache/ttl-cache.service';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { ProjectRole } from '@/common/enums/project-role.enum';
 import { ProjectStatus } from '@/common/enums/project-status.enum';
@@ -9,6 +10,14 @@ import { PROJECT_MEMBER_REPOSITORY } from '@/domain/repositories/project-member.
 import { TEAM_MEMBER_REPOSITORY } from '@/domain/repositories/team-member.repository';
 import type { Project } from '@/domain/models/project.model';
 import { ProjectAccessService } from './project-access.service';
+
+const mockCache = {
+  get: jest.fn(),
+  set: jest.fn(),
+  getOrSet: jest.fn().mockImplementation((_key: string, factory: () => Promise<unknown>) => factory()),
+  invalidate: jest.fn(),
+  invalidateByPrefix: jest.fn(),
+};
 
 const project: Project = {
   id: 10,
@@ -49,6 +58,7 @@ describe('ProjectAccessService', () => {
           useValue: mockProjectMemberRepository,
         },
         { provide: TEAM_MEMBER_REPOSITORY, useValue: mockTeamMemberRepository },
+        { provide: TtlCacheService, useValue: mockCache },
       ],
     }).compile();
 

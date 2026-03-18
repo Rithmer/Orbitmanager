@@ -1,8 +1,15 @@
 import { Request } from 'express';
 import { AuthenticatedUser } from '@/common/auth/authenticated-user.interface';
 
+export interface ProjectAccessCache {
+  project?: unknown;
+  teamMembership?: unknown;
+  projectMembership?: unknown;
+}
+
 export interface AuthenticatedRequest extends Request {
   user?: AuthenticatedUser;
+  projectAccessCache?: ProjectAccessCache;
 }
 
 export function getAuthenticatedUser(

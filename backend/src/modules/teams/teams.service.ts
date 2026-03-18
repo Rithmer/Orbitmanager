@@ -26,8 +26,7 @@ import { CreateTeamDto } from './dto/create-team.dto';
 import { UpdateTeamDto } from './dto/update-team.dto';
 import { AddTeamMemberDto } from './dto/add-team-member.dto';
 import { UpdateTeamMemberDto } from './dto/update-team-member.dto';
-import {
-  QueryHelper,
+import type {
   QueryParams,
   PaginatedResult,
 } from '@/common/helpers/query.helper';
@@ -53,8 +52,7 @@ export class TeamsService {
   ) {}
 
   async findAll(params: QueryParams): Promise<PaginatedResult<Team>> {
-    const teams = await this.teamRepository.findAll();
-    return QueryHelper.apply(teams, {
+    return this.teamRepository.findPaginated({
       ...params,
       searchFields: params.searchFields ?? ['name', 'description'],
     });
@@ -314,13 +312,15 @@ export class TeamsService {
       teamProjectIds,
     );
 
-    for (const membership of projectMemberships) {
-      await this.auditService.log(
-        actorUserId,
-        AuditAction.DELETE,
-        'project_member',
-        membership.id,
-        `Участник #${userId} автоматически удалён из проекта #${membership.projectId} после удаления из команды #${teamId}`,
+    if (projectMemberships.length > 0) {
+      await this.auditService.logMany(
+        projectMemberships.map((membership) => ({
+          userId: actorUserId,
+          action: AuditAction.DELETE,
+          entityType: 'project_member',
+          entityId: membership.id,
+          description: `Участник #${userId} автоматически удалён из проекта #${membership.projectId} после удаления из команды #${teamId}`,
+        })),
       );
     }
   }
@@ -341,22 +341,29 @@ export class TeamsService {
         membership.role !== ProjectRole.OBSERVER,
     );
 
+    if (memberships.length === 0) return;
+
+    const auditEntries: Parameters<typeof this.auditService.logMany>[0] = [];
+
     for (const membership of memberships) {
       const updated = await this.projectMemberRepository.update(membership.id, {
         role: ProjectRole.OBSERVER,
       });
-
       if (!updated) continue;
 
-      await this.auditService.log(
-        actorUserId,
-        AuditAction.UPDATE,
-        'project_member',
-        membership.id,
-        `Роль участника #${membership.id} автоматически изменена на observer после перевода в observer в команде #${teamId}`,
-        membership.role,
-        ProjectRole.OBSERVER,
-      );
+      auditEntries.push({
+        userId: actorUserId,
+        action: AuditAction.UPDATE,
+        entityType: 'project_member',
+        entityId: membership.id,
+        description: `Роль участника #${membership.id} автоматически изменена на observer после перевода в observer в команде #${teamId}`,
+        oldValue: membership.role,
+        newValue: ProjectRole.OBSERVER,
+      });
+    }
+
+    if (auditEntries.length > 0) {
+      await this.auditService.logMany(auditEntries);
     }
   }
 

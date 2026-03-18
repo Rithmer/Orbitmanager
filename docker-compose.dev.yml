@@ -6,8 +6,6 @@ services:
       POSTGRES_DB: ${DB_NAME:-task_manager}
       POSTGRES_USER: ${DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-    ports:
-      - "${DB_PORT:-5433}:5432"
     volumes:
       - pgdata_dev:/var/lib/postgresql/data
     healthcheck:
@@ -51,6 +49,8 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+    environment:
+      VITE_PROXY_TARGET: http://backend:3000
     ports:
       - "5173:5173"
     volumes:

@@ -15,6 +15,7 @@ import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { RiskModule } from './modules/risk/risk.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { CacheModule } from './common/cache/cache.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
         },
       ],
     }),
+    CacheModule,
     StorageModule,
     UsersModule,
     AuthModule,

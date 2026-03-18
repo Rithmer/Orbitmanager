@@ -132,26 +132,42 @@ export function Calendar() {
   const dayHeaderBg = isDark ? 'bg-[#1e2a3a]' : 'bg-[#f0f4f8]'
   const modalBg = isDark ? 'bg-[#273142]' : 'bg-white'
 
-  const loadData = useCallback(async () => {
-    setError('')
+  const loadStaticData = useCallback(async () => {
     try {
-      const from = new Date(currentYear, currentMonth - 1, 1).toISOString()
-      const to = new Date(currentYear, currentMonth, 0, 23, 59, 59).toISOString()
-      const [tasksRes, eventsRes, projectsRes] = await Promise.all([
+      const [tasksRes, projectsRes] = await Promise.all([
         tasksApi.list({ limit: 500 }),
-        calendarApi.list({ limit: 500, from, to }).catch((e) => { console.warn('Failed to load calendar events:', e); return { items: [] as CalendarEvent[], total: 0, page: 1, limit: 500, totalPages: 0 } }),
         projectsApi.list({ limit: 100 }).catch((e) => { console.warn('Failed to load projects:', e); return { items: [] as Project[], total: 0, page: 1, limit: 100, totalPages: 0 } }),
       ])
       setTasks(tasksRes.items)
-      setEvents(eventsRes.items)
       setProjects(projectsRes.items)
     } catch (e) {
-      console.error('Calendar: failed to load data:', e)
+      console.error('Calendar: failed to load static data:', e)
       setError('Не удалось загрузить данные календаря. Попробуйте обновить страницу.')
+    }
+  }, [])
+
+  const loadEvents = useCallback(async () => {
+    try {
+      const from = new Date(currentYear, currentMonth - 1, 1).toISOString()
+      const to = new Date(currentYear, currentMonth, 0, 23, 59, 59).toISOString()
+      const eventsRes = await calendarApi.list({ limit: 500, from, to }).catch((e) => {
+        console.warn('Failed to load calendar events:', e)
+        return { items: [] as CalendarEvent[], total: 0, page: 1, limit: 500, totalPages: 0 }
+      })
+      setEvents(eventsRes.items)
+    } catch (e) {
+      console.error('Calendar: failed to load events:', e)
+    }
+  }, [currentYear, currentMonth])
+
+  const loadData = useCallback(async () => {
+    setError('')
+    try {
+      await Promise.all([loadStaticData(), loadEvents()])
     } finally {
       setLoading(false)
     }
-  }, [currentYear, currentMonth])
+  }, [loadStaticData, loadEvents])
 
   useEffect(() => {
     loadData()
@@ -264,7 +280,7 @@ export function Calendar() {
         projectId: formProjectId ? Number(formProjectId) : undefined,
       })
       setShowCreateModal(false)
-      await loadData()
+      await loadEvents()
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Ошибка создания')
     } finally {
@@ -306,7 +322,7 @@ export function Calendar() {
       })
       setShowEditModal(false)
       setEditingEvent(null)
-      await loadData()
+      await loadEvents()
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Ошибка обновления')
     } finally {
@@ -318,7 +334,7 @@ export function Calendar() {
     if (!confirm('Удалить событие?')) return
     try {
       await calendarApi.delete(eventId)
-      await loadData()
+      await loadEvents()
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Ошибка удаления')
     }

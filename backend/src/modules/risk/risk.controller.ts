@@ -196,16 +196,8 @@ export class RiskController {
         ? await this.projectRepository.findAll()
         : await this.projectAccessService.getVisibleProjects(userId);
 
-    const result: Record<number, ProjectRiskOutputDto> = {};
-    for (const project of projects) {
-      try {
-        result[project.id] = await this.riskService.assessProject(project.id);
-      } catch {
-        // skip individual project risk errors
-      }
-    }
-
-    return result;
+    const projectIds = projects.map((p) => p.id);
+    return this.riskService.assessProjectsBatch(projectIds);
   }
 
   @Post('risk/retrain')

@@ -8,9 +8,9 @@ import {
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { AuditAction } from '@/common/enums/audit-action.enum';
 import {
-  PaginatedResult,
+  type PaginatedResult,
   QueryHelper,
-  QueryParams,
+  type QueryParams,
 } from '@/common/helpers/query.helper';
 import { CalendarEvent } from '@/domain/models/calendar-event.model';
 import type { ICalendarEventRepository } from '@/domain/repositories/calendar-event.repository';

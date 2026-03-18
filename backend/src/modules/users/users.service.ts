@@ -17,8 +17,7 @@ import { User } from '@/domain/models/user.model';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import {
-  QueryHelper,
+import type {
   QueryParams,
   PaginatedResult,
 } from '@/common/helpers/query.helper';
@@ -42,12 +41,14 @@ export class UsersService {
   async findAll(
     params: QueryParams,
   ): Promise<PaginatedResult<Omit<User, 'password'>>> {
-    const users = await this.userRepository.findAll();
-    const safe = users.map((u) => this.omitPassword(u));
-    return QueryHelper.apply(safe, {
+    const result = await this.userRepository.findPaginated({
       ...params,
       searchFields: params.searchFields ?? ['login', 'fullName', 'profession'],
     });
+    return {
+      ...result,
+      items: result.items.map((u) => this.omitPassword(u)),
+    };
   }
 
   async findById(id: number): Promise<Omit<User, 'password'>> {

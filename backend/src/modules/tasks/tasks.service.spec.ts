@@ -55,11 +55,20 @@ const mockTask: Task = {
   updatedAt: nowISO,
 };
 
+const paginatedTasks = {
+  items: [mockTask],
+  total: 1,
+  page: 1,
+  limit: 20,
+  totalPages: 1,
+};
+
 const mockTaskRepository = {
   findAll: jest.fn().mockResolvedValue([mockTask]),
   findById: jest.fn().mockResolvedValue(mockTask),
   findByProject: jest.fn().mockResolvedValue([mockTask]),
   findByProjects: jest.fn().mockResolvedValue([mockTask]),
+  findPaginated: jest.fn().mockResolvedValue(paginatedTasks),
   create: jest
     .fn()
     .mockImplementation((data: Omit<Task, 'id'>) =>
@@ -148,7 +157,9 @@ describe('TasksService', () => {
     it('returns all tasks for admin', async () => {
       const result = await service.findAll({}, OWNER_ID, AccountRole.ADMIN);
       expect(result.items).toHaveLength(1);
-      expect(mockTaskRepository.findAll).toHaveBeenCalled();
+      expect(mockTaskRepository.findPaginated).toHaveBeenCalledWith(
+        expect.objectContaining({ searchFields: ['name', 'description'] }),
+      );
     });
 
     it('loads visible tasks for non-admin user from access service', async () => {
@@ -157,9 +168,10 @@ describe('TasksService', () => {
       ]);
       const result = await service.findAll({}, OWNER_ID, AccountRole.MEMBER);
       expect(result.items).toHaveLength(1);
-      expect(mockTaskRepository.findByProjects).toHaveBeenCalledWith([
-        PROJECT_ID,
-      ]);
+      expect(mockTaskRepository.findPaginated).toHaveBeenCalledWith(
+        expect.objectContaining({ searchFields: ['name', 'description'] }),
+        [PROJECT_ID],
+      );
     });
   });
 
