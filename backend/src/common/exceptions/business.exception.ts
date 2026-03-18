@@ -1,7 +1,10 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 
 export class BusinessException extends HttpException {
-  constructor(message: string, statusCode: HttpStatus = HttpStatus.UNPROCESSABLE_ENTITY) {
+  constructor(
+    message: string,
+    statusCode: HttpStatus = HttpStatus.UNPROCESSABLE_ENTITY,
+  ) {
     super(
       {
         statusCode,

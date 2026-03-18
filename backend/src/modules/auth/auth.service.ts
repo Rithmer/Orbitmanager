@@ -2,11 +2,13 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import type { StringValue } from 'ms';
 import * as argon2 from 'argon2';
+import { User } from '@/domain/models/user.model';
 import { UsersService } from '../users/users.service';
 import { AuditService } from '../audit-logs/audit.service';
 import { AccountRole } from '@/common/enums/account-role.enum';
@@ -46,7 +48,7 @@ export class AuthService {
     return this.generateTokens({
       sub: user.id,
       login: user.login,
-      accountRole: user.accountRole as AccountRole,
+      accountRole: user.accountRole,
     });
   }
 
@@ -65,13 +67,27 @@ export class AuthService {
       throw new UnauthorizedException('Неверный логин или пароль');
     }
 
-    await this.auditService.log(user.id, AuditAction.LOGIN, 'user', user.id, `Пользователь "${user.login}" вошёл в систему`);
+    await this.auditService.log(
+      user.id,
+      AuditAction.LOGIN,
+      'user',
+      user.id,
+      `Пользователь "${user.login}" вошёл в систему`,
+    );
 
     return this.generateTokens({
       sub: user.id,
       login: user.login,
-      accountRole: user.accountRole as AccountRole,
+      accountRole: user.accountRole,
     });
+  }
+
+  async getMe(userId: number): Promise<Omit<User, 'password'>> {
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new NotFoundException('Пользователь не найден');
+    }
+    return user;
   }
 
   async refresh(refreshToken: string): Promise<TokenPair> {
@@ -96,18 +112,20 @@ export class AuthService {
     return this.generateTokens({
       sub: user.id,
       login: user.login,
-      accountRole: user.accountRole as AccountRole,
+      accountRole: user.accountRole,
     });
   }
 
-  async me(userId: number) {
-    return this.usersService.findById(userId);
-  }
-
   private async generateTokens(payload: JwtPayload): Promise<TokenPair> {
-    const accessExpiresIn = this.configService.get<string>('JWT_ACCESS_EXPIRES_IN') ?? '15m';
-    const refreshExpiresIn = this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') ?? '7d';
-    const tokenPayload = { sub: payload.sub, login: payload.login, accountRole: payload.accountRole };
+    const accessExpiresIn =
+      this.configService.get<string>('JWT_ACCESS_EXPIRES_IN') ?? '15m';
+    const refreshExpiresIn =
+      this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') ?? '7d';
+    const tokenPayload = {
+      sub: payload.sub,
+      login: payload.login,
+      accountRole: payload.accountRole,
+    };
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(tokenPayload, {

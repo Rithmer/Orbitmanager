@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, type ReactNode } from 'react'
 import {
   BarChart,
   Bar,
@@ -21,12 +21,22 @@ import { projectsApi } from '../api/projects'
 import type { Task, Project } from '../types'
 import { TaskStatus } from '../types'
 
+function DelayedMount({ delay, children }: { delay: number; children: ReactNode }) {
+  const [show, setShow] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setShow(true), delay)
+    return () => clearTimeout(t)
+  }, [delay])
+  return show ? <>{children}</> : null
+}
+
 export function Reports() {
   const { isDark } = useTheme()
 
   const [tasks, setTasks] = useState<Task[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   const pageBg = isDark ? 'bg-[#1c2534]' : 'bg-[#f5f6fa]'
   const cardBg = isDark ? 'bg-[#273142]' : 'bg-white'
@@ -36,23 +46,26 @@ export function Reports() {
   const gridColor = isDark ? '#313d4f' : '#f0f0f0'
   const axisColor = isDark ? '#94a3b8' : '#9ca3af'
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [tasksRes, projRes] = await Promise.all([
-          tasksApi.list({ limit: 200 }),
-          projectsApi.list({ limit: 100 }),
-        ])
-        setTasks(tasksRes.items)
-        setProjects(projRes.items)
-      } catch {
-        /* skip */
-      } finally {
-        setLoading(false)
-      }
+  const loadData = useCallback(async () => {
+    setError('')
+    try {
+      const [tasksRes, projRes] = await Promise.all([
+        tasksApi.list({ limit: 200 }),
+        projectsApi.list({ limit: 100 }),
+      ])
+      setTasks(tasksRes.items)
+      setProjects(projRes.items)
+    } catch (e) {
+      console.error('Reports: failed to load data:', e)
+      setError('Не удалось загрузить данные аналитики. Попробуйте обновить страницу.')
+    } finally {
+      setLoading(false)
     }
-    load()
   }, [])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const doneTasks = tasks.filter((t) => t.status === TaskStatus.DONE).length
   const inProgressTasks = tasks.filter((t) => t.status === TaskStatus.IN_PROGRESS).length
@@ -135,18 +148,32 @@ export function Reports() {
     )
   }
 
-  return (
-    <div className={`${pageBg} min-h-full p-8`}>
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className={`text-2xl font-bold ${textPrimary}`}>Аналитика</h1>
-          <p className={`mt-1 text-sm ${textSecondary}`}>Обзор производительности и прогресса</p>
+  if (error) {
+    return (
+      <div className={`${pageBg} min-h-full p-8`}>
+        <div className="flex flex-col items-center justify-center py-20 gap-4">
+          <AlertCircle className="w-10 h-10 text-red-500" />
+          <p className={`text-lg font-bold ${textPrimary}`}>Ошибка загрузки</p>
+          <p className={`text-sm ${textSecondary} text-center max-w-md`}>{error}</p>
+          <button onClick={() => { setLoading(true); loadData() }} className="bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2.5 rounded-lg text-sm font-semibold">
+            Повторить
+          </button>
         </div>
       </div>
+    )
+  }
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
+  return (
+    <div className={`${pageBg} min-h-full p-4 md:p-8`}>
+      <div className="mb-6 md:mb-8">
+        <h1 className={`text-xl md:text-2xl font-bold ${textPrimary}`}>Аналитика</h1>
+        <p className={`mt-1 text-sm ${textSecondary}`}>Обзор производительности и прогресса</p>
+      </div>
+
+      {/* Stats row — appears first */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-5 mb-6 md:mb-8 stagger-row" style={{ animationDelay: '100ms', animationDuration: '0.7s' }}>
         {stats.map((stat, i) => (
-          <div key={i} className={`${cardBg} border ${cardBorder} rounded-xl p-5`}>
+          <div key={i} className={`${cardBg} border ${cardBorder} rounded-xl p-5 card-hover`}>
             <div className="flex items-center gap-4">
               <div className={`w-12 h-12 ${stat.iconBg} rounded-xl flex items-center justify-center shrink-0`}>
                 <stat.icon className={`w-6 h-6 ${stat.iconColor}`} />
@@ -161,71 +188,115 @@ export function Reports() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
-        <div className={`${cardBg} border ${cardBorder} rounded-xl p-6 xl:col-span-2`}>
+      {/* Charts row — appears second */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6 mb-4 md:mb-6 stagger-row" style={{ animationDelay: '450ms', animationDuration: '0.7s' }}>
+        <div className={`${cardBg} border ${cardBorder} rounded-xl p-6 xl:col-span-2 card-hover`}>
           <h2 className={`font-bold mb-5 ${textPrimary}`}>Задачи по проектам</h2>
-          {projectTaskData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={projectTaskData} barGap={4}>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                <XAxis dataKey="name" tick={{ fill: axisColor, fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: axisColor, fontSize: 12 }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={tooltipStyle} cursor={{ fill: isDark ? 'rgba(72,128,255,0.05)' : 'rgba(72,128,255,0.04)' }} />
-                <Bar dataKey="tasks" fill={isDark ? '#4880ff' : '#93c5fd'} name="Всего" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="completed" fill="#4880ff" name="Выполнено" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <p className={`text-sm ${textSecondary} text-center py-10`}>Нет данных для отображения</p>
-          )}
+          <div style={{ height: 240 }}>
+            <DelayedMount delay={300}>
+              {projectTaskData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={projectTaskData} barGap={4}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                    <XAxis dataKey="name" tick={{ fill: axisColor, fontSize: 12 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: axisColor, fontSize: 12 }} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={tooltipStyle} cursor={{ fill: isDark ? 'rgba(72,128,255,0.05)' : 'rgba(72,128,255,0.04)' }} />
+                    <Bar
+                      dataKey="tasks"
+                      fill={isDark ? '#4880ff' : '#93c5fd'}
+                      name="Всего"
+                      radius={[4, 4, 0, 0]}
+                      animationBegin={0}
+                      animationDuration={1200}
+                      animationEasing="ease-out"
+                    />
+                    <Bar
+                      dataKey="completed"
+                      fill="#4880ff"
+                      name="Выполнено"
+                      radius={[4, 4, 0, 0]}
+                      animationBegin={200}
+                      animationDuration={1200}
+                      animationEasing="ease-out"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className={`text-sm ${textSecondary} text-center py-10`}>Нет данных для отображения</p>
+              )}
+            </DelayedMount>
+          </div>
         </div>
 
-        <div className={`${cardBg} border ${cardBorder} rounded-xl p-6`}>
+        <div className={`${cardBg} border ${cardBorder} rounded-xl p-6 card-hover`}>
           <h2 className={`font-bold mb-5 ${textPrimary}`}>Статус задач</h2>
-          {statusData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={240}>
-              <PieChart>
-                <Pie data={statusData} cx="50%" cy="45%" innerRadius={55} outerRadius={85} paddingAngle={3} dataKey="value">
-                  {statusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={tooltipStyle} />
-                <Legend iconType="circle" iconSize={8} formatter={(value) => <span style={{ color: axisColor, fontSize: 12 }}>{value}</span>} />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <p className={`text-sm ${textSecondary} text-center py-10`}>Нет данных</p>
-          )}
+          <div style={{ height: 240 }}>
+            <DelayedMount delay={300}>
+              {statusData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={240}>
+                  <PieChart>
+                    <Pie
+                      data={statusData}
+                      cx="50%"
+                      cy="45%"
+                      innerRadius={55}
+                      outerRadius={85}
+                      paddingAngle={3}
+                      dataKey="value"
+                      animationBegin={0}
+                      animationDuration={1000}
+                      animationEasing="ease-out"
+                    >
+                      {statusData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Legend iconType="circle" iconSize={8} formatter={(value) => <span style={{ color: axisColor, fontSize: 12 }}>{value}</span>} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className={`text-sm ${textSecondary} text-center py-10`}>Нет данных</p>
+              )}
+            </DelayedMount>
+          </div>
         </div>
       </div>
 
-      <div className={`${cardBg} border ${cardBorder} rounded-xl p-6`}>
+      {/* Bottom chart — appears last, line draws left-to-right */}
+      <div className={`${cardBg} border ${cardBorder} rounded-xl p-6 card-hover stagger-row`} style={{ animationDelay: '800ms', animationDuration: '0.7s' }}>
         <h2 className={`font-bold mb-5 ${textPrimary}`}>Распределение по сложности</h2>
-        <ResponsiveContainer width="100%" height={200}>
-          <AreaChart data={difficultyData}>
-            <defs>
-              <linearGradient id="prodGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#4880ff" stopOpacity={0.15} />
-                <stop offset="95%" stopColor="#4880ff" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-            <XAxis dataKey="week" tick={{ fill: axisColor, fontSize: 12 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: axisColor, fontSize: 12 }} axisLine={false} tickLine={false} />
-            <Tooltip contentStyle={tooltipStyle} />
-            <Area
-              type="monotone"
-              dataKey="productivity"
-              stroke="#4880ff"
-              strokeWidth={2.5}
-              fill="url(#prodGradient)"
-              name="Количество задач"
-              dot={{ fill: '#4880ff', strokeWidth: 0, r: 4 }}
-              activeDot={{ r: 6, fill: '#4880ff' }}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+        <div style={{ height: 200 }}>
+          <DelayedMount delay={650}>
+            <div className="chart-draw-ltr">
+              <ResponsiveContainer width="100%" height={200}>
+                <AreaChart data={difficultyData}>
+                  <defs>
+                    <linearGradient id="prodGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#4880ff" stopOpacity={0.15} />
+                      <stop offset="95%" stopColor="#4880ff" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                  <XAxis dataKey="week" tick={{ fill: axisColor, fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: axisColor, fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Area
+                    type="monotone"
+                    dataKey="productivity"
+                    stroke="#4880ff"
+                    strokeWidth={2.5}
+                    fill="url(#prodGradient)"
+                    name="Количество задач"
+                    dot={{ fill: '#4880ff', strokeWidth: 0, r: 4 }}
+                    activeDot={{ r: 6, fill: '#4880ff' }}
+                    isAnimationActive={false}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </DelayedMount>
+        </div>
       </div>
     </div>
   )

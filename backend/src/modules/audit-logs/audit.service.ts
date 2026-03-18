@@ -1,30 +1,20 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
+import type { IAuditLogRepository } from '@/domain/repositories/audit-log.repository';
+import { AUDIT_LOG_REPOSITORY } from '@/domain/repositories/audit-log.repository';
 import { AuditAction } from '@/common/enums/audit-action.enum';
+import { AuditLog } from '@/domain/models/audit-log.model';
 import {
+  QueryHelper,
+  QueryParams,
   PaginatedResult,
-  buildPaginatedResult,
-  normalizePagination,
-  parseSortField,
-} from '@/common/query/pagination';
-import { PrismaService } from '@/infrastructure/prisma/prisma.service';
-import type { AuditLog, Prisma } from '@prisma/client';
-
-export interface AuditLogListParams {
-  userId?: number;
-  entityType?: string;
-  entityId?: number;
-  action?: string;
-  from?: string;
-  to?: string;
-  search?: string;
-  page?: number;
-  limit?: number;
-  sort?: string;
-}
+} from '@/common/helpers/query.helper';
 
 @Injectable()
 export class AuditService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(AUDIT_LOG_REPOSITORY)
+    private readonly auditLogRepository: IAuditLogRepository,
+  ) {}
 
   async log(
     userId: number,
@@ -35,86 +25,57 @@ export class AuditService {
     oldValue?: string | null,
     newValue?: string | null,
   ): Promise<void> {
-    await this.prisma.auditLog.create({
-      data: {
-        userId,
-        action,
-        entityType,
-        entityId,
-        oldValue: oldValue ?? null,
-        newValue: newValue ?? null,
-        timestamp: new Date(),
-        description: description ?? '',
-      },
+    await this.auditLogRepository.create({
+      userId,
+      action,
+      entityType,
+      entityId,
+      oldValue: oldValue ?? null,
+      newValue: newValue ?? null,
+      timestamp: new Date().toISOString(),
+      description: description ?? '',
     });
   }
 
   async findAll(
-    params: AuditLogListParams,
+    params: QueryParams,
+    filters?: {
+      userId?: number;
+      entityType?: string;
+      entityId?: number;
+      action?: string;
+      from?: string;
+      to?: string;
+    },
   ): Promise<PaginatedResult<AuditLog>> {
-    const pagination = normalizePagination(params.page, params.limit);
-    const where = this.buildWhere(params);
-    const orderBy = this.buildOrderBy(params.sort);
+    let logs = await this.auditLogRepository.findAll();
 
-    const [total, items] = await Promise.all([
-      this.prisma.auditLog.count({ where }),
-      this.prisma.auditLog.findMany({
-        where,
-        orderBy,
-        skip: pagination.skip,
-        take: pagination.limit,
-      }),
-    ]);
-
-    return buildPaginatedResult(
-      items,
-      total,
-      pagination.page,
-      pagination.limit,
-    );
-  }
-
-  private buildWhere(params: AuditLogListParams): Prisma.AuditLogWhereInput {
-    const where: Prisma.AuditLogWhereInput = {};
-
-    if (params.userId !== undefined) {
-      where.userId = params.userId;
+    if (filters?.userId) {
+      logs = logs.filter((l) => l.userId === filters.userId);
     }
-    if (params.entityType) {
-      where.entityType = params.entityType;
+    if (filters?.entityType) {
+      logs = logs.filter((l) => l.entityType === filters.entityType);
     }
-    if (params.entityId !== undefined) {
-      where.entityId = params.entityId;
+    if (filters?.entityId) {
+      logs = logs.filter((l) => l.entityId === filters.entityId);
     }
-    if (params.action) {
-      where.action = params.action;
+    if (filters?.action) {
+      logs = logs.filter((l) => l.action === filters.action);
     }
-    if (params.from || params.to) {
-      where.timestamp = {
-        ...(params.from ? { gte: new Date(params.from) } : {}),
-        ...(params.to ? { lte: new Date(params.to) } : {}),
-      };
+    if (filters?.from) {
+      logs = logs.filter((l) => l.timestamp >= filters.from!);
     }
-    if (params.search) {
-      where.OR = [
-        { description: { contains: params.search, mode: 'insensitive' } },
-        { entityType: { contains: params.search, mode: 'insensitive' } },
-        { action: { contains: params.search, mode: 'insensitive' } },
-      ];
+    if (filters?.to) {
+      logs = logs.filter((l) => l.timestamp <= filters.to!);
     }
 
-    return where;
-  }
-
-  private buildOrderBy(
-    sort?: string,
-  ): Prisma.AuditLogOrderByWithRelationInput {
-    const { field, direction } = parseSortField(
-      sort,
-      ['id', 'userId', 'action', 'entityType', 'entityId', 'timestamp'],
-      'id',
-    );
-
-    return { [field]: direction };
+    return QueryHelper.apply(logs, {
+      ...params,
+      searchFields: params.searchFields ?? [
+        'description',
+        'entityType',
+        'action',
+      ],
+    });
   }
 }

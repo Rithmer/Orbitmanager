@@ -69,7 +69,7 @@ export function Register() {
 
   return (
     <div className={`${pageBg} min-h-screen flex items-center justify-center p-4`}>
-      <div className={`${cardBg} border ${cardBorder} rounded-2xl p-8 w-full max-w-md`}>
+      <div className={`${cardBg} border ${cardBorder} rounded-2xl p-8 w-full max-w-md fade-in-up`}>
         <div className="text-center mb-8">
           <h1 className="text-2xl font-extrabold mb-1">
             <span className="text-[#4880ff]">Orbit</span>
@@ -142,7 +142,7 @@ export function Register() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#4880ff] hover:bg-[#3a6fe0] text-white py-2.5 rounded-lg text-sm font-semibold transition-colors duration-150 disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full bg-[#4880ff] hover:bg-[#3a6fe0] text-white py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2 btn-fizzy"
           >
             {loading && (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

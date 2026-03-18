@@ -1,8 +1,9 @@
 node_modules
 dist
+.env
+.env.*
+*.log
 .git
 .gitignore
-npm-debug.log*
-*.log
-.DS_Store
-coverage
+.vscode
+.idea

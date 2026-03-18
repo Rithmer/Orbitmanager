@@ -4,7 +4,6 @@ import {
   MaxLength,
   IsOptional,
   IsInt,
-  IsEnum,
   Min,
   Max,
   IsDateString,
@@ -16,19 +15,27 @@ export class CreateTaskDto {
   @IsInt()
   projectId!: number;
 
-  @ApiProperty({ example: 'Реализовать авторизацию', description: 'Название задачи' })
+  @ApiProperty({
+    example: 'Реализовать авторизацию',
+    description: 'Название задачи',
+  })
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
   name!: string;
 
-  @ApiPropertyOptional({ example: 'Реализовать JWT авторизацию с access и refresh токенами' })
+  @ApiPropertyOptional({
+    example: 'Реализовать JWT авторизацию с access и refresh токенами',
+  })
   @IsString()
   @IsOptional()
   @MaxLength(2000)
   description?: string;
 
-  @ApiProperty({ example: '2026-04-01T00:00:00.000Z', description: 'Дедлайн (ISO 8601)' })
+  @ApiProperty({
+    example: '2026-04-01T00:00:00.000Z',
+    description: 'Дедлайн (ISO 8601)',
+  })
   @IsDateString()
   deadline!: string;
 
@@ -38,7 +45,10 @@ export class CreateTaskDto {
   @Max(5)
   difficulty!: number;
 
-  @ApiPropertyOptional({ example: 2, description: 'ID исполнителя (участник проекта)' })
+  @ApiPropertyOptional({
+    example: 2,
+    description: 'ID исполнителя (участник проекта)',
+  })
   @IsInt()
   @IsOptional()
   assigneeId?: number;

@@ -32,6 +32,20 @@ import { AccountRole } from '@/common/enums/account-role.enum';
 export class ProjectMembersController {
   constructor(private readonly projectsService: ProjectsService) {}
 
+  @Get('projects/members/batch')
+  @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
+  @ApiOperation({ summary: 'Получить участников всех видимых проектов' })
+  @ApiResponse({
+    status: 200,
+    description: 'Участники сгруппированные по projectId',
+  })
+  findAllMembersBatch(
+    @CurrentUser('id') userId: number,
+    @CurrentUser('accountRole') userRole: AccountRole,
+  ) {
+    return this.projectsService.findAllMembersBatch(userId, userRole);
+  }
+
   @Get('projects/:projectId/members')
   @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
   @ApiOperation({ summary: 'Получить участников проекта' })
@@ -47,9 +61,14 @@ export class ProjectMembersController {
 
   @Post('projects/:projectId/members')
   @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
-  @ApiOperation({ summary: 'Назначить участника в проект (только owner команды)' })
+  @ApiOperation({
+    summary: 'Назначить участника в проект (только owner команды)',
+  })
   @ApiResponse({ status: 201, description: 'Участник назначен' })
-  @ApiResponse({ status: 400, description: 'Пользователь не в команде / неверная роль' })
+  @ApiResponse({
+    status: 400,
+    description: 'Пользователь не в команде / неверная роль',
+  })
   @ApiResponse({ status: 403, description: 'Нет прав' })
   @ApiResponse({ status: 409, description: 'Участник уже в проекте' })
   addMember(
@@ -63,7 +82,9 @@ export class ProjectMembersController {
 
   @Patch('project-members/:id')
   @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
-  @ApiOperation({ summary: 'Изменить роль участника проекта (только owner команды)' })
+  @ApiOperation({
+    summary: 'Изменить роль участника проекта (только owner команды)',
+  })
   @ApiResponse({ status: 200, description: 'Роль обновлена' })
   @ApiResponse({ status: 403, description: 'Нет прав' })
   @ApiResponse({ status: 404, description: 'Участник не найден' })
@@ -79,7 +100,9 @@ export class ProjectMembersController {
   @Delete('project-members/:id')
   @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Убрать участника из проекта (только owner команды)' })
+  @ApiOperation({
+    summary: 'Убрать участника из проекта (только owner команды)',
+  })
   @ApiResponse({ status: 204, description: 'Участник удалён из проекта' })
   @ApiResponse({ status: 403, description: 'Нет прав' })
   @ApiResponse({ status: 404, description: 'Участник не найден' })

@@ -1,22 +1,22 @@
 import {
-  Body,
   Controller,
+  Post,
   Get,
+  Body,
   HttpCode,
   HttpStatus,
-  Post,
   UseGuards,
 } from '@nestjs/common';
 import {
+  ApiTags,
   ApiBearerAuth,
   ApiOperation,
   ApiResponse,
-  ApiTags,
 } from '@nestjs/swagger';
-import { CurrentUser } from '@/common/decorators/current-user.decorator';
-import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { AuthService } from './auth.service';
-import { LoginDto, RefreshDto, RegisterDto } from './dto';
+import { RegisterDto, LoginDto, RefreshDto } from './dto';
+import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
+import { CurrentUser } from '@/common/decorators/current-user.decorator';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -55,13 +55,10 @@ export class AuthController {
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Получить текущего пользователя' })
-  @ApiResponse({
-    status: 200,
-    description: 'Сведения о текущем пользователе',
-  })
-  @ApiResponse({ status: 401, description: 'Неавторизовано' })
-  me(@CurrentUser('id') userId: number) {
-    return this.authService.me(userId);
+  @ApiOperation({ summary: 'Получить профиль текущего пользователя' })
+  @ApiResponse({ status: 200, description: 'Профиль пользователя' })
+  @ApiResponse({ status: 401, description: 'Не авторизован' })
+  getMe(@CurrentUser('id') userId: number) {
+    return this.authService.getMe(userId);
   }
 }

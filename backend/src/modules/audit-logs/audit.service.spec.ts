@@ -1,20 +1,68 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AuditAction } from '@/common/enums/audit-action.enum';
-import { PrismaService } from '@/infrastructure/prisma/prisma.service';
-import { createPrismaMock, type PrismaMock } from '@/test-utils/mock-prisma';
 import { AuditService } from './audit.service';
+import { AUDIT_LOG_REPOSITORY } from '@/domain/repositories/audit-log.repository';
+import { AuditAction } from '@/common/enums/audit-action.enum';
+import { AuditLog } from '@/domain/models/audit-log.model';
+
+const makeLog = (overrides: Partial<AuditLog> = {}): AuditLog => ({
+  id: 1,
+  userId: 10,
+  action: AuditAction.CREATE,
+  entityType: 'project',
+  entityId: 5,
+  oldValue: null,
+  newValue: null,
+  timestamp: '2026-03-01T12:00:00.000Z',
+  description: 'Создан проект',
+  ...overrides,
+});
+
+const seedLogs: AuditLog[] = [
+  makeLog({
+    id: 1,
+    userId: 10,
+    action: AuditAction.CREATE,
+    entityType: 'project',
+    entityId: 1,
+    timestamp: '2026-03-01T10:00:00.000Z',
+  }),
+  makeLog({
+    id: 2,
+    userId: 10,
+    action: AuditAction.UPDATE,
+    entityType: 'project',
+    entityId: 1,
+    timestamp: '2026-03-02T10:00:00.000Z',
+  }),
+  makeLog({
+    id: 3,
+    userId: 20,
+    action: AuditAction.DELETE,
+    entityType: 'task',
+    entityId: 7,
+    timestamp: '2026-03-03T10:00:00.000Z',
+  }),
+];
+
+const mockAuditLogRepository = {
+  findAll: jest.fn().mockResolvedValue(seedLogs),
+  findById: jest.fn(),
+  findByEntity: jest.fn(),
+  create: jest
+    .fn()
+    .mockImplementation((data: Omit<AuditLog, 'id'>) =>
+      Promise.resolve({ ...data, id: 99 }),
+    ),
+};
 
 describe('AuditService', () => {
   let service: AuditService;
-  let prisma: PrismaMock;
 
   beforeEach(async () => {
-    prisma = createPrismaMock();
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuditService,
-        { provide: PrismaService, useValue: prisma },
+        { provide: AUDIT_LOG_REPOSITORY, useValue: mockAuditLogRepository },
       ],
     }).compile();
 
@@ -22,69 +70,109 @@ describe('AuditService', () => {
     jest.clearAllMocks();
   });
 
-  it('creates audit records with normalized optional values', async () => {
-    prisma.auditLog.create.mockResolvedValueOnce({ id: 1 });
+  // ─── log ───
 
-    await service.log(10, AuditAction.CREATE, 'project', 5);
-
-    expect(prisma.auditLog.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
+  describe('log', () => {
+    it('should create an audit record with correct fields', async () => {
+      mockAuditLogRepository.create.mockResolvedValueOnce({ id: 99 });
+      await service.log(
+        10,
+        AuditAction.CREATE,
+        'project',
+        3,
+        'desc',
+        'old',
+        'new',
+      );
+      expect(mockAuditLogRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
           userId: 10,
           action: AuditAction.CREATE,
           entityType: 'project',
-          entityId: 5,
+          entityId: 3,
+          description: 'desc',
+          oldValue: 'old',
+          newValue: 'new',
+        }),
+      );
+    });
+
+    it('should use null defaults when optional params omitted', async () => {
+      mockAuditLogRepository.create.mockResolvedValueOnce({ id: 100 });
+      await service.log(5, AuditAction.DELETE, 'team', 1);
+      expect(mockAuditLogRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
           oldValue: null,
           newValue: null,
           description: '',
         }),
-      }),
-    );
+      );
+    });
   });
 
-  it('applies filters, pagination and sorting via prisma query', async () => {
-    prisma.auditLog.count.mockResolvedValueOnce(1);
-    prisma.auditLog.findMany.mockResolvedValueOnce([
-      {
-        id: 2,
-        userId: 10,
-        action: AuditAction.UPDATE,
-        entityType: 'project',
-        entityId: 5,
-        oldValue: null,
-        newValue: null,
-        timestamp: new Date('2026-03-02T10:00:00.000Z'),
-        description: 'Updated',
-      },
-    ]);
+  // ─── findAll ───
 
-    const result = await service.findAll({
-      userId: 10,
-      action: AuditAction.UPDATE,
-      search: 'upd',
-      page: 2,
-      limit: 5,
-      sort: '-timestamp',
+  describe('findAll', () => {
+    it('returns all logs when no filters applied', async () => {
+      mockAuditLogRepository.findAll.mockResolvedValueOnce(seedLogs);
+      const result = await service.findAll({});
+      expect(result.items).toHaveLength(3);
     });
 
-    expect(prisma.auditLog.count).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          userId: 10,
-          action: AuditAction.UPDATE,
-          OR: expect.any(Array),
-        }),
-      }),
-    );
-    expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        skip: 5,
-        take: 5,
-        orderBy: { timestamp: 'desc' },
-      }),
-    );
-    expect(result.items).toHaveLength(1);
-    expect(result.total).toBe(1);
-    expect(result.page).toBe(2);
+    it('filters by userId', async () => {
+      mockAuditLogRepository.findAll.mockResolvedValueOnce(seedLogs);
+      const result = await service.findAll({}, { userId: 10 });
+      expect(result.items.every((l) => l.userId === 10)).toBe(true);
+      expect(result.items).toHaveLength(2);
+    });
+
+    it('filters by entityType', async () => {
+      mockAuditLogRepository.findAll.mockResolvedValueOnce(seedLogs);
+      const result = await service.findAll({}, { entityType: 'task' });
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].entityType).toBe('task');
+    });
+
+    it('filters by entityId', async () => {
+      mockAuditLogRepository.findAll.mockResolvedValueOnce(seedLogs);
+      const result = await service.findAll({}, { entityId: 7 });
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].entityId).toBe(7);
+    });
+
+    it('filters by action', async () => {
+      mockAuditLogRepository.findAll.mockResolvedValueOnce(seedLogs);
+      const result = await service.findAll({}, { action: AuditAction.DELETE });
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].action).toBe(AuditAction.DELETE);
+    });
+
+    it('filters by from date', async () => {
+      mockAuditLogRepository.findAll.mockResolvedValueOnce(seedLogs);
+      const result = await service.findAll(
+        {},
+        { from: '2026-03-02T00:00:00.000Z' },
+      );
+      expect(result.items.length).toBe(2);
+    });
+
+    it('filters by to date', async () => {
+      mockAuditLogRepository.findAll.mockResolvedValueOnce(seedLogs);
+      const result = await service.findAll(
+        {},
+        { to: '2026-03-01T23:59:59.000Z' },
+      );
+      expect(result.items.length).toBe(1);
+    });
+
+    it('combines multiple filters', async () => {
+      mockAuditLogRepository.findAll.mockResolvedValueOnce(seedLogs);
+      const result = await service.findAll(
+        {},
+        { userId: 10, action: AuditAction.UPDATE },
+      );
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].id).toBe(2);
+    });
   });
 });

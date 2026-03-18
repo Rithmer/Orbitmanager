@@ -22,9 +22,13 @@ import {
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto, UpdateProjectDto } from './dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
+import { ProjectRolesGuard } from '@/common/guards/project-roles.guard';
+import { ProjectRoles } from '@/common/decorators/project-roles.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
+import { ProjectRole } from '@/common/enums/project-role.enum';
 import { ProjectStatus } from '@/common/enums/project-status.enum';
+import { parseOptionalInt } from '@/common/helpers/query.helper';
 
 @ApiTags('Projects')
 @ApiBearerAuth()
@@ -34,14 +38,14 @@ export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РїСЂРѕРµРєС‚РѕРІ' })
+  @ApiOperation({ summary: 'Получить список проектов' })
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'teamId', required: false, type: Number })
   @ApiQuery({ name: 'status', required: false, enum: ProjectStatus })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'sort', required: false })
-  @ApiResponse({ status: 200, description: 'РЎРїРёСЃРѕРє РїСЂРѕРµРєС‚РѕРІ' })
+  @ApiResponse({ status: 200, description: 'Список проектов' })
   findAll(
     @CurrentUser('id') userId: number,
     @CurrentUser('accountRole') userRole: AccountRole,
@@ -52,14 +56,18 @@ export class ProjectsController {
     @Query('limit') limit?: string,
     @Query('sort') sort?: string,
   ) {
+    const parsedTeamId = parseOptionalInt(teamId);
+
     return this.projectsService.findAll(
       {
         search,
         sort,
-        page: page ? parseInt(page, 10) : undefined,
-        limit: limit ? parseInt(limit, 10) : undefined,
-        teamId: teamId ? parseInt(teamId, 10) : undefined,
-        status,
+        page: parseOptionalInt(page),
+        limit: parseOptionalInt(limit),
+        filters: {
+          ...(parsedTeamId !== undefined ? { teamId: parsedTeamId } : {}),
+          ...(status ? { status } : {}),
+        },
       },
       userId,
       userRole,
@@ -67,9 +75,9 @@ export class ProjectsController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'РџРѕР»СѓС‡РёС‚СЊ РїСЂРѕРµРєС‚ РїРѕ ID' })
-  @ApiResponse({ status: 200, description: 'РџСЂРѕРµРєС‚ РЅР°Р№РґРµРЅ' })
-  @ApiResponse({ status: 404, description: 'РџСЂРѕРµРєС‚ РЅРµ РЅР°Р№РґРµРЅ' })
+  @ApiOperation({ summary: 'Получить проект по ID' })
+  @ApiResponse({ status: 200, description: 'Проект найден' })
+  @ApiResponse({ status: 404, description: 'Проект не найден' })
   findOne(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('id') userId: number,
@@ -79,10 +87,10 @@ export class ProjectsController {
   }
 
   @Post()
-  @ApiOperation({ summary: 'РЎРѕР·РґР°С‚СЊ РїСЂРѕРµРєС‚ (С‚РѕР»СЊРєРѕ owner РєРѕРјР°РЅРґС‹)' })
-  @ApiResponse({ status: 201, description: 'РџСЂРѕРµРєС‚ СЃРѕР·РґР°РЅ' })
-  @ApiResponse({ status: 403, description: 'РќРµС‚ РїСЂР°РІ' })
-  @ApiResponse({ status: 404, description: 'РљРѕРјР°РЅРґР° РЅРµ РЅР°Р№РґРµРЅР°' })
+  @ApiOperation({ summary: 'Создать проект (только owner команды)' })
+  @ApiResponse({ status: 201, description: 'Проект создан' })
+  @ApiResponse({ status: 403, description: 'Нет прав' })
+  @ApiResponse({ status: 404, description: 'Команда не найдена' })
   create(
     @Body() dto: CreateProjectDto,
     @CurrentUser('id') userId: number,
@@ -92,10 +100,12 @@ export class ProjectsController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'РћР±РЅРѕРІРёС‚СЊ РїСЂРѕРµРєС‚ (owner / team_lead)' })
-  @ApiResponse({ status: 200, description: 'РџСЂРѕРµРєС‚ РѕР±РЅРѕРІР»С‘РЅ' })
-  @ApiResponse({ status: 403, description: 'РќРµС‚ РїСЂР°РІ' })
-  @ApiResponse({ status: 404, description: 'РџСЂРѕРµРєС‚ РЅРµ РЅР°Р№РґРµРЅ' })
+  @UseGuards(ProjectRolesGuard)
+  @ProjectRoles(ProjectRole.TEAM_LEAD)
+  @ApiOperation({ summary: 'Обновить проект (owner / team_lead)' })
+  @ApiResponse({ status: 200, description: 'Проект обновлён' })
+  @ApiResponse({ status: 403, description: 'Нет прав' })
+  @ApiResponse({ status: 404, description: 'Проект не найден' })
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateProjectDto,
@@ -107,10 +117,10 @@ export class ProjectsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'РЈРґР°Р»РёС‚СЊ РїСЂРѕРµРєС‚ (С‚РѕР»СЊРєРѕ owner РєРѕРјР°РЅРґС‹)' })
-  @ApiResponse({ status: 204, description: 'РџСЂРѕРµРєС‚ СѓРґР°Р»С‘РЅ' })
-  @ApiResponse({ status: 403, description: 'РќРµС‚ РїСЂР°РІ' })
-  @ApiResponse({ status: 404, description: 'РџСЂРѕРµРєС‚ РЅРµ РЅР°Р№РґРµРЅ' })
+  @ApiOperation({ summary: 'Удалить проект (только owner команды)' })
+  @ApiResponse({ status: 204, description: 'Проект удалён' })
+  @ApiResponse({ status: 403, description: 'Нет прав' })
+  @ApiResponse({ status: 404, description: 'Проект не найден' })
   remove(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('id') userId: number,

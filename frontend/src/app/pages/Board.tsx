@@ -10,6 +10,8 @@ import {
   Trash2,
   Edit3,
   User as UserIcon,
+  Eye,
+  Clock,
 } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 import { tasksApi } from '../api/tasks'
@@ -27,6 +29,7 @@ import {
   PROJECT_ROLE_LABELS,
 } from '../types'
 import { usersApi } from '../api/users'
+import { formatLocalDateInput, toLocalEndOfDayIso } from '../utils/dateTime'
 
 const COLUMNS = [
   { status: TaskStatus.NEW, title: 'К выполнению', accent: '#4880ff' },
@@ -48,11 +51,13 @@ export function Board() {
   const [allUsers, setAllUsers] = useState<User[]>([])
   const [taskRisks, setTaskRisks] = useState<Record<number, TaskRiskOutput>>({})
   const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState('')
+  const [error, setError] = useState('')
 
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showRiskModal, setShowRiskModal] = useState(false)
+  const [showDetailModal, setShowDetailModal] = useState(false)
+  const [detailTask, setDetailTask] = useState<Task | null>(null)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [selectedRisk, setSelectedRisk] = useState<{ task: Task; risk: TaskRiskOutput } | null>(null)
   const [openTaskMenu, setOpenTaskMenu] = useState<number | null>(null)
@@ -78,12 +83,12 @@ export function Board() {
       setLoading(false)
       return
     }
-    setLoadError('')
+    setError('')
     try {
       const [proj, tasksRes, membersRes, usersRes] = await Promise.all([
         projectsApi.getById(projectId),
         tasksApi.list({ projectId, limit: 200 }),
-        projectsApi.getMembers(projectId),
+        projectsApi.getMembers(projectId).catch((e) => { console.warn('Failed to load project members:', e); return [] }),
         usersApi.list({ limit: 100 }),
       ])
       setProject(proj)
@@ -91,16 +96,15 @@ export function Board() {
       setMembers(membersRes as ProjectMember[])
       setAllUsers(usersRes.items)
 
-      const risksMap: Record<number, TaskRiskOutput> = {}
-      const taskRiskList = await Promise.all(
-        tasksRes.items.map((task) => riskApi.getTaskRisk(task.id)),
-      )
-      tasksRes.items.forEach((task, index) => {
-        risksMap[task.id] = taskRiskList[index] as TaskRiskOutput
-      })
-      setTaskRisks(risksMap)
-    } catch (err) {
-      setLoadError(err instanceof Error ? err.message : 'Ошибка загрузки данных')
+      try {
+        const risksMap = await riskApi.getProjectTasksRisk(projectId)
+        setTaskRisks(risksMap)
+      } catch (e) {
+        console.warn('Failed to load task risks:', e)
+      }
+    } catch (e) {
+      console.error('Board: failed to load data:', e)
+      setError('Не удалось загрузить данные доски. Попробуйте обновить страницу.')
     } finally {
       setLoading(false)
     }
@@ -123,7 +127,7 @@ export function Board() {
         projectId,
         name: formName,
         description: formDesc || undefined,
-        deadline: new Date(formDeadline).toISOString(),
+        deadline: toLocalEndOfDayIso(formDeadline),
         difficulty: Number(formDifficulty),
         assigneeId: formAssignee ? Number(formAssignee) : undefined,
       })
@@ -145,7 +149,7 @@ export function Board() {
       await tasksApi.update(editingTask.id, {
         name: formName,
         description: formDesc || undefined,
-        deadline: formDeadline ? new Date(formDeadline).toISOString() : undefined,
+        deadline: formDeadline ? toLocalEndOfDayIso(formDeadline) : undefined,
         difficulty: Number(formDifficulty),
         status: formStatus,
         assigneeId: formAssignee ? Number(formAssignee) : null,
@@ -224,6 +228,21 @@ export function Board() {
     )
   }
 
+  if (error) {
+    return (
+      <div className={`${pageBg} min-h-full p-8`}>
+        <div className="flex flex-col items-center justify-center py-20 gap-4">
+          <AlertTriangle className="w-10 h-10 text-red-500" />
+          <p className={`text-lg font-bold ${textPrimary}`}>Ошибка загрузки</p>
+          <p className={`text-sm ${textSecondary} text-center max-w-md`}>{error}</p>
+          <button onClick={() => { setLoading(true); loadData() }} className="bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2.5 rounded-lg text-sm font-semibold">
+            Повторить
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   const assigneeOptions = [
     { value: '', label: 'Не назначен' },
     ...members.map((m) => ({
@@ -233,8 +252,8 @@ export function Board() {
   ]
 
   return (
-    <div className={`${pageBg} min-h-full p-8`}>
-      <div className="flex items-center justify-between mb-8">
+    <div className={`${pageBg} min-h-full p-4 md:p-8`}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 md:mb-8">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/projects')}
@@ -243,7 +262,7 @@ export function Board() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className={`text-2xl font-bold ${textPrimary}`}>{project?.name || 'Проект'}</h1>
+            <h1 className={`text-xl md:text-2xl font-bold ${textPrimary}`}>{project?.name || 'Проект'}</h1>
             <p className={`mt-1 text-sm ${textSecondary}`}>
               Канбан-доска · {tasks.length} задач
             </p>
@@ -254,19 +273,17 @@ export function Board() {
             resetForm()
             const tomorrow = new Date()
             tomorrow.setDate(tomorrow.getDate() + 7)
-            setFormDeadline(tomorrow.toISOString().split('T')[0])
+            setFormDeadline(formatLocalDateInput(tomorrow))
             setShowCreateModal(true)
           }}
-          className="flex items-center gap-2 bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors duration-150"
+          className="flex items-center gap-2 bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors duration-150 self-start sm:self-auto btn-fizzy"
         >
           <Plus className="w-4 h-4" />
           Добавить задачу
         </button>
       </div>
 
-      <ErrorMessage message={loadError} />
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 items-start">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 md:gap-4 items-start overflow-x-auto">
         {COLUMNS.map((col) => {
           const columnTasks = tasks.filter((t) => t.status === col.status)
           return (
@@ -293,7 +310,7 @@ export function Board() {
                   return (
                     <div
                       key={task.id}
-                      className={`${cardBg} border ${cardBorder} rounded-xl p-4 hover:shadow-md transition-all duration-200`}
+                      className={`${cardBg} border ${cardBorder} rounded-xl p-4 card-hover transition-all duration-200`}
                     >
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <h4 className={`text-sm font-semibold leading-snug ${textPrimary}`}>{task.name}</h4>
@@ -305,13 +322,23 @@ export function Board() {
                             <MoreHorizontal className="w-4 h-4" />
                           </button>
                           {openTaskMenu === task.id && (
-                            <div className={`absolute right-0 top-6 z-20 w-48 rounded-xl shadow-xl border overflow-hidden ${isDark ? 'bg-[#273142] border-[#313d4f]' : 'bg-white border-[#e8e8e8]'}`}>
+                            <div className={`absolute right-0 top-6 z-20 w-48 rounded-xl shadow-xl border overflow-hidden ${isDark ? 'bg-[#273142] border-[#313d4f]' : 'bg-white border-[#e8e8e8]'} dropdown-enter`}>
+                              <button
+                                onClick={() => {
+                                  setDetailTask(task)
+                                  setShowDetailModal(true)
+                                  setOpenTaskMenu(null)
+                                }}
+                                className={`w-full flex items-center gap-2 px-3 py-2 text-xs ${textPrimary} ${isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'}`}
+                              >
+                                <Eye className="w-3.5 h-3.5" /> Подробнее
+                              </button>
                               <button
                                 onClick={() => {
                                   setEditingTask(task)
                                   setFormName(task.name)
                                   setFormDesc(task.description || '')
-                                  setFormDeadline(task.deadline ? task.deadline.split('T')[0] : '')
+                                  setFormDeadline(task.deadline ? formatLocalDateInput(task.deadline) : '')
                                   setFormDifficulty(String(task.difficulty))
                                   setFormAssignee(task.assigneeId ? String(task.assigneeId) : '')
                                   setFormStatus(task.status as TaskStatus)
@@ -497,6 +524,122 @@ export function Board() {
             )}
           </div>
         )}
+      </Modal>
+
+      {/* Task Detail Modal */}
+      <Modal open={showDetailModal} onClose={() => setShowDetailModal(false)} title="Подробности задачи" maxWidth="max-w-xl">
+        {detailTask && (() => {
+          const risk = taskRisks[detailTask.id]
+          const isOverdue = new Date(detailTask.deadline) < new Date() && detailTask.status !== TaskStatus.DONE && detailTask.status !== TaskStatus.CANCELLED
+          const statusCol = COLUMNS.find((c) => c.status === detailTask.status)
+          return (
+            <div className="space-y-5">
+              <div>
+                <h3 className={`text-lg font-bold ${textPrimary} mb-1`}>{detailTask.name}</h3>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className="text-xs font-semibold px-2.5 py-1 rounded-full text-white"
+                    style={{ backgroundColor: statusCol?.accent || '#4880ff' }}
+                  >
+                    {TASK_STATUS_LABELS[detailTask.status as TaskStatus] || detailTask.status}
+                  </span>
+                  {isOverdue && (
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-500/10 text-red-500">
+                      Просрочено
+                    </span>
+                  )}
+                  {risk && risk.riskLevel !== RiskLevel.LOW && (
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 ${getRiskBg(risk.riskLevel)} ${getRiskColor(risk.riskLevel)}`}>
+                      <AlertTriangle className="w-3 h-3" />
+                      {RISK_LEVEL_LABELS[risk.riskLevel]}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {detailTask.description && (
+                <div>
+                  <p className={`text-xs font-semibold uppercase tracking-wider mb-1.5 ${textSecondary}`}>Описание</p>
+                  <p className={`text-sm leading-relaxed ${textPrimary}`}>{detailTask.description}</p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className={`p-3 rounded-xl ${isDark ? 'bg-[#1c2534]' : 'bg-gray-50'}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Calendar className={`w-4 h-4 ${textSecondary}`} />
+                    <span className={`text-xs font-semibold ${textSecondary}`}>Дедлайн</span>
+                  </div>
+                  <p className={`text-sm font-bold ${isOverdue ? 'text-red-500' : textPrimary}`}>
+                    {new Date(detailTask.deadline).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </p>
+                </div>
+                <div className={`p-3 rounded-xl ${isDark ? 'bg-[#1c2534]' : 'bg-gray-50'}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Tag className={`w-4 h-4 ${textSecondary}`} />
+                    <span className={`text-xs font-semibold ${textSecondary}`}>Сложность</span>
+                  </div>
+                  <p className={`text-sm font-bold ${textPrimary}`}>
+                    {detailTask.difficulty}/5 — {['Очень лёгкая', 'Лёгкая', 'Средняя', 'Сложная', 'Очень сложная'][detailTask.difficulty - 1] || ''}
+                  </p>
+                </div>
+                <div className={`p-3 rounded-xl ${isDark ? 'bg-[#1c2534]' : 'bg-gray-50'}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <UserIcon className={`w-4 h-4 ${textSecondary}`} />
+                    <span className={`text-xs font-semibold ${textSecondary}`}>Исполнитель</span>
+                  </div>
+                  <p className={`text-sm font-bold ${textPrimary}`}>{getUserName(detailTask.assigneeId)}</p>
+                </div>
+                <div className={`p-3 rounded-xl ${isDark ? 'bg-[#1c2534]' : 'bg-gray-50'}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Clock className={`w-4 h-4 ${textSecondary}`} />
+                    <span className={`text-xs font-semibold ${textSecondary}`}>Создана</span>
+                  </div>
+                  <p className={`text-sm font-bold ${textPrimary}`}>
+                    {new Date(detailTask.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </p>
+                </div>
+              </div>
+
+              {risk && (
+                <div className={`p-4 rounded-xl ${getRiskBg(risk.riskLevel)}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <AlertTriangle className={`w-4 h-4 ${getRiskColor(risk.riskLevel)}`} />
+                    <span className={`text-sm font-bold ${getRiskColor(risk.riskLevel)}`}>
+                      Риск: {RISK_LEVEL_LABELS[risk.riskLevel]}
+                    </span>
+                  </div>
+                  <p className={`text-xs ${textSecondary}`}>
+                    Вероятность задержки: {Math.round(risk.delayProbability * 100)}%
+                  </p>
+                  {risk.recommendation && (
+                    <p className={`text-xs mt-1 ${textSecondary}`}>{risk.recommendation}</p>
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  onClick={() => {
+                    setShowDetailModal(false)
+                    setEditingTask(detailTask)
+                    setFormName(detailTask.name)
+                    setFormDesc(detailTask.description || '')
+                    setFormDeadline(detailTask.deadline ? formatLocalDateInput(detailTask.deadline) : '')
+                    setFormDifficulty(String(detailTask.difficulty))
+                    setFormAssignee(detailTask.assigneeId ? String(detailTask.assigneeId) : '')
+                    setFormStatus(detailTask.status as TaskStatus)
+                    setFormError('')
+                    setShowEditModal(true)
+                  }}
+                  className="flex items-center gap-2 bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+                >
+                  <Edit3 className="w-4 h-4" /> Редактировать
+                </button>
+              </div>
+            </div>
+          )
+        })()}
       </Modal>
     </div>
   )

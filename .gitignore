@@ -24,12 +24,17 @@ logs/
 
 # === Environment ===
 .env
-.env.test
-.env.local
-.env.*.local
+.env.*
+!.env.example
+!.env.*.example
 
 # === Build ===
 dist/
+build/
+
+# === Test / Coverage ===
 coverage/
+
+# === TypeScript ===
+*.tsbuildinfo
 documentation_archive/
-fronendbeta/

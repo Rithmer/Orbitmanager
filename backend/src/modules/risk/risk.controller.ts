@@ -5,6 +5,7 @@ import {
   Param,
   ParseIntPipe,
   UseGuards,
+  Inject,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -13,7 +14,6 @@ import {
   ApiOperation,
   ApiResponse,
 } from '@nestjs/swagger';
-import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { ProjectAccessService } from '@/common/access/project-access.service';
 import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
@@ -22,8 +22,15 @@ import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { AuditAction } from '@/common/enums/audit-action.enum';
 import { TaskStatus } from '@/common/enums/task-status.enum';
+import type { IAuditLogRepository } from '@/domain/repositories/audit-log.repository';
+import { AUDIT_LOG_REPOSITORY } from '@/domain/repositories/audit-log.repository';
+import type { IProjectRepository } from '@/domain/repositories/project.repository';
+import { PROJECT_REPOSITORY } from '@/domain/repositories/project.repository';
+import type { ITaskRepository } from '@/domain/repositories/task.repository';
+import { TASK_REPOSITORY } from '@/domain/repositories/task.repository';
+import type { IRiskAssessmentService } from '@/domain/services/risk-assessment.interface';
+import { RISK_ASSESSMENT_SERVICE } from '@/domain/services/risk-assessment.interface';
 import { ProjectRiskOutputDto, TaskRiskOutputDto } from './dto';
-import { RiskStubService } from './risk-stub.service';
 import { buildTaskRiskInput } from './helpers/build-task-risk-input';
 
 @ApiTags('Risk Assessment')
@@ -32,36 +39,40 @@ import { buildTaskRiskInput } from './helpers/build-task-risk-input';
 @Controller()
 export class RiskController {
   constructor(
-    private readonly riskService: RiskStubService,
-    private readonly prisma: PrismaService,
+    @Inject(RISK_ASSESSMENT_SERVICE)
+    private readonly riskService: IRiskAssessmentService,
+    @Inject(TASK_REPOSITORY)
+    private readonly taskRepository: ITaskRepository,
+    @Inject(PROJECT_REPOSITORY)
+    private readonly projectRepository: IProjectRepository,
+    @Inject(AUDIT_LOG_REPOSITORY)
+    private readonly auditLogRepository: IAuditLogRepository,
     private readonly projectAccessService: ProjectAccessService,
   ) {}
 
   @Get('tasks/:id/risk')
   @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
-  @ApiOperation({ summary: 'РћС†РµРЅРєР° СЂРёСЃРєРѕРІ Р·Р°РґР°С‡Рё' })
+  @ApiOperation({ summary: 'Оценка рисков задачи' })
   @ApiResponse({
     status: 200,
-    description: 'РћС†РµРЅРєР° СЂРёСЃРєРѕРІ Р·Р°РґР°С‡Рё',
+    description: 'Оценка рисков задачи',
     type: TaskRiskOutputDto,
   })
-  @ApiResponse({ status: 404, description: 'Р—Р°РґР°С‡Р° РЅРµ РЅР°Р№РґРµРЅР°' })
-  @ApiResponse({ status: 403, description: 'РќРµС‚ РґРѕСЃС‚СѓРїР° Рє Р·Р°РґР°С‡Рµ' })
+  @ApiResponse({ status: 404, description: 'Задача не найдена' })
+  @ApiResponse({ status: 403, description: 'Нет доступа к задаче' })
   async getTaskRisk(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('id') userId: number,
     @CurrentUser('accountRole') userRole: AccountRole,
   ): Promise<TaskRiskOutputDto> {
-    const task = await this.prisma.task.findUnique({ where: { id } });
+    const task = await this.taskRepository.findById(id);
     if (!task) {
-      throw new NotFoundException(`Р—Р°РґР°С‡Р° #${id} РЅРµ РЅР°Р№РґРµРЅР°`);
+      throw new NotFoundException(`Задача #${id} не найдена`);
     }
 
-    const project = await this.prisma.project.findUnique({
-      where: { id: task.projectId },
-    });
+    const project = await this.projectRepository.findById(task.projectId);
     if (!project) {
-      throw new NotFoundException(`РџСЂРѕРµРєС‚ #${task.projectId} РЅРµ РЅР°Р№РґРµРЅ`);
+      throw new NotFoundException(`Проект #${task.projectId} не найден`);
     }
 
     if (userRole !== AccountRole.ADMIN) {
@@ -69,15 +80,8 @@ export class RiskController {
     }
 
     const [auditLogs, allTasks] = await Promise.all([
-      this.prisma.auditLog.findMany({
-        where: {
-          entityType: 'task',
-          entityId: task.id,
-        },
-      }),
-      this.prisma.task.findMany({
-        where: { projectId: task.projectId },
-      }),
+      this.auditLogRepository.findByEntity('task', task.id),
+      this.taskRepository.findByProject(task.projectId),
     ]);
 
     const statusChangesCount = auditLogs.filter(
@@ -101,22 +105,22 @@ export class RiskController {
 
   @Get('projects/:id/risk')
   @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
-  @ApiOperation({ summary: 'РћС†РµРЅРєР° СЂРёСЃРєРѕРІ РїСЂРѕРµРєС‚Р° (Р‘Рџ3: РњРѕРЅРёС‚РѕСЂРёРЅРі)' })
+  @ApiOperation({ summary: 'Оценка рисков проекта (БП3: Мониторинг)' })
   @ApiResponse({
     status: 200,
-    description: 'РћС†РµРЅРєР° СЂРёСЃРєРѕРІ РїСЂРѕРµРєС‚Р°',
+    description: 'Оценка рисков проекта',
     type: ProjectRiskOutputDto,
   })
-  @ApiResponse({ status: 404, description: 'РџСЂРѕРµРєС‚ РЅРµ РЅР°Р№РґРµРЅ' })
-  @ApiResponse({ status: 403, description: 'РќРµС‚ РґРѕСЃС‚СѓРїР° Рє РїСЂРѕРµРєС‚Сѓ' })
+  @ApiResponse({ status: 404, description: 'Проект не найден' })
+  @ApiResponse({ status: 403, description: 'Нет доступа к проекту' })
   async getProjectRisk(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('id') userId: number,
     @CurrentUser('accountRole') userRole: AccountRole,
   ): Promise<ProjectRiskOutputDto> {
-    const project = await this.prisma.project.findUnique({ where: { id } });
+    const project = await this.projectRepository.findById(id);
     if (!project) {
-      throw new NotFoundException(`РџСЂРѕРµРєС‚ #${id} РЅРµ РЅР°Р№РґРµРЅ`);
+      throw new NotFoundException(`Проект #${id} не найден`);
     }
 
     if (userRole !== AccountRole.ADMIN) {
@@ -126,10 +130,88 @@ export class RiskController {
     return this.riskService.assessProject(id);
   }
 
+  @Get('projects/:id/tasks-risk')
+  @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
+  @ApiOperation({ summary: 'Оценка рисков всех задач проекта (пакетный)' })
+  @ApiResponse({ status: 200, description: 'Риски всех задач проекта' })
+  @ApiResponse({ status: 404, description: 'Проект не найден' })
+  async getProjectTasksRisk(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser('id') userId: number,
+    @CurrentUser('accountRole') userRole: AccountRole,
+  ): Promise<Record<number, TaskRiskOutputDto>> {
+    const project = await this.projectRepository.findById(id);
+    if (!project) {
+      throw new NotFoundException(`Проект #${id} не найден`);
+    }
+
+    if (userRole !== AccountRole.ADMIN) {
+      await this.projectAccessService.assertProjectVisibility(project, userId);
+    }
+
+    const allTasks = await this.taskRepository.findByProject(id);
+    if (allTasks.length === 0) return {};
+
+    const taskIds = allTasks.map((t) => t.id);
+    const auditLogs =
+      await this.auditLogRepository.findByEntityIds('task', taskIds);
+
+    const result: Record<number, TaskRiskOutputDto> = {};
+    for (const task of allTasks) {
+      const statusChangesCount = auditLogs.filter(
+        (log) =>
+          log.entityId === task.id &&
+          log.action === AuditAction.STATUS_CHANGE,
+      ).length;
+
+      const assigneeLoad = task.assigneeId
+        ? allTasks.filter(
+            (c) =>
+              c.assigneeId === task.assigneeId &&
+              c.status !== TaskStatus.DONE &&
+              c.status !== TaskStatus.CANCELLED &&
+              c.id !== task.id,
+          ).length
+        : 0;
+
+      const input = buildTaskRiskInput(task, statusChangesCount, assigneeLoad);
+      result[task.id] = await this.riskService.assessTask(input);
+    }
+
+    return result;
+  }
+
+  @Get('risks/projects')
+  @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
+  @ApiOperation({
+    summary: 'Оценка рисков всех видимых проектов (пакетный)',
+  })
+  @ApiResponse({ status: 200, description: 'Риски проектов' })
+  async getAllProjectsRisk(
+    @CurrentUser('id') userId: number,
+    @CurrentUser('accountRole') userRole: AccountRole,
+  ): Promise<Record<number, ProjectRiskOutputDto>> {
+    const projects =
+      userRole === AccountRole.ADMIN
+        ? await this.projectRepository.findAll()
+        : await this.projectAccessService.getVisibleProjects(userId);
+
+    const result: Record<number, ProjectRiskOutputDto> = {};
+    for (const project of projects) {
+      try {
+        result[project.id] = await this.riskService.assessProject(project.id);
+      } catch {
+        // skip individual project risk errors
+      }
+    }
+
+    return result;
+  }
+
   @Post('risk/retrain')
   @Roles(AccountRole.ADMIN)
-  @ApiOperation({ summary: 'РџРµСЂРµРѕР±СѓС‡РµРЅРёРµ ML-РјРѕРґРµР»Рё (Р·Р°РіР»СѓС€РєР°)' })
-  @ApiResponse({ status: 200, description: 'РЎС‚Р°С‚СѓСЃ РїРµСЂРµРѕР±СѓС‡РµРЅРёСЏ' })
+  @ApiOperation({ summary: 'Переобучение ML-модели (заглушка)' })
+  @ApiResponse({ status: 200, description: 'Статус переобучения' })
   retrain() {
     return { message: 'Retraining not implemented yet' };
   }

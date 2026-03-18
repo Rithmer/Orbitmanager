@@ -193,11 +193,17 @@ export function Teams() {
     }
   }
 
-  const filteredTeams = teams.filter(
-    (team) =>
-      team.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (team.description || '').toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+  const filteredTeams = teams.filter((team) => {
+    const q = searchQuery.toLowerCase()
+    if (team.name.toLowerCase().includes(q)) return true
+    if ((team.description || '').toLowerCase().includes(q)) return true
+    const members = teamMembers[team.id] || []
+    return members.some((m) => {
+      const name = getUserName(m.userId).toLowerCase()
+      const role = getUserRole(m.userId).toLowerCase()
+      return name.includes(q) || role.includes(q)
+    })
+  })
 
   const roleIcon = (role: TeamRole) => {
     if (role === TeamRole.OWNER) return <Crown className="w-3 h-3 text-amber-500" />
@@ -214,10 +220,10 @@ export function Teams() {
   }
 
   return (
-    <div className={`${pageBg} min-h-full p-8`}>
-      <div className="flex items-center justify-between mb-6">
+    <div className={`${pageBg} min-h-full p-4 md:p-8`}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className={`text-2xl font-bold ${textPrimary}`}>Команды</h1>
+          <h1 className={`text-xl md:text-2xl font-bold ${textPrimary}`}>Команды</h1>
           <p className={`mt-1 text-sm ${textSecondary}`}>
             {teams.length} команд
           </p>
@@ -229,7 +235,7 @@ export function Teams() {
             setFormError('')
             setShowCreateModal(true)
           }}
-          className="flex items-center gap-2 bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors duration-150"
+          className="flex items-center gap-2 bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors duration-150 self-start sm:self-auto btn-fizzy"
         >
           <Plus className="w-4 h-4" />
           Новая команда
@@ -242,14 +248,14 @@ export function Teams() {
         <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${textSecondary}`} />
         <input
           type="text"
-          placeholder="Поиск команд..."
+          placeholder="Поиск по командам и участникам..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className={`w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm transition-colors focus:outline-none focus:border-[#4880ff] ${inputBg}`}
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
         {filteredTeams.length > 0 ? (
           filteredTeams.map((team, idx) => {
             const ci = idx % colors.length
@@ -259,7 +265,7 @@ export function Teams() {
             return (
               <div
                 key={team.id}
-                className={`${cardBg} border ${cardBorder} rounded-xl p-6 hover:shadow-lg transition-all duration-200`}
+                className={`${cardBg} border ${cardBorder} rounded-xl p-6 card-hover transition-all duration-200`}
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -284,7 +290,7 @@ export function Teams() {
                     </button>
                     {openMenuId === team.id && (
                       <div
-                        className={`absolute right-0 top-8 z-10 w-48 rounded-xl shadow-xl border overflow-hidden ${
+                        className={`absolute right-0 top-8 z-10 w-48 rounded-xl shadow-xl border overflow-hidden dropdown-enter ${
                           isDark ? 'bg-[#273142] border-[#313d4f]' : 'bg-white border-[#e8e8e8]'
                         }`}
                       >

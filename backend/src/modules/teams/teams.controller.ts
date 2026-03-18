@@ -22,8 +22,12 @@ import {
 import { TeamsService } from './teams.service';
 import { CreateTeamDto, UpdateTeamDto } from './dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
+import { TeamRolesGuard } from '@/common/guards/team-roles.guard';
+import { TeamRoles } from '@/common/decorators/team-roles.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
+import { TeamRole } from '@/common/enums/team-role.enum';
+import { parseOptionalInt } from '@/common/helpers/query.helper';
 
 @ApiTags('Teams')
 @ApiBearerAuth()
@@ -33,12 +37,12 @@ export class TeamsController {
   constructor(private readonly teamsService: TeamsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РєРѕРјР°РЅРґ' })
+  @ApiOperation({ summary: 'Получить список команд' })
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'sort', required: false })
-  @ApiResponse({ status: 200, description: 'РЎРїРёСЃРѕРє РєРѕРјР°РЅРґ' })
+  @ApiResponse({ status: 200, description: 'Список команд' })
   findAll(
     @Query('search') search?: string,
     @Query('page') page?: string,
@@ -48,31 +52,33 @@ export class TeamsController {
     return this.teamsService.findAll({
       search,
       sort,
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
+      page: parseOptionalInt(page),
+      limit: parseOptionalInt(limit),
     });
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'РџРѕР»СѓС‡РёС‚СЊ РєРѕРјР°РЅРґСѓ РїРѕ ID' })
-  @ApiResponse({ status: 200, description: 'РљРѕРјР°РЅРґР° РЅР°Р№РґРµРЅР°' })
-  @ApiResponse({ status: 404, description: 'РљРѕРјР°РЅРґР° РЅРµ РЅР°Р№РґРµРЅР°' })
+  @ApiOperation({ summary: 'Получить команду по ID' })
+  @ApiResponse({ status: 200, description: 'Команда найдена' })
+  @ApiResponse({ status: 404, description: 'Команда не найдена' })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.teamsService.findById(id);
   }
 
   @Post()
-  @ApiOperation({ summary: 'РЎРѕР·РґР°С‚СЊ РєРѕРјР°РЅРґСѓ (Р°РІС‚РѕСЂ СЃС‚Р°РЅРѕРІРёС‚СЃСЏ owner)' })
-  @ApiResponse({ status: 201, description: 'РљРѕРјР°РЅРґР° СЃРѕР·РґР°РЅР°' })
+  @ApiOperation({ summary: 'Создать команду (автор становится owner)' })
+  @ApiResponse({ status: 201, description: 'Команда создана' })
   create(@Body() dto: CreateTeamDto, @CurrentUser('id') userId: number) {
     return this.teamsService.create(dto, userId);
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'РћР±РЅРѕРІРёС‚СЊ РєРѕРјР°РЅРґСѓ (С‚РѕР»СЊРєРѕ owner)' })
-  @ApiResponse({ status: 200, description: 'РљРѕРјР°РЅРґР° РѕР±РЅРѕРІР»РµРЅР°' })
-  @ApiResponse({ status: 403, description: 'РќРµС‚ РїСЂР°РІ' })
-  @ApiResponse({ status: 404, description: 'РљРѕРјР°РЅРґР° РЅРµ РЅР°Р№РґРµРЅР°' })
+  @UseGuards(TeamRolesGuard)
+  @TeamRoles(TeamRole.OWNER)
+  @ApiOperation({ summary: 'Обновить команду (только owner)' })
+  @ApiResponse({ status: 200, description: 'Команда обновлена' })
+  @ApiResponse({ status: 403, description: 'Нет прав' })
+  @ApiResponse({ status: 404, description: 'Команда не найдена' })
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateTeamDto,
@@ -84,10 +90,12 @@ export class TeamsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'РЈРґР°Р»РёС‚СЊ РєРѕРјР°РЅРґСѓ (С‚РѕР»СЊРєРѕ owner)' })
-  @ApiResponse({ status: 204, description: 'РљРѕРјР°РЅРґР° СѓРґР°Р»РµРЅР°' })
-  @ApiResponse({ status: 403, description: 'РќРµС‚ РїСЂР°РІ' })
-  @ApiResponse({ status: 404, description: 'РљРѕРјР°РЅРґР° РЅРµ РЅР°Р№РґРµРЅР°' })
+  @UseGuards(TeamRolesGuard)
+  @TeamRoles(TeamRole.OWNER)
+  @ApiOperation({ summary: 'Удалить команду (только owner)' })
+  @ApiResponse({ status: 204, description: 'Команда удалена' })
+  @ApiResponse({ status: 403, description: 'Нет прав' })
+  @ApiResponse({ status: 404, description: 'Команда не найдена' })
   remove(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('id') userId: number,

@@ -26,6 +26,10 @@ export const teamsApi = {
     return api.get(`/teams/${teamId}/members`)
   },
 
+  getAllMembersBatch(): Promise<Record<number, TeamMember[]>> {
+    return api.get('/teams/members/batch')
+  },
+
   addMember(teamId: number, dto: { userId: number; teamRole: string }): Promise<TeamMember> {
     return api.post(`/teams/${teamId}/members`, dto)
   },

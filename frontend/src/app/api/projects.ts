@@ -34,6 +34,10 @@ export const projectsApi = {
     return api.get(`/projects/${projectId}/members`)
   },
 
+  getAllMembersBatch(): Promise<Record<number, ProjectMember[]>> {
+    return api.get('/projects/members/batch')
+  },
+
   addMember(
     projectId: number,
     dto: { userId: number; role: string },

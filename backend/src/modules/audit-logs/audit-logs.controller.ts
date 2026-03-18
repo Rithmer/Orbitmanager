@@ -1,9 +1,4 @@
-import {
-  Controller,
-  Get,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -16,6 +11,7 @@ import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
+import { parseOptionalInt } from '@/common/helpers/query.helper';
 
 @ApiTags('Audit Logs')
 @ApiBearerAuth()
@@ -50,17 +46,24 @@ export class AuditLogsController {
     @Query('limit') limit?: string,
     @Query('sort') sort?: string,
   ) {
-    return this.auditService.findAll({
-      userId: userId ? parseInt(userId, 10) : undefined,
-      entityType,
-      entityId: entityId ? parseInt(entityId, 10) : undefined,
-      action,
-      from,
-      to,
-      search,
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
-      sort,
-    });
+    const parsedUserId = parseOptionalInt(userId);
+    const parsedEntityId = parseOptionalInt(entityId);
+
+    return this.auditService.findAll(
+      {
+        search,
+        page: parseOptionalInt(page),
+        limit: parseOptionalInt(limit),
+        sort,
+      },
+      {
+        userId: parsedUserId,
+        entityType,
+        entityId: parsedEntityId,
+        action,
+        from,
+        to,
+      },
+    );
   }
 }

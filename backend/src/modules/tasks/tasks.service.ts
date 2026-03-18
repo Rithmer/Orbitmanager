@@ -1,11 +1,10 @@
 import {
   Injectable,
+  Inject,
   NotFoundException,
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
-import { Prisma, type Project, type Task } from '@prisma/client';
-import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { ProjectAccessService } from '@/common/access/project-access.service';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { AuditAction } from '@/common/enums/audit-action.enum';
@@ -17,67 +16,55 @@ import {
 import { BusinessException } from '@/common/exceptions/business.exception';
 import {
   PaginatedResult,
-  buildPaginatedResult,
-  normalizePagination,
-  parseSortField,
-} from '@/common/query/pagination';
+  QueryHelper,
+  QueryParams,
+} from '@/common/helpers/query.helper';
+import { Task } from '@/domain/models/task.model';
+import type { IProjectMemberRepository } from '@/domain/repositories/project-member.repository';
+import { PROJECT_MEMBER_REPOSITORY } from '@/domain/repositories/project-member.repository';
+import type { IProjectRepository } from '@/domain/repositories/project.repository';
+import { PROJECT_REPOSITORY } from '@/domain/repositories/project.repository';
+import type { ITaskRepository } from '@/domain/repositories/task.repository';
+import { TASK_REPOSITORY } from '@/domain/repositories/task.repository';
 import { AuditService } from '../audit-logs/audit.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 
-export interface TasksListParams {
-  search?: string;
-  sort?: string;
-  page?: number;
-  limit?: number;
-  projectId?: number;
-  status?: string;
-  difficulty?: number;
-  assigneeId?: number;
-}
-
 @Injectable()
 export class TasksService {
   constructor(
-    private readonly prisma: PrismaService,
+    @Inject(TASK_REPOSITORY)
+    private readonly taskRepository: ITaskRepository,
+    @Inject(PROJECT_REPOSITORY)
+    private readonly projectRepository: IProjectRepository,
+    @Inject(PROJECT_MEMBER_REPOSITORY)
+    private readonly projectMemberRepository: IProjectMemberRepository,
     private readonly auditService: AuditService,
     private readonly projectAccessService: ProjectAccessService,
   ) {}
 
   async findAll(
-    params: TasksListParams,
+    params: QueryParams,
     userId: number,
     userRole: AccountRole,
   ): Promise<PaginatedResult<Task>> {
-    const pagination = normalizePagination(params.page, params.limit);
-    const visibleProjectIds =
-      userRole === AccountRole.ADMIN
-        ? null
-        : await this.projectAccessService.getVisibleProjectIds(userId);
+    let tasks: Task[];
 
-    if (visibleProjectIds && visibleProjectIds.length === 0) {
-      return buildPaginatedResult([], 0, pagination.page, pagination.limit);
+    if (userRole === AccountRole.ADMIN) {
+      tasks = await this.taskRepository.findAll();
+    } else {
+      const visibleProjectIds =
+        await this.projectAccessService.getVisibleProjectIds(userId);
+      tasks =
+        visibleProjectIds.length > 0
+          ? await this.taskRepository.findByProjects(visibleProjectIds)
+          : [];
     }
 
-    const where = this.buildWhere(params, visibleProjectIds);
-    const orderBy = this.buildOrderBy(params.sort);
-
-    const [total, tasks] = await Promise.all([
-      this.prisma.task.count({ where }),
-      this.prisma.task.findMany({
-        where,
-        orderBy,
-        skip: pagination.skip,
-        take: pagination.limit,
-      }),
-    ]);
-
-    return buildPaginatedResult(
-      tasks,
-      total,
-      pagination.page,
-      pagination.limit,
-    );
+    return QueryHelper.apply(tasks, {
+      ...params,
+      searchFields: params.searchFields ?? ['name', 'description'],
+    });
   }
 
   async findById(
@@ -85,17 +72,15 @@ export class TasksService {
     userId: number,
     userRole: AccountRole,
   ): Promise<Task> {
-    const task = await this.prisma.task.findUnique({ where: { id } });
+    const task = await this.taskRepository.findById(id);
     if (!task) {
-      throw new NotFoundException(`Р—Р°РґР°С‡Р° #${id} РЅРµ РЅР°Р№РґРµРЅР°`);
+      throw new NotFoundException(`Задача #${id} не найдена`);
     }
 
     if (userRole !== AccountRole.ADMIN) {
-      const project = await this.prisma.project.findUnique({
-        where: { id: task.projectId },
-      });
+      const project = await this.projectRepository.findById(task.projectId);
       if (!project) {
-        throw new NotFoundException(`РџСЂРѕРµРєС‚ #${task.projectId} РЅРµ РЅР°Р№РґРµРЅ`);
+        throw new NotFoundException(`Проект #${task.projectId} не найден`);
       }
 
       await this.projectAccessService.assertProjectVisibility(project, userId);
@@ -109,11 +94,9 @@ export class TasksService {
     userId: number,
     userRole: AccountRole,
   ): Promise<Task> {
-    const project = await this.prisma.project.findUnique({
-      where: { id: dto.projectId },
-    });
+    const project = await this.projectRepository.findById(dto.projectId);
     if (!project) {
-      throw new NotFoundException(`РџСЂРѕРµРєС‚ #${dto.projectId} РЅРµ РЅР°Р№РґРµРЅ`);
+      throw new NotFoundException(`Проект #${dto.projectId} не найден`);
     }
 
     await this.projectAccessService.assertTeamOwnerOrProjectLead(
@@ -125,36 +108,34 @@ export class TasksService {
 
     const deadlineDate = new Date(dto.deadline);
     if (deadlineDate <= new Date()) {
-      throw new BadRequestException('Р”РµРґР»Р°Р№РЅ РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РІ Р±СѓРґСѓС‰РµРј');
+      throw new BadRequestException('Дедлайн должен быть в будущем');
     }
 
     if (dto.assigneeId !== undefined && dto.assigneeId !== null) {
-      const assigneeMembership = await this.prisma.projectMember.findUnique({
-        where: {
-          projectId_userId: {
-            projectId: dto.projectId,
-            userId: dto.assigneeId,
-          },
-        },
-      });
+      const assigneeMembership =
+        await this.projectMemberRepository.findByUserAndProject(
+          dto.assigneeId,
+          dto.projectId,
+        );
       if (!assigneeMembership) {
         throw new BadRequestException(
-          `РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ #${dto.assigneeId} РЅРµ СЏРІР»СЏРµС‚СЃСЏ СѓС‡Р°СЃС‚РЅРёРєРѕРј РїСЂРѕРµРєС‚Р° #${dto.projectId}`,
+          `Пользователь #${dto.assigneeId} не является участником проекта #${dto.projectId}`,
         );
       }
     }
 
-    const task = await this.prisma.task.create({
-      data: {
-        projectId: dto.projectId,
-        name: dto.name,
-        description: dto.description ?? '',
-        deadline: deadlineDate,
-        status: TaskStatus.NEW,
-        difficulty: dto.difficulty,
-        assigneeId: dto.assigneeId ?? null,
-        createdById: userId,
-      },
+    const now = new Date().toISOString();
+    const task = await this.taskRepository.create({
+      projectId: dto.projectId,
+      name: dto.name,
+      description: dto.description ?? '',
+      deadline: dto.deadline,
+      status: TaskStatus.NEW,
+      difficulty: dto.difficulty,
+      assigneeId: dto.assigneeId ?? null,
+      createdById: userId,
+      createdAt: now,
+      updatedAt: now,
     });
 
     await this.auditService.log(
@@ -162,7 +143,7 @@ export class TasksService {
       AuditAction.CREATE,
       'task',
       task.id,
-      `РЎРѕР·РґР°РЅР° Р·Р°РґР°С‡Р° "${task.name}"`,
+      `Создана задача "${task.name}"`,
     );
 
     return task;
@@ -175,15 +156,13 @@ export class TasksService {
     userRole: AccountRole,
   ): Promise<Task> {
     const task = await this.findById(id, userId, userRole);
-    const project = await this.prisma.project.findUnique({
-      where: { id: task.projectId },
-    });
+    const project = await this.projectRepository.findById(task.projectId);
     if (!project) {
-      throw new NotFoundException(`РџСЂРѕРµРєС‚ #${task.projectId} РЅРµ РЅР°Р№РґРµРЅ`);
+      throw new NotFoundException(`Проект #${task.projectId} не найден`);
     }
 
     if (dto.status && dto.status !== task.status) {
-      await this.assertCanChangeStatus(task, project, userId, userRole);
+      await this.assertCanChangeStatus(task, project.teamId, userId, userRole);
       this.validateStatusTransition(task.status, dto.status);
     } else {
       await this.projectAccessService.assertTeamOwnerOrProjectLead(
@@ -195,44 +174,36 @@ export class TasksService {
     }
 
     if (dto.assigneeId !== undefined && dto.assigneeId !== null) {
-      const assigneeMembership = await this.prisma.projectMember.findUnique({
-        where: {
-          projectId_userId: {
-            projectId: task.projectId,
-            userId: dto.assigneeId,
-          },
-        },
-      });
+      const assigneeMembership =
+        await this.projectMemberRepository.findByUserAndProject(
+          dto.assigneeId,
+          task.projectId,
+        );
       if (!assigneeMembership) {
         throw new BadRequestException(
-          `РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ #${dto.assigneeId} РЅРµ СЏРІР»СЏРµС‚СЃСЏ СѓС‡Р°СЃС‚РЅРёРєРѕРј РїСЂРѕРµРєС‚Р° #${task.projectId}`,
+          `Пользователь #${dto.assigneeId} не является участником проекта #${task.projectId}`,
         );
       }
     }
 
     if (dto.deadline) {
       const deadlineDate = new Date(dto.deadline);
-      if (deadlineDate < task.createdAt) {
+      const createdAtDate = new Date(task.createdAt);
+      if (deadlineDate < createdAtDate) {
         throw new BadRequestException(
-          'Р”РµРґР»Р°Р№РЅ РЅРµ РјРѕР¶РµС‚ Р±С‹С‚СЊ СЂР°РЅСЊС€Рµ РґР°С‚С‹ СЃРѕР·РґР°РЅРёСЏ Р·Р°РґР°С‡Рё',
+          'Дедлайн не может быть раньше даты создания задачи',
         );
       }
     }
 
     const oldStatus = task.status;
-    const updated = await this.prisma.task.update({
-      where: { id },
-      data: {
-        ...(dto.name !== undefined ? { name: dto.name } : {}),
-        ...(dto.description !== undefined
-          ? { description: dto.description }
-          : {}),
-        ...(dto.deadline !== undefined ? { deadline: new Date(dto.deadline) } : {}),
-        ...(dto.status !== undefined ? { status: dto.status } : {}),
-        ...(dto.difficulty !== undefined ? { difficulty: dto.difficulty } : {}),
-        ...(dto.assigneeId !== undefined ? { assigneeId: dto.assigneeId } : {}),
-      },
+    const updated = await this.taskRepository.update(id, {
+      ...dto,
+      updatedAt: new Date().toISOString(),
     });
+    if (!updated) {
+      throw new NotFoundException(`Задача #${id} не найдена`);
+    }
 
     if (dto.status && dto.status !== oldStatus) {
       await this.auditService.log(
@@ -240,7 +211,7 @@ export class TasksService {
         AuditAction.STATUS_CHANGE,
         'task',
         id,
-        `РЎС‚Р°С‚СѓСЃ Р·Р°РґР°С‡Рё "${task.name}" РёР·РјРµРЅС‘РЅ: ${oldStatus} в†’ ${dto.status}`,
+        `Статус задачи "${task.name}" изменён: ${oldStatus} → ${dto.status}`,
         oldStatus,
         dto.status,
       );
@@ -255,11 +226,9 @@ export class TasksService {
     userRole: AccountRole,
   ): Promise<void> {
     const task = await this.findById(id, userId, userRole);
-    const project = await this.prisma.project.findUnique({
-      where: { id: task.projectId },
-    });
+    const project = await this.projectRepository.findById(task.projectId);
     if (!project) {
-      throw new NotFoundException(`РџСЂРѕРµРєС‚ #${task.projectId} РЅРµ РЅР°Р№РґРµРЅ`);
+      throw new NotFoundException(`Проект #${task.projectId} не найден`);
     }
 
     await this.projectAccessService.assertTeamOwnerOrProjectLead(
@@ -269,27 +238,27 @@ export class TasksService {
       userRole,
     );
 
-    await this.prisma.task.delete({ where: { id } });
+    await this.taskRepository.delete(id);
 
     await this.auditService.log(
       userId,
       AuditAction.DELETE,
       'task',
       id,
-      `РЈРґР°Р»РµРЅР° Р·Р°РґР°С‡Р° "${task.name}"`,
+      `Удалена задача "${task.name}"`,
     );
   }
 
   private async assertCanChangeStatus(
     task: Task,
-    project: Project,
+    teamId: number,
     userId: number,
     accountRole: AccountRole,
   ): Promise<void> {
     const canManageTask =
       await this.projectAccessService.hasTeamOwnershipOrProjectLead(
         userId,
-        project.teamId,
+        teamId,
         task.projectId,
         accountRole,
       );
@@ -298,14 +267,11 @@ export class TasksService {
       return;
     }
 
-    const projectMembership = await this.prisma.projectMember.findUnique({
-      where: {
-        projectId_userId: {
-          projectId: task.projectId,
-          userId,
-        },
-      },
-    });
+    const projectMembership =
+      await this.projectMemberRepository.findByUserAndProject(
+        userId,
+        task.projectId,
+      );
 
     if (
       projectMembership?.role === ProjectRole.DEVELOPER &&
@@ -314,66 +280,18 @@ export class TasksService {
       return;
     }
 
-    throw new ForbiddenException('РќРµС‚ РїСЂР°РІ РґР»СЏ РёР·РјРµРЅРµРЅРёСЏ СЃС‚Р°С‚СѓСЃР° Р·Р°РґР°С‡Рё');
+    throw new ForbiddenException('Нет прав для изменения статуса задачи');
   }
 
   private validateStatusTransition(
-    currentStatus: string,
-    newStatus: string,
+    currentStatus: TaskStatus,
+    newStatus: TaskStatus,
   ): void {
-    const allowed = ALLOWED_TASK_TRANSITIONS[currentStatus as TaskStatus];
-    if (!allowed || !allowed.includes(newStatus as TaskStatus)) {
+    const allowed = ALLOWED_TASK_TRANSITIONS[currentStatus];
+    if (!allowed || !allowed.includes(newStatus)) {
       throw new BusinessException(
-        `РќРµРґРѕРїСѓСЃС‚РёРјС‹Р№ РїРµСЂРµС…РѕРґ СЃС‚Р°С‚СѓСЃР°: ${currentStatus} в†’ ${newStatus}. Р”РѕРїСѓСЃС‚РёРјС‹Рµ: ${allowed?.join(', ') || 'РЅРµС‚'}`,
+        `Недопустимый переход статуса: ${currentStatus} → ${newStatus}. Допустимые: ${allowed?.join(', ') || 'нет'}`,
       );
     }
-  }
-
-  private buildWhere(
-    params: TasksListParams,
-    visibleProjectIds: number[] | null,
-  ): Prisma.TaskWhereInput {
-    const where: Prisma.TaskWhereInput = {
-      ...(visibleProjectIds ? { projectId: { in: visibleProjectIds } } : {}),
-      ...(params.projectId !== undefined ? { projectId: params.projectId } : {}),
-      ...(params.status ? { status: params.status } : {}),
-      ...(params.difficulty !== undefined
-        ? { difficulty: params.difficulty }
-        : {}),
-      ...(params.assigneeId !== undefined
-        ? { assigneeId: params.assigneeId }
-        : {}),
-    };
-
-    if (params.search) {
-      where.OR = [
-        { name: { contains: params.search, mode: 'insensitive' } },
-        { description: { contains: params.search, mode: 'insensitive' } },
-      ];
-    }
-
-    return where;
-  }
-
-  private buildOrderBy(sort?: string): Prisma.TaskOrderByWithRelationInput {
-    const { field, direction } = parseSortField(
-      sort,
-      [
-        'id',
-        'projectId',
-        'name',
-        'description',
-        'deadline',
-        'status',
-        'difficulty',
-        'assigneeId',
-        'createdById',
-        'createdAt',
-        'updatedAt',
-      ],
-      'id',
-    );
-
-    return { [field]: direction };
   }
 }

@@ -9,4 +9,12 @@ export const riskApi = {
   getTaskRisk(taskId: number): Promise<TaskRiskOutput> {
     return api.get(`/tasks/${taskId}/risk`)
   },
+
+  getProjectTasksRisk(projectId: number): Promise<Record<number, TaskRiskOutput>> {
+    return api.get(`/projects/${projectId}/tasks-risk`)
+  },
+
+  getAllProjectsRisk(): Promise<Record<number, ProjectRiskOutput>> {
+    return api.get('/risks/projects')
+  },
 }
