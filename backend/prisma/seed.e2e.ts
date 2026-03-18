@@ -21,9 +21,9 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 const TEAM_COUNT = 10;
-const USERS_PER_TEAM = 6;
 const TASKS_PER_TEAM = 5;
 const TEST_PASSWORD = process.env['E2E_SEED_PASSWORD'] ?? 'Test123!';
+const ADMIN_PASSWORD = 'Admin123!';
 const TABLES = [
   'audit_logs',
   'project_members',
@@ -74,10 +74,15 @@ type SeedUser = {
   login: string;
   fullName: string;
   profession: string;
+  password: string;
   accountRole: 'admin' | 'member';
-  teamIndex: number;
-  slot: number;
 };
+
+function ownerLoginForTeam(teamIndex: number): string {
+  return teamIndex === 1
+    ? 'admin'
+    : `team${String(teamIndex).padStart(2, '0')}_owner`;
+}
 
 function buildUsers(): SeedUser[] {
   const users: SeedUser[] = [];
@@ -86,52 +91,47 @@ function buildUsers(): SeedUser[] {
     const padded = String(teamIndex).padStart(2, '0');
     users.push(
       {
-        login: `team${padded}_owner`,
-        fullName: `Team ${padded} Owner`,
-        profession: 'Engineering Manager',
-        accountRole: teamIndex <= 2 ? 'admin' : 'member',
-        teamIndex,
-        slot: 0,
+        login: ownerLoginForTeam(teamIndex),
+        fullName: teamIndex === 1 ? 'admin' : `Team ${padded} Owner`,
+        profession:
+          teamIndex === 1 ? 'System Administrator' : 'Engineering Manager',
+        password: teamIndex === 1 ? ADMIN_PASSWORD : TEST_PASSWORD,
+        accountRole: teamIndex === 1 ? 'admin' : 'member',
       },
       {
         login: `team${padded}_lead`,
         fullName: `Team ${padded} Lead`,
         profession: 'Tech Lead',
+        password: TEST_PASSWORD,
         accountRole: 'member',
-        teamIndex,
-        slot: 1,
       },
       {
         login: `team${padded}_dev1`,
         fullName: `Team ${padded} Developer 1`,
         profession: 'Backend Developer',
+        password: TEST_PASSWORD,
         accountRole: 'member',
-        teamIndex,
-        slot: 2,
       },
       {
         login: `team${padded}_dev2`,
         fullName: `Team ${padded} Developer 2`,
         profession: 'Frontend Developer',
+        password: TEST_PASSWORD,
         accountRole: 'member',
-        teamIndex,
-        slot: 3,
       },
       {
         login: `team${padded}_dev3`,
         fullName: `Team ${padded} Developer 3`,
         profession: 'QA Engineer',
+        password: TEST_PASSWORD,
         accountRole: 'member',
-        teamIndex,
-        slot: 4,
       },
       {
         login: `team${padded}_observer`,
         fullName: `Team ${padded} Observer`,
         profession: 'Business Analyst',
+        password: TEST_PASSWORD,
         accountRole: 'member',
-        teamIndex,
-        slot: 5,
       },
     );
   }
@@ -146,7 +146,8 @@ function addDays(date: Date, days: number): Date {
 }
 
 async function main(): Promise<void> {
-  const passwordHash = await argon2.hash(TEST_PASSWORD);
+  const defaultPasswordHash = await argon2.hash(TEST_PASSWORD);
+  const adminPasswordHash = await argon2.hash(ADMIN_PASSWORD);
   const seedUsers = buildUsers();
 
   await prisma.$executeRawUnsafe(
@@ -156,7 +157,10 @@ async function main(): Promise<void> {
   await prisma.user.createMany({
     data: seedUsers.map((user) => ({
       login: user.login,
-      password: passwordHash,
+      password:
+        user.password === ADMIN_PASSWORD
+          ? adminPasswordHash
+          : defaultPasswordHash,
       fullName: user.fullName,
       profession: user.profession,
       accountStatus: 'active',
@@ -174,7 +178,7 @@ async function main(): Promise<void> {
 
   for (let teamIndex = 1; teamIndex <= TEAM_COUNT; teamIndex += 1) {
     const padded = String(teamIndex).padStart(2, '0');
-    const owner = userByLogin.get(`team${padded}_owner`);
+    const owner = userByLogin.get(ownerLoginForTeam(teamIndex));
     const lead = userByLogin.get(`team${padded}_lead`);
     const dev1 = userByLogin.get(`team${padded}_dev1`);
     const dev2 = userByLogin.get(`team${padded}_dev2`);
@@ -285,7 +289,7 @@ async function main(): Promise<void> {
     `Users: ${usersCount}, teams: ${teamsCount}, projects: ${projectsCount}, tasks: ${tasksCount}`,
   );
   console.log(`Password for all seeded users: ${TEST_PASSWORD}`);
-  console.log('Admin-capable users: team01_owner, team02_owner');
+  console.log(`Admin user: admin / ${ADMIN_PASSWORD}`);
 }
 
 main()
