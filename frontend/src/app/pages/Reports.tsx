@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import {
   BarChart,
   Bar,
@@ -16,7 +15,15 @@ import {
 } from 'recharts'
 import { AlertCircle, CheckCircle2, Clock, TrendingUp, RefreshCw } from 'lucide-react'
 import { useTheme } from '../context/useTheme'
-import { PageSection, PageShell, PageShellSectionSkeleton } from '../components/PageShell'
+import {
+  AnalyticsChartSkeleton,
+  PageRefreshOverlay,
+  PageSection,
+  PageShell,
+  PageToolbarSkeleton,
+  RefreshBadge,
+  StatCardsSkeleton,
+} from '../components/PageShell'
 import { useReportsSummaryQuery } from '../features/reports'
 
 export function Reports() {
@@ -24,43 +31,11 @@ export function Reports() {
   const summaryQuery = useReportsSummaryQuery()
   const summary = summaryQuery.data
   const isInitialLoading = summaryQuery.isPending && !summary
+  const isRefreshing = summaryQuery.isFetching && !!summary
   const errorMessage =
     summaryQuery.error instanceof Error
       ? summaryQuery.error.message
       : 'Не удалось загрузить данные аналитики. Попробуйте обновить страницу.'
-
-  const [areChartsVisible, setAreChartsVisible] = useState(false)
-  const [isChartAnimationActive, setIsChartAnimationActive] = useState(false)
-
-  useEffect(() => {
-    if (!summary || areChartsVisible) {
-      return
-    }
-
-    const timeoutId = window.setTimeout(() => setAreChartsVisible(true), 650)
-    return () => window.clearTimeout(timeoutId)
-  }, [summary, areChartsVisible])
-
-  useEffect(() => {
-    if (!areChartsVisible) {
-      return
-    }
-
-    const timeoutId = window.setTimeout(() => setIsChartAnimationActive(true), 0)
-    return () => window.clearTimeout(timeoutId)
-  }, [areChartsVisible])
-
-  useEffect(() => {
-    if (!isChartAnimationActive) {
-      return
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setIsChartAnimationActive(false)
-    }, 0)
-
-    return () => window.clearTimeout(timeoutId)
-  }, [isChartAnimationActive])
 
   const textPrimary = isDark ? 'text-[#f4f3f2]' : 'text-[#202224]'
   const textSecondary = isDark ? 'text-[#94a3b8]' : 'text-[#737373]'
@@ -120,10 +95,14 @@ export function Reports() {
   if (isInitialLoading) {
     return (
       <PageShell title="Аналитика" description="Подготавливаем сводку эффективности и распределений.">
-        <div className="grid gap-6">
-          <PageShellSectionSkeleton rows={4} />
-          <PageShellSectionSkeleton rows={4} />
-          <PageShellSectionSkeleton rows={4} />
+        <div className="space-y-6">
+          <PageToolbarSkeleton />
+          <StatCardsSkeleton count={4} />
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">
+            <AnalyticsChartSkeleton className="xl:col-span-2" heightClassName="h-[240px]" />
+            <AnalyticsChartSkeleton heightClassName="h-[240px]" />
+          </div>
+          <AnalyticsChartSkeleton heightClassName="h-[200px]" />
         </div>
       </PageShell>
     )
@@ -157,19 +136,24 @@ export function Reports() {
   return (
     <PageShell
       title="Аналитика"
-      description={
-        summaryQuery.isFetching
-          ? 'Сводка обновляется в фоне.'
-          : 'Обзор производительности и прогресса.'
-      }
+      description={isRefreshing ? 'Сводка обновляется в фоне.' : 'Обзор производительности и прогресса.'}
       actions={
-        <button
-          onClick={() => void summaryQuery.refetch()}
-          className="flex items-center gap-2 bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Обновить
-        </button>
+        <div className="flex items-center gap-3">
+          {isRefreshing ? <RefreshBadge isRefreshing label="Обновляем отчёты" /> : null}
+          <button
+            onClick={() => void summaryQuery.refetch()}
+            disabled={isRefreshing}
+            aria-busy={isRefreshing}
+            className="flex items-center gap-2 bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {isRefreshing ? (
+              <span className="h-4 w-4 rounded-full border-2 border-white/70 border-t-transparent animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4" />
+            )}
+            {isRefreshing ? 'Обновление...' : 'Обновить'}
+          </button>
+        </div>
       }
     >
       {summaryQuery.error && summary ? (
@@ -178,35 +162,40 @@ export function Reports() {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-5 mb-6 md:mb-8 stagger-row">
-        {stats.map((stat) => (
-          <div key={stat.label} className={`${cardBg} border ${cardBorder} rounded-xl p-5 card-hover`}>
-            <div className="flex items-center gap-4">
-              <div className={`w-12 h-12 ${stat.iconBg} rounded-xl flex items-center justify-center shrink-0`}>
-                <stat.icon className={`w-6 h-6 ${stat.iconColor}`} />
+      <PageRefreshOverlay show={isRefreshing} label="Обновляем метрики" className="mb-6 md:mb-8">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-5 stagger-row">
+          {stats.map((stat, index) => (
+            <div
+              key={stat.label}
+              className={`${cardBg} border ${cardBorder} rounded-xl p-5 card-hover stagger-card`}
+              style={{ animationDelay: `${index * 70}ms` }}
+            >
+              <div className="flex items-center gap-4">
+                <div className={`w-12 h-12 ${stat.iconBg} rounded-xl flex items-center justify-center shrink-0`}>
+                  <stat.icon className={`w-6 h-6 ${stat.iconColor}`} />
+                </div>
+                <div className="min-w-0">
+                  <div className={`text-2xl font-bold ${textPrimary}`}>{stat.value}</div>
+                  <div className={`text-sm ${textSecondary}`}>{stat.label}</div>
+                </div>
               </div>
-              <div>
-                <div className={`text-2xl font-bold ${textPrimary}`}>{stat.value}</div>
-                <div className={`text-sm ${textSecondary}`}>{stat.label}</div>
-              </div>
+              <div className={`mt-3 text-xs ${textSecondary}`}>{stat.change}</div>
             </div>
-            <div className={`mt-3 text-xs ${textSecondary}`}>{stat.change}</div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      </PageRefreshOverlay>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6 mb-4 md:mb-6 stagger-row">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6 mb-4 md:mb-6">
         <PageSection
           title="Задачи по проектам"
           description="Количество задач и завершённых задач в наиболее активных проектах."
-          className={`card-hover xl:col-span-2 ${cardBg} border ${cardBorder}`.trim()}
+          className={`card-hover xl:col-span-2 ${cardBg} border ${cardBorder} fade-in-up`.trim()}
+          isRefreshing={isRefreshing}
+          refreshLabel="Обновляем график по проектам"
+          headerSlot={isRefreshing ? <RefreshBadge isRefreshing label="Обновляем" /> : null}
         >
           <div style={{ height: 240 }}>
-            {!areChartsVisible ? (
-              <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-black/10 bg-black/5 dark:border-white/10 dark:bg-white/5">
-                <div className="h-4 w-32 rounded-lg skeleton-shimmer bg-black/5 dark:bg-white/5" />
-              </div>
-            ) : projectTaskBreakdown.length === 0 ? (
+            {projectTaskBreakdown.length === 0 ? (
               <p className={`text-sm ${textSecondary} text-center py-10`}>Нет данных для отображения</p>
             ) : (
               <ResponsiveContainer width="100%" height={240}>
@@ -214,15 +203,18 @@ export function Reports() {
                   <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                   <XAxis dataKey="projectName" tick={{ fill: axisColor, fontSize: 12 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: axisColor, fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={tooltipStyle} cursor={{ fill: isDark ? 'rgba(72,128,255,0.05)' : 'rgba(72,128,255,0.04)' }} />
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    cursor={{ fill: isDark ? 'rgba(72,128,255,0.05)' : 'rgba(72,128,255,0.04)' }}
+                  />
                   <Bar
                     dataKey="taskCount"
                     fill={isDark ? '#4880ff' : '#93c5fd'}
                     name="Всего"
                     radius={[4, 4, 0, 0]}
-                    isAnimationActive={isChartAnimationActive}
+                    isAnimationActive
                     animationBegin={0}
-                    animationDuration={1200}
+                    animationDuration={900}
                     animationEasing="ease-out"
                   />
                   <Bar
@@ -230,9 +222,9 @@ export function Reports() {
                     fill="#4880ff"
                     name="Выполнено"
                     radius={[4, 4, 0, 0]}
-                    isAnimationActive={isChartAnimationActive}
-                    animationBegin={200}
-                    animationDuration={1200}
+                    isAnimationActive
+                    animationBegin={160}
+                    animationDuration={900}
                     animationEasing="ease-out"
                   />
                 </BarChart>
@@ -244,14 +236,13 @@ export function Reports() {
         <PageSection
           title="Статус задач"
           description="Распределение задач по текущему состоянию."
-          className={`card-hover ${cardBg} border ${cardBorder}`.trim()}
+          className={`card-hover ${cardBg} border ${cardBorder} fade-in-up`.trim()}
+          isRefreshing={isRefreshing}
+          refreshLabel="Обновляем распределение статусов"
+          headerSlot={isRefreshing ? <RefreshBadge isRefreshing label="Обновляем" /> : null}
         >
           <div style={{ height: 240 }}>
-            {!areChartsVisible ? (
-              <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-black/10 bg-black/5 dark:border-white/10 dark:bg-white/5">
-                <div className="h-4 w-28 rounded-lg skeleton-shimmer bg-black/5 dark:bg-white/5" />
-              </div>
-            ) : statusDistribution.length === 0 ? (
+            {statusDistribution.length === 0 ? (
               <p className={`text-sm ${textSecondary} text-center py-10`}>Нет данных</p>
             ) : (
               <ResponsiveContainer width="100%" height={240}>
@@ -264,9 +255,9 @@ export function Reports() {
                     outerRadius={85}
                     paddingAngle={3}
                     dataKey="value"
-                    isAnimationActive={isChartAnimationActive}
+                    isAnimationActive
                     animationBegin={0}
-                    animationDuration={1000}
+                    animationDuration={900}
                     animationEasing="ease-out"
                   >
                     {statusDistribution.map((entry) => (
@@ -289,14 +280,13 @@ export function Reports() {
       <PageSection
         title="Распределение по сложности"
         description="Группировка задач по уровням сложности."
-        className={`card-hover ${cardBg} border ${cardBorder} stagger-row`.trim()}
+        className={`card-hover ${cardBg} border ${cardBorder} fade-in-up`.trim()}
+        isRefreshing={isRefreshing}
+        refreshLabel="Обновляем распределение по сложности"
+        headerSlot={isRefreshing ? <RefreshBadge isRefreshing label="Обновляем" /> : null}
       >
         <div style={{ height: 200 }}>
-          {!areChartsVisible ? (
-            <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-black/10 bg-black/5 dark:border-white/10 dark:bg-white/5">
-              <div className="h-4 w-36 rounded-lg skeleton-shimmer bg-black/5 dark:bg-white/5" />
-            </div>
-          ) : difficultyDistribution.length === 0 ? (
+          {difficultyDistribution.length === 0 ? (
             <p className={`text-sm ${textSecondary} text-center py-10`}>Нет данных</p>
           ) : (
             <div className="chart-draw-ltr">
@@ -321,7 +311,10 @@ export function Reports() {
                     name="Количество задач"
                     dot={{ fill: '#4880ff', strokeWidth: 0, r: 4 }}
                     activeDot={{ r: 6, fill: '#4880ff' }}
-                    isAnimationActive={false}
+                    isAnimationActive
+                    animationBegin={0}
+                    animationDuration={1000}
+                    animationEasing="ease-out"
                   />
                 </AreaChart>
               </ResponsiveContainer>

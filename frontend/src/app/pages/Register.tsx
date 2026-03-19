@@ -64,7 +64,7 @@ export function Register() {
   const fields = [
     { key: 'fullName', label: 'ФИО', placeholder: 'Иванов Иван Иванович', required: true },
     { key: 'login', label: 'Логин', placeholder: 'ivanov', required: true },
-    { key: 'profession', label: 'Должность', placeholder: 'Frontend Developer', required: false },
+    { key: 'profession', label: 'Должность', placeholder: 'Фронтенд-разработчик', required: false },
   ] as const
 
   return (

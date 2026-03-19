@@ -53,6 +53,11 @@ docker compose up -d --build
 
 Root [.env.example](.env.example) используется `docker compose` и уже содержит dev-friendly значения по умолчанию.
 
+Один [docker-compose.yml](docker-compose.yml) теперь содержит обычный стек по умолчанию и отдельный профиль:
+
+- обычный стек - основной production-like запуск без профиля
+- `e2e` - изолированный e2e-стек на отдельных портах
+
 Ключевые переменные:
 
 - `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`, `DB_PORT`
@@ -86,34 +91,40 @@ npm run dev
 npm run build
 ```
 
-## E2E-контур
+## Docker Compose
 
-Для изолированного e2e-окружения используется [docker-compose.e2e.yml](docker-compose.e2e.yml).
-
-Запуск:
+Основной стек:
 
 ```bash
-docker compose -f docker-compose.e2e.yml up -d --build
+docker compose up -d --build
 ```
 
-Остановка:
+E2E-стек:
 
 ```bash
-docker compose -f docker-compose.e2e.yml down
+docker compose -p taskmanager-e2e --profile e2e up -d --build frontend-e2e
+```
+
+Остановка нужного стека:
+
+```bash
+docker compose down
+docker compose -p taskmanager-e2e down
 ```
 
 Полный сброс e2e-базы:
 
 ```bash
-docker compose -f docker-compose.e2e.yml down -v
+docker compose -p taskmanager-e2e down -v
 ```
+
+Для `e2e` используется адресный запуск сервиса `frontend-e2e`: Compose поднимет его зависимости (`backend-e2e` и `postgres-e2e`), но не затронет обычный стек без профиля.
 
 ## Структура
 
 - [backend](backend) - NestJS API, Prisma, тесты и скрипты
 - [frontend](frontend) - React/Vite клиент
-- [docker-compose.yml](docker-compose.yml) - основной docker-стек
-- [docker-compose.e2e.yml](docker-compose.e2e.yml) - изолированный e2e-стек
+- [docker-compose.yml](docker-compose.yml) - единый docker-compose файл с обычным стеком и профилем `e2e`
 
 ## Ограничения
 

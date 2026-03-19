@@ -1,11 +1,55 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router'
 import { AlertCircle, ArrowUpRight, CheckCircle2, Clock, Plus, TrendingUp } from 'lucide-react'
-import { PageSection, PageShell, PageShellSectionSkeleton } from '../components/PageShell'
+import {
+  PageRefreshOverlay,
+  PageSection,
+  PageShell,
+  RefreshBadge,
+  StatCardsSkeleton,
+} from '../components/PageShell'
 import { useTheme } from '../context/useTheme'
 import { useAuth } from '../context/useAuth'
 import { TaskStatus, TASK_STATUS_LABELS } from '../types'
 import { useDashboardSummaryQuery } from '../features/dashboard'
+
+function DashboardListSkeleton() {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div
+          key={`dashboard-task-skeleton-${index}`}
+          className="flex items-center gap-4 rounded-xl border border-black/5 bg-black/5 px-4 py-3 dark:border-white/5 dark:bg-white/5"
+        >
+          <div className="h-2.5 w-2.5 rounded-full skeleton-shimmer bg-black/10 dark:bg-white/10" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="h-4 w-2/3 rounded-lg skeleton-shimmer bg-black/10 dark:bg-white/10" />
+            <div className="h-3 w-1/2 rounded-lg skeleton-shimmer bg-black/10 dark:bg-white/10" />
+          </div>
+          <div className="h-6 w-20 rounded-full skeleton-shimmer bg-black/10 dark:bg-white/10" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function DashboardInsightSkeleton() {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div
+          key={`dashboard-insight-skeleton-${index}`}
+          className="rounded-xl border border-black/5 bg-black/5 p-4 dark:border-white/5 dark:bg-white/5"
+        >
+          <div className="space-y-2">
+            <div className="h-4 w-4/5 rounded-lg skeleton-shimmer bg-black/10 dark:bg-white/10" />
+            <div className="h-3 w-2/3 rounded-lg skeleton-shimmer bg-black/10 dark:bg-white/10" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export function Dashboard() {
   const { isDark } = useTheme()
@@ -15,6 +59,7 @@ export function Dashboard() {
 
   const summary = summaryQuery.data
   const isInitialLoading = summaryQuery.isPending && !summary
+  const isRefreshing = summaryQuery.isFetching && !!summary
   const errorMessage =
     summaryQuery.error instanceof Error
       ? summaryQuery.error.message
@@ -86,9 +131,24 @@ export function Dashboard() {
         title={`Добро пожаловать, ${firstName}!`}
         description="Подготавливаем сводку по задачам, проектам и рискам."
       >
-        <div className="grid gap-6">
-          <PageShellSectionSkeleton rows={4} />
-          <PageShellSectionSkeleton rows={4} />
+        <div className="space-y-6">
+          <StatCardsSkeleton count={4} />
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">
+            <div className={`xl:col-span-2 rounded-xl border ${cardBorder} ${cardBg} p-6 shadow-sm`}>
+              <div className="mb-4 space-y-2">
+                <div className="h-5 w-40 rounded-lg skeleton-shimmer bg-black/5 dark:bg-white/5" />
+                <div className="h-4 w-72 max-w-full rounded-lg skeleton-shimmer bg-black/5 dark:bg-white/5" />
+              </div>
+              <DashboardListSkeleton />
+            </div>
+            <div className={`rounded-xl border ${cardBorder} ${cardBg} p-6 shadow-sm`}>
+              <div className="mb-4 space-y-2">
+                <div className="h-5 w-36 rounded-lg skeleton-shimmer bg-black/5 dark:bg-white/5" />
+                <div className="h-4 w-56 max-w-full rounded-lg skeleton-shimmer bg-black/5 dark:bg-white/5" />
+              </div>
+              <DashboardInsightSkeleton />
+            </div>
+          </div>
         </div>
       </PageShell>
     )
@@ -161,15 +221,13 @@ export function Dashboard() {
     <PageShell
       title={`Добро пожаловать, ${firstName}!`}
       description={
-        summaryQuery.isFetching
+        isRefreshing
           ? 'Сводка обновляется в фоне.'
           : `У вас ${overview?.inProgressTasks ?? 0} активных задач.`
       }
       actions={
         <div className="flex flex-col items-start gap-2 sm:items-end">
-          {summaryQuery.isFetching ? (
-            <span className={`text-xs font-medium ${textSecondary}`}>Обновление данных</span>
-          ) : null}
+          {isRefreshing ? <RefreshBadge isRefreshing label="Сводка обновляется" /> : null}
           <button
             onClick={() => navigate('/projects')}
             className="flex items-center gap-2 bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors duration-150 btn-fizzy"
@@ -186,31 +244,40 @@ export function Dashboard() {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-5 mb-6 md:mb-8 stagger-row">
-        {stats.map((stat) => (
-          <div key={stat.label} className={`${cardBg} border ${cardBorder} rounded-xl p-5 card-hover`}>
-            <div className="flex items-center gap-4">
-              <div className={`w-12 h-12 ${stat.iconBg} rounded-xl flex items-center justify-center shrink-0`}>
-                <stat.icon className={`w-6 h-6 ${stat.iconColor}`} />
+      <PageRefreshOverlay show={isRefreshing} label="Сводка обновляется" className="mb-6 md:mb-8">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-5 stagger-row">
+          {stats.map((stat, index) => (
+            <div
+              key={stat.label}
+              className={`${cardBg} border ${cardBorder} rounded-xl p-5 card-hover stagger-card`}
+              style={{ animationDelay: `${index * 70}ms` }}
+            >
+              <div className="flex items-center gap-4">
+                <div className={`w-12 h-12 ${stat.iconBg} rounded-xl flex items-center justify-center shrink-0`}>
+                  <stat.icon className={`w-6 h-6 ${stat.iconColor}`} />
+                </div>
+                <div className="min-w-0">
+                  <div className={`text-2xl font-bold ${textPrimary}`}>{stat.value}</div>
+                  <div className={`text-sm ${textSecondary}`}>{stat.label}</div>
+                </div>
               </div>
-              <div className="min-w-0">
-                <div className={`text-2xl font-bold ${textPrimary}`}>{stat.value}</div>
-                <div className={`text-sm ${textSecondary}`}>{stat.label}</div>
+              <div className="mt-3 flex items-center gap-1">
+                <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                <span className={`text-xs ${textSecondary}`}>{stat.change}</span>
               </div>
             </div>
-            <div className="mt-3 flex items-center gap-1">
-              <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-              <span className={`text-xs ${textSecondary}`}>{stat.change}</span>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      </PageRefreshOverlay>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">
         <PageSection
           title="Последние задачи"
           description="Показаны самые свежие задачи из доступных проектов."
-          className={`card-hover xl:col-span-2 ${cardBg} border ${cardBorder}`.trim()}
+          className={`card-hover xl:col-span-2 ${cardBg} border ${cardBorder} fade-in-up`.trim()}
+          isRefreshing={isRefreshing}
+          refreshLabel="Обновляем последние задачи"
+          headerSlot={isRefreshing ? <RefreshBadge isRefreshing label="Обновляем" /> : null}
         >
           {recentTasks.length === 0 ? (
             <p className={`text-sm ${textSecondary} py-8 text-center`}>
@@ -218,19 +285,26 @@ export function Dashboard() {
             </p>
           ) : (
             <div className="space-y-1">
-              {recentTasks.map((task) => {
+              {recentTasks.map((task, index) => {
                 const statusStyle = statusStyles[task.status]
 
                 return (
-                  <div key={task.id} className={`flex items-center gap-4 py-3 border-b ${dividerColor} last:border-0`}>
+                  <div
+                    key={task.id}
+                    className={`flex items-center gap-4 py-3 border-b ${dividerColor} last:border-0 stagger-card`}
+                    style={{ animationDelay: `${index * 45}ms` }}
+                  >
                     <div className={`w-2 h-2 rounded-full ${statusStyle.dot} shrink-0`} />
                     <div className="flex-1 min-w-0">
                       <div className={`text-sm font-medium truncate ${textPrimary}`}>{task.name}</div>
                       <div className={`text-xs ${textSecondary}`}>
-                        {task.projectName} · {task.assigneeName ?? 'Без исполнителя'} · {new Date(task.deadline).toLocaleDateString()}
+                        {task.projectName} · {task.assigneeName ?? 'Без исполнителя'} ·{' '}
+                        {new Date(task.deadline).toLocaleDateString()}
                       </div>
                     </div>
-                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${statusStyle.color} ${statusStyle.bg} shrink-0`}>
+                    <span
+                      className={`text-xs font-semibold px-2.5 py-1 rounded-full ${statusStyle.color} ${statusStyle.bg} shrink-0`}
+                    >
                       {TASK_STATUS_LABELS[task.status]}
                     </span>
                   </div>
@@ -243,7 +317,10 @@ export function Dashboard() {
         <PageSection
           title="AI аналитика рисков"
           description="Оценка задач с наибольшей вероятностью задержки."
-          className={`card-hover ${cardBg} border ${cardBorder}`.trim()}
+          className={`card-hover ${cardBg} border ${cardBorder} fade-in-up`.trim()}
+          isRefreshing={isRefreshing}
+          refreshLabel="Обновляем аналитику рисков"
+          headerSlot={isRefreshing ? <RefreshBadge isRefreshing label="Обновляем" /> : null}
         >
           {riskInsights.length === 0 ? (
             <p className={`text-sm ${textSecondary} py-8 text-center`}>
@@ -251,11 +328,15 @@ export function Dashboard() {
             </p>
           ) : (
             <div className="space-y-3">
-              {riskInsights.map((insight) => {
+              {riskInsights.map((insight, index) => {
                 const style = insightStyles[insight.type]
 
                 return (
-                  <div key={insight.taskId} className={`${style.bg} border ${style.border} rounded-lg p-3.5`}>
+                  <div
+                    key={insight.taskId}
+                    className={`${style.bg} border ${style.border} rounded-lg p-3.5 stagger-card`}
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  >
                     <div className="flex items-start gap-2.5">
                       <div className={`w-1.5 h-1.5 rounded-full ${style.dot} mt-1.5 shrink-0`} />
                       <p className={`text-sm leading-relaxed ${style.text}`}>{insight.message}</p>

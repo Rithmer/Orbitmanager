@@ -96,6 +96,7 @@ interface InputFieldProps {
   placeholder?: string
   required?: boolean
   disabled?: boolean
+  hint?: ReactNode
 }
 
 export function InputField({
@@ -106,6 +107,7 @@ export function InputField({
   placeholder,
   required,
   disabled,
+  hint,
 }: InputFieldProps) {
   const { isDark } = useTheme()
   const inputBg = isDark ? 'bg-[#1c2534] border-[#313d4f]' : 'bg-gray-50 border-gray-200'
@@ -127,6 +129,7 @@ export function InputField({
         disabled={disabled}
         className={`w-full px-3 py-2 rounded-lg border text-sm transition-all duration-200 focus:outline-none focus:border-[#4880ff] ${inputBg} ${inputText} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
       />
+      {hint ? <div className={`mt-1.5 text-xs ${labelColor}`}>{hint}</div> : null}
     </div>
   )
 }
@@ -138,6 +141,7 @@ interface SelectFieldProps {
   options: { value: string; label: string }[]
   required?: boolean
   disabled?: boolean
+  hint?: ReactNode
 }
 
 export function SelectField({
@@ -147,6 +151,7 @@ export function SelectField({
   options,
   required,
   disabled,
+  hint,
 }: SelectFieldProps) {
   const { isDark } = useTheme()
   const inputBg = isDark ? 'bg-[#1c2534] border-[#313d4f]' : 'bg-gray-50 border-gray-200'
@@ -172,6 +177,7 @@ export function SelectField({
           </option>
         ))}
       </select>
+      {hint ? <div className={`mt-1.5 text-xs ${labelColor}`}>{hint}</div> : null}
     </div>
   )
 }
@@ -194,11 +200,17 @@ export function SubmitButton({
   children,
   onClick,
   variant = 'primary',
+  disabled = false,
+  type = 'submit',
+  className = '',
 }: {
   loading?: boolean
   children: ReactNode
   onClick?: () => void
   variant?: 'primary' | 'danger'
+  disabled?: boolean
+  type?: 'submit' | 'button'
+  className?: string
 }) {
   const bg =
     variant === 'danger'
@@ -206,16 +218,20 @@ export function SubmitButton({
       : 'bg-[#4880ff] hover:bg-[#3a6fe0]'
 
   const handleClick = useCallback((e: MouseEvent<HTMLButtonElement>) => {
+    if (loading || disabled) {
+      return
+    }
     createRipple(e)
     onClick?.()
-  }, [onClick])
+  }, [disabled, loading, onClick])
 
   return (
     <button
-      type="submit"
+      type={type}
       onClick={handleClick}
-      disabled={loading}
-      className={`${bg} text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 disabled:opacity-50 flex items-center gap-2 btn-fizzy btn-ripple`}
+      disabled={loading || disabled}
+      aria-busy={loading}
+      className={`${bg} text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 btn-fizzy btn-ripple ${className}`.trim()}
     >
       {loading && (
         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

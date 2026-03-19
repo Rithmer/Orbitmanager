@@ -1,16 +1,16 @@
-import { useState } from 'react'
+import { startTransition, useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  AlertTriangle,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
   Clock,
+  Edit3,
   Filter,
+  LoaderCircle,
   Plus,
   Tag,
   Trash2,
-  Edit3,
 } from 'lucide-react'
 import { useAuth } from '../context/useAuth'
 import { useTheme } from '../context/useTheme'
@@ -24,15 +24,9 @@ import {
   toLocalDateTimeIso,
   toLocalEndOfDayIso,
 } from '../utils/dateTime'
-import {
-  CalendarMonthViewSkeleton,
-} from '../features/calendar/calendar-view'
+import { CalendarMonthViewSkeleton, useCalendarMonthViewQuery } from '../features/calendar'
 import { DAY_NAMES, MONTH_NAMES, buildMonthCells, getLocalMonthTitle } from '../features/calendar/calendar-view.constants'
-import {
-  useCalendarMonthViewQuery,
-  type CalendarMonthView,
-  type CalendarViewEvent,
-} from '../features/calendar'
+import type { CalendarMonthView, CalendarViewEvent } from '../features/calendar'
 
 type CalendarFilter = 'all' | 'tasks' | 'events'
 
@@ -79,11 +73,6 @@ function pad2(value: number): string {
   return String(value).padStart(2, '0')
 }
 
-function toLocalDateKey(value: string | Date): string {
-  const date = value instanceof Date ? value : new Date(value)
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
-}
-
 function getTimeLabel(value: string): string {
   const date = new Date(value)
   return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`
@@ -104,59 +93,14 @@ function getEventDurationMinutes(event: CalendarViewEvent): number {
   return Math.max(0, Math.round((end - start) / 60000))
 }
 
-function buildCalendarDayEntries(
-  calendarMonthView: CalendarMonthView,
-  selectedDay: number | null,
-  filterType: CalendarFilter = 'all',
-): CalendarDayEntry[] {
-  if (selectedDay === null) {
-    return []
-  }
-
-  const selectedDateKey = toLocalDateKey(
-    new Date(calendarMonthView.year, calendarMonthView.month - 1, selectedDay),
-  )
-
-  const taskEntries = calendarMonthView.tasks
-    .filter((task) => filterType !== 'events' && toLocalDateKey(task.deadline) === selectedDateKey)
-    .map<CalendarDayEntry>((task) => {
-      const statusStyles = TASK_STATUS_STYLES[task.status as TaskStatus]
-      return {
-        id: `task-${task.id}`,
-        type: 'task',
-        title: task.name,
-        description: task.description,
-        projectName: task.projectName,
-        time: `Дедлайн: ${new Date(task.deadline).toLocaleDateString('ru-RU')}`,
-        status: task.status as TaskStatus,
-        backgroundClass: statusStyles.backgroundClass,
-        textClass: statusStyles.textClass,
-        sortTimestamp: new Date(task.deadline).getTime(),
-      }
-    })
-
-  const eventEntries = calendarMonthView.events
-    .filter((event) => filterType !== 'tasks' && toLocalDateKey(event.startDate) === selectedDateKey)
-    .map<CalendarDayEntry>((event) => ({
-      id: `event-${event.id}`,
-      type: 'event',
-      title: event.title,
-      description: event.description,
-      projectName: event.projectName,
-      time: event.allDay ? 'Весь день' : getTimeLabel(event.startDate),
-      duration: event.allDay ? undefined : formatDurationLabel(getEventDurationMinutes(event)),
-      eventId: event.id,
-      accentColor: event.color,
-      backgroundClass: 'bg-[#4880ff]',
-      textClass: 'text-white',
-      sortTimestamp: new Date(event.startDate).getTime(),
-    }))
-
-  return [...taskEntries, ...eventEntries].sort((left, right) => left.sortTimestamp - right.sortTimestamp)
-}
-
 function buildMonthDayItems(calendarMonthView: CalendarMonthView) {
   const dayItems = new Map<number, CalendarDayEntry[]>()
+
+  function pushEntry(day: number, entry: CalendarDayEntry) {
+    const bucket = dayItems.get(day) ?? []
+    bucket.push(entry)
+    dayItems.set(day, bucket)
+  }
 
   for (const task of calendarMonthView.tasks) {
     const taskDate = new Date(task.deadline)
@@ -168,8 +112,7 @@ function buildMonthDayItems(calendarMonthView: CalendarMonthView) {
     }
 
     const statusStyles = TASK_STATUS_STYLES[task.status as TaskStatus]
-    const bucket = dayItems.get(taskDate.getDate()) ?? []
-    bucket.push({
+    pushEntry(taskDate.getDate(), {
       id: `task-${task.id}`,
       type: 'task',
       title: task.name,
@@ -181,7 +124,6 @@ function buildMonthDayItems(calendarMonthView: CalendarMonthView) {
       textClass: statusStyles.textClass,
       sortTimestamp: taskDate.getTime(),
     })
-    dayItems.set(taskDate.getDate(), bucket)
   }
 
   for (const event of calendarMonthView.events) {
@@ -193,8 +135,7 @@ function buildMonthDayItems(calendarMonthView: CalendarMonthView) {
       continue
     }
 
-    const bucket = dayItems.get(eventDate.getDate()) ?? []
-    bucket.push({
+    pushEntry(eventDate.getDate(), {
       id: `event-${event.id}`,
       type: 'event',
       title: event.title,
@@ -208,10 +149,38 @@ function buildMonthDayItems(calendarMonthView: CalendarMonthView) {
       textClass: 'text-white',
       sortTimestamp: eventDate.getTime(),
     })
-    dayItems.set(eventDate.getDate(), bucket)
+  }
+
+  for (const entries of dayItems.values()) {
+    entries.sort((left, right) => left.sortTimestamp - right.sortTimestamp)
   }
 
   return dayItems
+}
+
+function buildCalendarDayEntries(
+  monthDayItems: Map<number, CalendarDayEntry[]>,
+  selectedDay: number | null,
+  filterType: CalendarFilter = 'all',
+): CalendarDayEntry[] {
+  if (selectedDay === null) {
+    return []
+  }
+
+  const entries = monthDayItems.get(selectedDay) ?? []
+  return entries.filter((entry) => {
+    if (filterType === 'tasks') return entry.type === 'task'
+    if (filterType === 'events') return entry.type === 'event'
+    return true
+  })
+}
+
+function isSameCalendarMonth(
+  calendarMonthView: CalendarMonthView | null,
+  year: number,
+  month: number,
+): calendarMonthView is CalendarMonthView {
+  return Boolean(calendarMonthView && calendarMonthView.year === year && calendarMonthView.month === month)
 }
 
 export function Calendar() {
@@ -220,8 +189,8 @@ export function Calendar() {
   const queryClient = useQueryClient()
   const today = new Date()
 
-  const [currentYear, setCurrentYear] = useState(today.getFullYear())
-  const [currentMonth, setCurrentMonth] = useState(today.getMonth() + 1)
+  const [requestedYear, setRequestedYear] = useState(today.getFullYear())
+  const [requestedMonth, setRequestedMonth] = useState(today.getMonth() + 1)
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
   const [filterType, setFilterType] = useState<CalendarFilter>('all')
   const [isEventFormOpen, setIsEventFormOpen] = useState(false)
@@ -240,12 +209,29 @@ export function Calendar() {
     user?.accountRole === AccountRole.ADMIN || user?.accountRole === AccountRole.MEMBER
 
   const calendarQuery = useCalendarMonthViewQuery({
-    year: currentYear,
-    month: currentMonth,
+    year: requestedYear,
+    month: requestedMonth,
   })
-  const calendarMonthView = calendarQuery.data ?? null
-  const viewYear = calendarMonthView?.year ?? currentYear
-  const viewMonth = calendarMonthView?.month ?? currentMonth
+  const activeMonthView = isSameCalendarMonth(calendarQuery.data ?? null, requestedYear, requestedMonth)
+    ? calendarQuery.data
+    : null
+  const monthCells = useMemo(
+    () => buildMonthCells(requestedYear, requestedMonth),
+    [requestedYear, requestedMonth],
+  )
+  const monthDayItems = useMemo(
+    () => (activeMonthView ? buildMonthDayItems(activeMonthView) : new Map<number, CalendarDayEntry[]>()),
+    [activeMonthView],
+  )
+  const selectedDayEntries = useMemo(
+    () => buildCalendarDayEntries(monthDayItems, selectedDay, filterType),
+    [monthDayItems, selectedDay, filterType],
+  )
+  const eventById = useMemo(
+    () => new Map(activeMonthView?.events.map((event) => [event.id, event] as const) ?? []),
+    [activeMonthView],
+  )
+
   const pageBg = isDark ? 'bg-[#1c2534]' : 'bg-[#f5f6fa]'
   const cardBg = isDark ? 'bg-[#273142]' : 'bg-white'
   const cardBorder = isDark ? 'border-[#313d4f]' : 'border-[#e8e8e8]'
@@ -254,10 +240,49 @@ export function Calendar() {
   const textPrimary = isDark ? 'text-[#f4f3f2]' : 'text-[#202224]'
   const textSecondary = isDark ? 'text-[#94a3b8]' : 'text-[#737373]'
 
+  const isRefreshing = calendarQuery.isFetching && activeMonthView !== null
+  const showMonthSkeleton = !activeMonthView && (calendarQuery.isLoading || calendarQuery.isFetching)
+
   const invalidateCalendar = async () => {
     await queryClient.invalidateQueries({
       queryKey: ['calendar', 'month-view'],
     })
+  }
+
+  function resetEventForm() {
+    setEventFormError('')
+    setEventFormTitle('')
+    setEventFormDescription('')
+    setEventFormDate(formatLocalDateInput(today))
+    setEventFormTime('09:00')
+    setEventFormDurationMinutes('60')
+    setEventFormProjectId('')
+    setEventFormColor('#3b82f6')
+    setEventFormAllDay(false)
+  }
+
+  function openEventCreation(day?: number) {
+    setSelectedEventForEditing(null)
+    resetEventForm()
+    const maxDay = new Date(requestedYear, requestedMonth, 0).getDate()
+    const targetDay = Math.min(day ?? selectedDay ?? today.getDate(), maxDay)
+    const targetDate = new Date(requestedYear, requestedMonth - 1, targetDay)
+    setEventFormDate(formatLocalDateInput(targetDate))
+    setIsEventFormOpen(true)
+  }
+
+  function openEventEditing(event: CalendarViewEvent) {
+    setSelectedEventForEditing(event)
+    setEventFormError('')
+    setEventFormTitle(event.title)
+    setEventFormDescription(event.description)
+    setEventFormDate(formatLocalDateInput(event.startDate))
+    setEventFormTime(formatLocalTimeInput(event.startDate))
+    setEventFormDurationMinutes(String(Math.max(30, getEventDurationMinutes(event) || 60)))
+    setEventFormProjectId(event.projectId ? String(event.projectId) : '')
+    setEventFormColor(event.color)
+    setEventFormAllDay(event.allDay)
+    setIsEventFormOpen(true)
   }
 
   const createEventMutation = useMutation({
@@ -334,117 +359,45 @@ export function Calendar() {
     },
   })
 
-  if (calendarQuery.isLoading && !calendarMonthView) {
-    return (
-      <PageShell title="Календарь" description="Загрузка календарной сетки..." className={pageBg}>
-        <CalendarMonthViewSkeleton />
-      </PageShell>
-    )
+  const pendingDeleteEventId = deleteEventMutation.isPending ? (deleteEventMutation.variables ?? null) : null
+  const pendingEventId =
+    pendingDeleteEventId ?? (updateEventMutation.isPending && selectedEventForEditing ? selectedEventForEditing.id : null)
+
+  const goToPreviousMonth = () => {
+    setSelectedDay(null)
+    startTransition(() => {
+      if (requestedMonth === 1) {
+        setRequestedYear((year) => year - 1)
+        setRequestedMonth(12)
+        return
+      }
+
+      setRequestedMonth((month) => month - 1)
+    })
   }
 
-  if (calendarQuery.isError && !calendarMonthView) {
-    return (
-      <PageShell
-        title="Календарь"
-        description="Не удалось загрузить календарь."
-        className={pageBg}
-        actions={
-          <button
-            onClick={() => calendarQuery.refetch()}
-            className="rounded-lg bg-[#4880ff] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#3a6fe0]"
-          >
-            Повторить
-          </button>
-        }
-      >
-        <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-black/10 bg-white/60 p-10 text-center dark:border-white/10 dark:bg-[#273142]">
-          <AlertTriangle className="h-10 w-10 text-red-500" />
-          <p className={`text-lg font-bold ${textPrimary}`}>Ошибка загрузки</p>
-          <p className={`max-w-xl text-sm ${textSecondary}`}>
-            {calendarQuery.error instanceof Error
-              ? calendarQuery.error.message
-              : 'Не удалось загрузить данные календаря. Попробуйте повторить запрос.'}
-          </p>
-        </div>
-      </PageShell>
-    )
+  const goToNextMonth = () => {
+    setSelectedDay(null)
+    startTransition(() => {
+      if (requestedMonth === 12) {
+        setRequestedYear((year) => year + 1)
+        setRequestedMonth(1)
+        return
+      }
+
+      setRequestedMonth((month) => month + 1)
+    })
   }
 
-  if (!calendarMonthView) {
-    return null
-  }
-
-  const monthCells = buildMonthCells(viewYear, viewMonth)
-  const refreshLabel = calendarQuery.isFetching && !calendarQuery.isLoading
-  const monthDayItems = buildMonthDayItems(calendarMonthView)
-  const selectedDayEntries = buildCalendarDayEntries(calendarMonthView, selectedDay, filterType)
   const filterButtons: Array<{ key: CalendarFilter; label: string }> = [
     { key: 'all', label: 'Все' },
     { key: 'tasks', label: 'Задачи' },
     { key: 'events', label: 'События' },
   ]
 
-  function resetEventForm() {
-    setEventFormError('')
-    setEventFormTitle('')
-    setEventFormDescription('')
-    setEventFormDate(formatLocalDateInput(today))
-    setEventFormTime('09:00')
-    setEventFormDurationMinutes('60')
-    setEventFormProjectId('')
-    setEventFormColor('#3b82f6')
-    setEventFormAllDay(false)
-  }
-
-  function openEventCreation(day?: number) {
-    setSelectedEventForEditing(null)
-    resetEventForm()
-    const maxDay = new Date(viewYear, viewMonth, 0).getDate()
-    const targetDay = Math.min(day ?? selectedDay ?? today.getDate(), maxDay)
-    const targetDate = new Date(viewYear, viewMonth - 1, targetDay)
-    setEventFormDate(formatLocalDateInput(targetDate))
-    setIsEventFormOpen(true)
-  }
-
-  function openEventEditing(event: CalendarViewEvent) {
-    setSelectedEventForEditing(event)
-    setEventFormError('')
-    setEventFormTitle(event.title)
-    setEventFormDescription(event.description)
-    setEventFormDate(formatLocalDateInput(event.startDate))
-    setEventFormTime(formatLocalTimeInput(event.startDate))
-    setEventFormDurationMinutes(String(Math.max(30, getEventDurationMinutes(event) || 60)))
-    setEventFormProjectId(event.projectId ? String(event.projectId) : '')
-    setEventFormColor(event.color)
-    setEventFormAllDay(event.allDay)
-    setIsEventFormOpen(true)
-  }
-
-  const goToPreviousMonth = () => {
-    setSelectedDay(null)
-    if (currentMonth === 1) {
-      setCurrentYear((year) => year - 1)
-      setCurrentMonth(12)
-      return
-    }
-
-    setCurrentMonth((month) => month - 1)
-  }
-
-  const goToNextMonth = () => {
-    setSelectedDay(null)
-    if (currentMonth === 12) {
-      setCurrentYear((year) => year + 1)
-      setCurrentMonth(1)
-      return
-    }
-
-    setCurrentMonth((month) => month + 1)
-  }
-
   return (
     <PageShell
-      title={getLocalMonthTitle(viewYear, viewMonth)}
+      title={getLocalMonthTitle(requestedYear, requestedMonth)}
       description="Дедлайны задач и события в календаре"
       className={pageBg}
       actions={
@@ -481,8 +434,12 @@ export function Calendar() {
         </div>
       }
     >
-      {refreshLabel && (
-        <div className={`mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${isDark ? 'bg-[#273142] text-[#94a3b8]' : 'bg-white text-[#737373] shadow-sm'}`}>
+      {isRefreshing && (
+        <div
+          className={`mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+            isDark ? 'bg-[#273142] text-[#94a3b8]' : 'bg-white text-[#737373] shadow-sm'
+          }`}
+        >
           <span className="h-2 w-2 rounded-full bg-[#4880ff]" />
           Обновление календарной сетки
         </div>
@@ -507,95 +464,101 @@ export function Calendar() {
         ))}
       </div>
 
-      <div className={`${cardBg} overflow-hidden rounded-xl border ${cardBorder}`}>
-        <div className="grid grid-cols-7 border-b border-black/5 dark:border-white/5">
-          {DAY_NAMES.map((dayName) => (
-            <div
-              key={dayName}
-              className={`py-3 text-center text-xs font-bold uppercase tracking-wider ${textSecondary}`}
-            >
-              {dayName}
-            </div>
-          ))}
-        </div>
+      {showMonthSkeleton ? (
+        <CalendarMonthViewSkeleton />
+      ) : (
+        <div
+          className={`${cardBg} overflow-hidden rounded-xl border ${cardBorder} transition-opacity duration-300 ${
+            calendarQuery.isFetching ? 'opacity-90' : 'opacity-100'
+          }`}
+          aria-busy={calendarQuery.isFetching}
+        >
+          <div className="grid grid-cols-7 border-b border-black/5 dark:border-white/5">
+            {DAY_NAMES.map((dayName) => (
+              <div key={dayName} className={`py-3 text-center text-xs font-bold uppercase tracking-wider ${textSecondary}`}>
+                {dayName}
+              </div>
+            ))}
+          </div>
 
-        <div className="grid grid-cols-7">
-          {monthCells.map((cell, index) => {
-            if (cell.type === 'empty') {
-              return (
-                <div
-                  key={`empty-${index}`}
-                  className={`min-h-[92px] border-t border-r p-2 md:min-h-[120px] ${dayCellBorder} ${
-                    index % 7 === 6 ? 'border-r-0' : ''
-                  }`}
-                />
-              )
-            }
-
-            const items = monthDayItems.get(cell.day) ?? []
-            const visibleItems = items.filter((entry) => {
-              if (filterType === 'tasks') return entry.type === 'task'
-              if (filterType === 'events') return entry.type === 'event'
-              return true
-            })
-            const isToday =
-              cell.day === today.getDate() &&
-              viewMonth === today.getMonth() + 1 &&
-              viewYear === today.getFullYear()
-
-            return (
-              <button
-                key={`day-${cell.day}`}
-                type="button"
-                onClick={() => setSelectedDay(cell.day)}
-                className={`min-h-[92px] border-t border-r p-2 text-left transition-colors md:min-h-[120px] ${dayCellBorder} ${dayCellHover} ${
-                  index % 7 === 6 ? 'border-r-0' : ''
-                } ${isToday ? (isDark ? 'bg-[#4880ff]/10' : 'bg-blue-50/60') : ''}`}
-              >
-                <div className="mb-1 flex items-center justify-between">
-                  <span
-                    className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold md:h-7 md:w-7 ${
-                      isToday ? 'bg-[#4880ff] text-white' : textPrimary
+          <div className={`grid grid-cols-7 transition-opacity duration-300 ${calendarQuery.isFetching ? 'opacity-70' : 'opacity-100'}`}>
+            {monthCells.map((cell, index) => {
+              if (cell.type === 'empty') {
+                return (
+                  <div
+                    key={`empty-${index}`}
+                    className={`min-h-[92px] border-t border-r p-2 md:min-h-[120px] ${dayCellBorder} ${
+                      index % 7 === 6 ? 'border-r-0' : ''
                     }`}
-                  >
-                    {cell.day}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  {visibleItems.slice(0, 2).map((entry) => (
-                    <div
-                      key={entry.id}
-                      className={`truncate rounded px-1.5 py-0.5 text-[10px] font-semibold ${entry.backgroundClass} ${entry.textClass}`}
-                      style={entry.type === 'event' ? { backgroundColor: entry.accentColor ?? '#4880ff' } : undefined}
+                  />
+                )
+              }
+
+              const items = monthDayItems.get(cell.day) ?? []
+              const visibleItems = items.filter((entry) => {
+                if (filterType === 'tasks') return entry.type === 'task'
+                if (filterType === 'events') return entry.type === 'event'
+                return true
+              })
+              const isToday =
+                cell.day === today.getDate() &&
+                requestedMonth === today.getMonth() + 1 &&
+                requestedYear === today.getFullYear()
+
+              return (
+                <button
+                  key={`day-${cell.day}`}
+                  type="button"
+                  onClick={() => setSelectedDay(cell.day)}
+                  className={`min-h-[92px] border-t border-r p-2 text-left transition-colors md:min-h-[120px] ${dayCellBorder} ${dayCellHover} ${
+                    index % 7 === 6 ? 'border-r-0' : ''
+                  } ${isToday ? (isDark ? 'bg-[#4880ff]/10' : 'bg-blue-50/60') : ''}`}
+                >
+                  <div className="mb-1 flex items-center justify-between">
+                    <span
+                      className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold md:h-7 md:w-7 ${
+                        isToday ? 'bg-[#4880ff] text-white' : textPrimary
+                      }`}
                     >
-                      {entry.type === 'event' && <span className="mr-0.5">●</span>}
-                      {entry.title}
-                    </div>
-                  ))}
-                  {visibleItems.length > 2 && (
-                    <div className={`text-[10px] font-semibold ${textSecondary}`}>+{visibleItems.length - 2} ещё</div>
-                  )}
-                </div>
-              </button>
-            )
-          })}
+                      {cell.day}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    {visibleItems.slice(0, 2).map((entry) => (
+                      <div
+                        key={entry.id}
+                        className={`truncate rounded px-1.5 py-0.5 text-[10px] font-semibold ${entry.backgroundClass} ${entry.textClass}`}
+                        style={entry.type === 'event' ? { backgroundColor: entry.accentColor ?? '#4880ff' } : undefined}
+                      >
+                        {entry.type === 'event' && <span className="mr-0.5">•</span>}
+                        {entry.title}
+                      </div>
+                    ))}
+                    {visibleItems.length > 2 && (
+                      <div className={`text-[10px] font-semibold ${textSecondary}`}>+{visibleItems.length - 2} ещё</div>
+                    )}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       <Modal
         open={selectedDay !== null}
         onClose={() => setSelectedDay(null)}
-        title={selectedDay ? `${selectedDay} ${MONTH_NAMES[viewMonth - 1]}` : 'День календаря'}
+        title={selectedDay ? `${selectedDay} ${MONTH_NAMES[requestedMonth - 1]}` : 'День календаря'}
         maxWidth="max-w-2xl"
       >
-        {selectedDay !== null ? (
+        {selectedDay !== null && activeMonthView ? (
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className={`text-sm font-semibold ${textPrimary}`}>
-                  {selectedDay} {MONTH_NAMES[viewMonth - 1]}
+                  {selectedDay} {MONTH_NAMES[requestedMonth - 1]}
                 </p>
-                <p className={`text-xs ${textSecondary}`}>{viewYear}</p>
+                <p className={`text-xs ${textSecondary}`}>{requestedYear}</p>
               </div>
               {canManageCalendar && (
                 <button
@@ -618,10 +581,15 @@ export function Calendar() {
               </div>
             ) : (
               <div className="space-y-3">
-                {selectedDayEntries.map((entry) => (
+                {selectedDayEntries.map((entry) => {
+                  const isEventActionPending = entry.type === 'event' && entry.eventId === pendingEventId
+
+                  return (
                     <div
                       key={entry.id}
-                      className={`flex gap-3 rounded-xl p-3 md:p-4 ${entry.type === 'event' ? 'text-white' : isDark ? 'bg-[#1c2534]' : 'bg-gray-50'}`}
+                      className={`flex gap-3 rounded-xl p-3 md:p-4 ${
+                        entry.type === 'event' ? 'text-white' : isDark ? 'bg-[#1c2534]' : 'bg-gray-50'
+                      }`}
                       style={entry.type === 'event' ? { backgroundColor: entry.accentColor ?? '#4880ff' } : undefined}
                     >
                       <div
@@ -656,18 +624,23 @@ export function Calendar() {
                           {entry.projectName && (
                             <span className={`text-xs ${entry.type === 'event' ? 'text-white/90' : textSecondary}`}>{entry.projectName}</span>
                           )}
-                          {entry.type === 'event' && <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold text-white">Событие</span>}
+                          {entry.type === 'event' && (
+                            <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                              Событие
+                            </span>
+                          )}
                         </div>
                         {entry.type === 'event' && canManageCalendar && entry.eventId && (
                           <div className="mt-2 flex items-center gap-1">
                             <button
                               onClick={() => {
-                                const event = calendarMonthView.events.find((candidate) => candidate.id === entry.eventId)
+                                const event = eventById.get(entry.eventId)
                                 if (event) {
                                   openEventEditing(event)
                                 }
                               }}
-                              className="rounded p-1 text-white/90 transition-colors hover:bg-white/10"
+                              disabled={isEventActionPending}
+                              className="rounded p-1 text-white/90 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <Edit3 className="h-3.5 w-3.5" />
                             </button>
@@ -677,15 +650,22 @@ export function Calendar() {
                                   deleteEventMutation.mutate(entry.eventId)
                                 }
                               }}
-                              className="rounded p-1 text-white/90 transition-colors hover:bg-white/10"
+                              disabled={isEventActionPending}
+                              className="rounded p-1 text-white/90 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                              aria-label="Удалить событие"
                             >
-                              <Trash2 className="h-3.5 w-3.5" />
+                              {isEventActionPending ? (
+                                <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3.5 w-3.5" />
+                              )}
                             </button>
                           </div>
                         )}
                       </div>
                     </div>
-                  ))}
+                  )
+                })}
               </div>
             )}
           </div>
@@ -750,7 +730,7 @@ export function Calendar() {
             onChange={setEventFormProjectId}
             options={[
               { value: '', label: 'Без проекта' },
-              ...calendarMonthView.projects.map((project) => ({ value: String(project.id), label: project.name })),
+              ...((activeMonthView?.projects ?? []).map((project) => ({ value: String(project.id), label: project.name }))),
             ]}
           />
           <div>
@@ -763,7 +743,9 @@ export function Calendar() {
                   key={colorOption.value}
                   type="button"
                   onClick={() => setEventFormColor(colorOption.value)}
-                  className={`h-8 w-8 rounded-full transition-all ${eventFormColor === colorOption.value ? 'ring-2 ring-[#4880ff] ring-offset-2' : ''}`}
+                  className={`h-8 w-8 rounded-full transition-all ${
+                    eventFormColor === colorOption.value ? 'ring-2 ring-[#4880ff] ring-offset-2' : ''
+                  }`}
                   style={{ backgroundColor: colorOption.value }}
                   title={colorOption.label}
                 />

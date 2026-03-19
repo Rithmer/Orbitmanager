@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+﻿import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   Plus,
   MoreVertical,
@@ -10,6 +10,7 @@ import {
   UserPlus,
   Crown,
   Eye,
+  LoaderCircle,
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router'
@@ -17,7 +18,13 @@ import { useTheme } from '../context/useTheme'
 import { useAuth } from '../context/useAuth'
 import { teamsApi } from '../api/teams'
 import { ErrorMessage, Modal, InputField, SelectField, SubmitButton } from '../components/Modal'
-import { PageShell, PageShellSectionSkeleton } from '../components/PageShell'
+import {
+  PageCardGridSkeleton,
+  PageRefreshOverlay,
+  PageShell,
+  PageToolbarSkeleton,
+  RefreshBadge,
+} from '../components/PageShell'
 import { TeamRole, TEAM_ROLE_LABELS } from '../types'
 import { useTeamMemberUsersQuery, useTeamsListViewQuery } from '../features/teams'
 
@@ -132,6 +139,9 @@ export function Teams() {
   const [memberRole, setMemberRole] = useState(TeamRole.MEMBER)
   const [formLoading, setFormLoading] = useState(false)
   const [formError, setFormError] = useState('')
+  const [pendingDeleteTeamId, setPendingDeleteTeamId] = useState<number | null>(null)
+  const [pendingRemoveMemberId, setPendingRemoveMemberId] = useState<number | null>(null)
+  const [pendingRoleChangeMemberId, setPendingRoleChangeMemberId] = useState<number | null>(null)
 
   const teamsQuery = useTeamsListViewQuery({
     page,
@@ -141,11 +151,14 @@ export function Teams() {
   const teamMembersQuery = useTeamMemberUsersQuery(showAddMemberModal)
 
   const isInitialLoading = teamsQuery.isPending && !teamsQuery.data
+  const isRefreshing = teamsQuery.isFetching && !!teamsQuery.data
   const listError = teamsQuery.error instanceof Error ? teamsQuery.error.message : ''
   const totalTeams = teamsQuery.data?.total ?? 0
   const totalPages = teamsQuery.data?.totalPages ?? 1
   const teams = teamsQuery.data?.items ?? []
   const selectedTeam = teams.find((team) => team.id === selectedTeamId) ?? null
+  const availableUsersLoading = teamMembersQuery.isPending && !teamMembersQuery.data
+  const availableUsersError = teamMembersQuery.error instanceof Error ? teamMembersQuery.error.message : ''
 
   const textPrimary = isDark ? 'text-[#f4f3f2]' : 'text-[#202224]'
   const textSecondary = isDark ? 'text-[#94a3b8]' : 'text-[#737373]'
@@ -209,6 +222,7 @@ export function Teams() {
     const candidateIds = new Set((selectedTeam?.members ?? []).map((member) => member.userId))
     return (teamMembersQuery.data?.items ?? []).filter((user) => !candidateIds.has(user.id))
   }, [selectedTeam, teamMembersQuery.data])
+  const noAvailableUsers = !availableUsersLoading && !availableUsersError && availableUsers.length === 0
 
   const updatePage = (nextPage: number) => {
     const nextParams = buildPageQueryParams(searchParams, nextPage, searchTerm)
@@ -294,12 +308,15 @@ export function Teams() {
       return
     }
 
+    setPendingDeleteTeamId(teamId)
     try {
       await teamsApi.delete(teamId)
       setOpenMenuId(null)
       await invalidateTeamQueries()
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Не удалось удалить команду')
+    } finally {
+      setPendingDeleteTeamId((currentId) => (currentId === teamId ? null : currentId))
     }
   }
 
@@ -330,20 +347,26 @@ export function Teams() {
       return
     }
 
+    setPendingRemoveMemberId(memberId)
     try {
       await teamsApi.removeMember(memberId)
       await invalidateTeamQueries()
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Не удалось удалить участника')
+    } finally {
+      setPendingRemoveMemberId((currentId) => (currentId === memberId ? null : currentId))
     }
   }
 
   const handleChangeRole = async (memberId: number, nextRole: TeamRole) => {
+    setPendingRoleChangeMemberId(memberId)
     try {
       await teamsApi.updateMember(memberId, { teamRole: nextRole })
       await invalidateTeamQueries()
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Не удалось изменить роль')
+    } finally {
+      setPendingRoleChangeMemberId((currentId) => (currentId === memberId ? null : currentId))
     }
   }
 
@@ -362,7 +385,7 @@ export function Teams() {
   return (
     <PageShell
       title="Команды"
-      description="Серверная пагинация и inline-участники для текущей страницы списка."
+      description="Серверная пагинация и встроенный список участников для текущей страницы."
       actions={
         <button
           type="button"
@@ -374,223 +397,266 @@ export function Teams() {
         </button>
       }
     >
-      <div className="mb-6">
-        <div className="relative">
-          <Search className={`absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 ${textSecondary}`} />
-          <input
-            type="text"
-            placeholder="Поиск по командам и участникам..."
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-            className={`w-full rounded-xl border px-9 py-2.5 text-sm transition-colors focus:border-[#4880ff] focus:outline-none ${inputBg}`}
-          />
-        </div>
-        <div className={`mt-2 flex items-center justify-between gap-3 text-xs ${textSecondary}`}>
-          <span>
-            {totalTeams} {totalTeams === 1 ? 'команда' : 'команд'}
-          </span>
-          {teamsQuery.isFetching && teamsQuery.data ? <span>Обновление списка...</span> : null}
-        </div>
-      </div>
-
-      {listError && !teamsQuery.data ? <ErrorMessage message={listError} /> : null}
-      {teamsQuery.isError && teamsQuery.data ? <ErrorMessage message={listError} /> : null}
-
       {isInitialLoading ? (
-        <PageShellSectionSkeleton rows={4} />
-      ) : teams.length > 0 ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {teams.map((team, index) => {
-            const colorIndex = index % CARD_COLORS.length
-            const ownerAccess = team.currentUserRole === TeamRole.OWNER
-            const members = team.members
+        <>
+          <PageToolbarSkeleton />
+          <PageCardGridSkeleton variant="team" count={6} />
+        </>
+      ) : listError && !teamsQuery.data ? (
+        <>
+          <div className="mb-6">
+            <div className="relative">
+              <Search className={`absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 ${textSecondary}`} />
+              <input
+                type="text"
+                placeholder="Поиск по командам и участникам..."
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                className={`w-full rounded-xl border px-9 py-2.5 text-sm transition-colors focus:border-[#4880ff] focus:outline-none ${inputBg}`}
+              />
+            </div>
+            <div className={`mt-2 flex items-center justify-between gap-3 text-xs ${textSecondary}`}>
+              <span>0 команд</span>
+            </div>
+          </div>
+          <ErrorMessage message={listError} />
+        </>
+      ) : (
+        <PageRefreshOverlay show={isRefreshing} label="Обновление команд">
+          <div className="mb-6">
+            <div className="relative">
+              <Search className={`absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 ${textSecondary}`} />
+              <input
+                type="text"
+                placeholder="Поиск по командам и участникам..."
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                className={`w-full rounded-xl border px-9 py-2.5 text-sm transition-colors focus:border-[#4880ff] focus:outline-none ${inputBg}`}
+              />
+            </div>
+            <div className={`mt-2 flex items-center justify-between gap-3 text-xs ${textSecondary}`}>
+              <div className="flex items-center gap-2">
+                <span>
+                  {totalTeams} {totalTeams === 1 ? 'команда' : 'команд'}
+                </span>
+                <RefreshBadge isRefreshing={isRefreshing} label="Обновление..." />
+              </div>
+              {teamsQuery.isFetching && teamsQuery.data ? <span>Обновление списка...</span> : null}
+            </div>
+          </div>
 
-            return (
-              <div
-                key={team.id}
-                className="card-hover rounded-xl border border-[#e8e8e8] bg-white p-6 transition-all duration-200 dark:border-[#313d4f] dark:bg-[#273142]"
-              >
-                <div className="mb-4 flex items-start justify-between">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div
-                      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${CARD_COLORS[colorIndex]} text-lg font-bold text-white`}
-                    >
-                      {team.name.charAt(0)}
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className={`truncate font-bold ${textPrimary}`}>{team.name}</h3>
-                      {team.description ? (
-                        <p className={`mt-0.5 text-xs ${textSecondary}`}>{team.description}</p>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setOpenMenuId((currentMenuId) =>
-                          currentMenuId === team.id ? null : team.id,
-                        )
-                      }
-                      className={`rounded p-1 transition-colors ${moreIconColor}`}
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </button>
-                    {openMenuId === team.id ? (
-                      <div
-                        className={`dropdown-enter absolute right-0 top-8 z-10 w-48 overflow-hidden rounded-xl border shadow-xl ${
-                          isDark
-                            ? 'border-[#313d4f] bg-[#273142]'
-                            : 'border-[#e8e8e8] bg-white'
-                        }`}
-                      >
-                        {ownerAccess ? (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                openEditModal(team.id)
-                                setOpenMenuId(null)
-                              }}
-                              className={`flex w-full items-center gap-2 px-4 py-2.5 text-sm ${textPrimary} ${
-                                isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'
-                              }`}
-                            >
-                              <Edit3 className="h-4 w-4" />
-                              Редактировать
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                openAddMemberModal(team.id)
-                                setOpenMenuId(null)
-                              }}
-                              className={`flex w-full items-center gap-2 px-4 py-2.5 text-sm ${textPrimary} ${
-                                isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'
-                              }`}
-                            >
-                              <UserPlus className="h-4 w-4" />
-                              Добавить участника
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteTeam(team.id)}
-                              className={`flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-500 ${
-                                isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'
-                              }`}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              Удалить
-                            </button>
-                          </>
-                        ) : (
-                          <div className={`px-4 py-2.5 text-xs ${textSecondary}`}>
-                            Только владелец может управлять
-                          </div>
-                        )}
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
+          {teams.length > 0 ? (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {teams.map((team, index) => {
+                const colorIndex = index % CARD_COLORS.length
+                const ownerAccess = team.currentUserRole === TeamRole.OWNER
+                const members = team.members
+                const isDeletePending = pendingDeleteTeamId === team.id
 
-                <div className="mb-4 grid grid-cols-2 gap-3">
-                  <div className={`${CARD_LIGHT_BACKGROUNDS[colorIndex]} flex items-center gap-2 rounded-lg px-3 py-2`}>
-                    <Users className={`h-4 w-4 ${CARD_TEXT_COLORS[colorIndex]}`} />
-                    <div>
-                      <div className={`text-sm font-bold ${CARD_TEXT_COLORS[colorIndex]}`}>
-                        {team.memberCount}
-                      </div>
-                      <div className={`text-xs ${textSecondary}`}>Участников</div>
-                    </div>
-                  </div>
-                  <div className={`${CARD_LIGHT_BACKGROUNDS[colorIndex]} flex items-center gap-2 rounded-lg px-3 py-2`}>
-                    <CheckCircle2 className={`h-4 w-4 ${CARD_TEXT_COLORS[colorIndex]}`} />
-                    <div>
-                      <div className={`text-sm font-bold ${CARD_TEXT_COLORS[colorIndex]}`}>
-                        {formatShortDate(team.createdAt)}
-                      </div>
-                      <div className={`text-xs ${textSecondary}`}>Создана</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className={`border-t pt-4 ${dividerColor}`}>
-                  <p className={`mb-3 text-xs font-semibold uppercase tracking-wider ${textSecondary}`}>
-                    Участники
-                  </p>
-                  <div className="space-y-2.5">
-                    {members.map((member) => (
-                      <div key={member.id} className="flex items-center justify-between gap-3">
-                        <div className="flex min-w-0 items-center gap-2.5">
-                          <div
-                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${avatarBg} ${textSecondary}`}
-                          >
-                            {member.user.fullName.charAt(0)}
-                          </div>
-                          <div className="min-w-0">
-                            <div className={`flex items-center gap-1 text-xs font-semibold ${textPrimary}`}>
-                              <span className="truncate">{member.user.fullName}</span>
-                              {roleIcon(member.teamRole)}
-                            </div>
-                            <div className={`text-xs ${textSecondary}`}>
-                              {TEAM_ROLE_LABELS[member.teamRole] || member.teamRole}
-                              {member.user.profession ? ` · ${member.user.profession}` : ''}
-                            </div>
-                          </div>
+                return (
+                  <div
+                    key={team.id}
+                    className="card-hover rounded-xl border border-[#e8e8e8] bg-white p-6 transition-all duration-200 dark:border-[#313d4f] dark:bg-[#273142]"
+                  >
+                    <div className="mb-4 flex items-start justify-between">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div
+                          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${CARD_COLORS[colorIndex]} text-lg font-bold text-white`}
+                        >
+                          {team.name.charAt(0)}
                         </div>
-                        {ownerAccess && member.userId !== currentUser?.id ? (
-                          <div className="flex items-center gap-1">
-                            <select
-                              value={member.teamRole}
-                              onChange={(event) =>
-                                handleChangeRole(member.id, event.target.value as TeamRole)
-                              }
-                              className={`rounded border px-1.5 py-0.5 text-xs ${
-                                isDark
-                                  ? 'border-[#313d4f] bg-[#1c2534] text-[#f4f3f2]'
-                                  : 'border-gray-200 bg-gray-50 text-[#202224]'
-                              }`}
-                            >
-                              {Object.entries(TEAM_ROLE_LABELS).map(([value, label]) => (
-                                <option key={value} value={value}>
-                                  {label}
-                                </option>
-                              ))}
-                            </select>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveMember(member.id)}
-                              className="rounded p-1 text-red-500 transition-colors hover:bg-red-500/10"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+                        <div className="min-w-0">
+                          <h3 className={`truncate font-bold ${textPrimary}`}>{team.name}</h3>
+                          {team.description ? (
+                            <p className={`mt-0.5 text-xs ${textSecondary}`}>{team.description}</p>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setOpenMenuId((currentMenuId) =>
+                              currentMenuId === team.id ? null : team.id,
+                            )
+                          }
+                          className={`rounded p-1 transition-colors ${moreIconColor}`}
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </button>
+                        {openMenuId === team.id ? (
+                          <div
+                            className={`dropdown-enter absolute right-0 top-8 z-10 w-48 overflow-hidden rounded-xl border shadow-xl ${
+                              isDark
+                                ? 'border-[#313d4f] bg-[#273142]'
+                                : 'border-[#e8e8e8] bg-white'
+                            }`}
+                          >
+                            {ownerAccess ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    openEditModal(team.id)
+                                    setOpenMenuId(null)
+                                  }}
+                                  className={`flex w-full items-center gap-2 px-4 py-2.5 text-sm ${textPrimary} ${
+                                    isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'
+                                  }`}
+                                >
+                                  <Edit3 className="h-4 w-4" />
+                                  Редактировать
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    openAddMemberModal(team.id)
+                                    setOpenMenuId(null)
+                                  }}
+                                  className={`flex w-full items-center gap-2 px-4 py-2.5 text-sm ${textPrimary} ${
+                                    isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'
+                                  }`}
+                                >
+                                  <UserPlus className="h-4 w-4" />
+                                  Добавить участника
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleDeleteTeam(team.id)}
+                                  disabled={isDeletePending}
+                                  className={`flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-500 disabled:cursor-not-allowed disabled:opacity-50 ${
+                                    isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'
+                                  }`}
+                                >
+                                  {isDeletePending ? (
+                                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                  )}
+                                  {isDeletePending ? 'Удаление...' : 'Удалить'}
+                                </button>
+                              </>
+                            ) : (
+                              <div className={`px-4 py-2.5 text-xs ${textSecondary}`}>
+                                Только владелец может управлять
+                              </div>
+                            )}
                           </div>
                         ) : null}
                       </div>
-                    ))}
-                    {members.length === 0 ? (
-                      <p className={`py-2 text-center text-xs ${textSecondary}`}>Нет участников</p>
-                    ) : null}
+                    </div>
+
+                    <div className="mb-4 grid grid-cols-2 gap-3">
+                      <div className={`${CARD_LIGHT_BACKGROUNDS[colorIndex]} flex items-center gap-2 rounded-lg px-3 py-2`}>
+                        <Users className={`h-4 w-4 ${CARD_TEXT_COLORS[colorIndex]}`} />
+                        <div>
+                          <div className={`text-sm font-bold ${CARD_TEXT_COLORS[colorIndex]}`}>
+                            {team.memberCount}
+                          </div>
+                          <div className={`text-xs ${textSecondary}`}>Участников</div>
+                        </div>
+                      </div>
+                      <div className={`${CARD_LIGHT_BACKGROUNDS[colorIndex]} flex items-center gap-2 rounded-lg px-3 py-2`}>
+                        <CheckCircle2 className={`h-4 w-4 ${CARD_TEXT_COLORS[colorIndex]}`} />
+                        <div>
+                          <div className={`text-sm font-bold ${CARD_TEXT_COLORS[colorIndex]}`}>
+                            {formatShortDate(team.createdAt)}
+                          </div>
+                          <div className={`text-xs ${textSecondary}`}>Создана</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className={`border-t pt-4 ${dividerColor}`}>
+                      <p className={`mb-3 text-xs font-semibold uppercase tracking-wider ${textSecondary}`}>
+                        Участники
+                      </p>
+                      <div className="space-y-2.5">
+                        {members.map((member) => {
+                          const isRolePending = pendingRoleChangeMemberId === member.id
+                          const isRemovePending = pendingRemoveMemberId === member.id
+
+                          return (
+                            <div key={member.id} className="flex items-center justify-between gap-3">
+                              <div className="flex min-w-0 items-center gap-2.5">
+                                <div
+                                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${avatarBg} ${textSecondary}`}
+                                >
+                                  {member.user.fullName.charAt(0)}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className={`flex items-center gap-1 text-xs font-semibold ${textPrimary}`}>
+                                    <span className="truncate">{member.user.fullName}</span>
+                                    {roleIcon(member.teamRole)}
+                                  </div>
+                                  <div className={`text-xs ${textSecondary}`}>
+                                    {TEAM_ROLE_LABELS[member.teamRole] || member.teamRole}
+                                    {member.user.profession ? ` · ${member.user.profession}` : ''}
+                                  </div>
+                                </div>
+                              </div>
+                              {ownerAccess && member.userId !== currentUser?.id ? (
+                                <div className="flex items-center gap-1">
+                                  <select
+                                    value={member.teamRole}
+                                    onChange={(event) =>
+                                      handleChangeRole(member.id, event.target.value as TeamRole)
+                                    }
+                                    disabled={isRolePending}
+                                    className={`rounded border px-1.5 py-0.5 text-xs disabled:cursor-not-allowed disabled:opacity-50 ${
+                                      isDark
+                                        ? 'border-[#313d4f] bg-[#1c2534] text-[#f4f3f2]'
+                                        : 'border-gray-200 bg-gray-50 text-[#202224]'
+                                    }`}
+                                  >
+                                    {Object.entries(TEAM_ROLE_LABELS).map(([value, label]) => (
+                                      <option key={value} value={value}>
+                                        {label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleRemoveMember(member.id)}
+                                    disabled={isRemovePending}
+                                    className="rounded p-1 text-red-500 transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    {isRemovePending ? (
+                                      <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    )}
+                                  </button>
+                                </div>
+                              ) : null}
+                            </div>
+                          )
+                        })}
+                        {members.length === 0 ? (
+                          <p className={`py-2 text-center text-xs ${textSecondary}`}>Нет участников</p>
+                        ) : null}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      ) : (
-        <div
-          className={`flex flex-col items-center justify-center gap-3 rounded-xl border border-[#e8e8e8] py-16 dark:border-[#313d4f] ${
-            isDark ? 'bg-[#273142]' : 'bg-white'
-          }`}
-        >
-          <Search className={`h-6 w-6 ${textSecondary}`} />
-          <p className={`font-semibold ${textSecondary}`}>
-            {searchTerm ? 'Ничего не найдено' : 'Команд пока нет'}
-          </p>
-          <p className={`text-xs ${textSecondary}`}>
-            {searchTerm ? 'Попробуйте изменить поисковый запрос' : 'Создайте первую команду'}
-          </p>
-        </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div
+              className={`flex flex-col items-center justify-center gap-3 rounded-xl border border-[#e8e8e8] py-16 dark:border-[#313d4f] ${
+                isDark ? 'bg-[#273142]' : 'bg-white'
+              }`}
+            >
+              <Search className={`h-6 w-6 ${textSecondary}`} />
+              <p className={`font-semibold ${textSecondary}`}>
+                {searchTerm ? 'Ничего не найдено' : 'Команд пока нет'}
+              </p>
+              <p className={`text-xs ${textSecondary}`}>
+                {searchTerm ? 'Попробуйте изменить поисковый запрос' : 'Создайте первую команду'}
+              </p>
+            </div>
+          )}
+        </PageRefreshOverlay>
       )}
 
       {totalPages > 1 ? (
@@ -624,6 +690,7 @@ export function Teams() {
             onChange={setFormName}
             required
             placeholder="Название команды"
+            hint="Название будет видно в списке команд."
           />
           <InputField
             label="Описание"
@@ -639,7 +706,7 @@ export function Teams() {
             >
               Отмена
             </button>
-            <SubmitButton loading={formLoading}>Создать</SubmitButton>
+            <SubmitButton loading={formLoading} className="min-w-28">Создать</SubmitButton>
           </div>
         </form>
       </Modal>
@@ -653,8 +720,19 @@ export function Teams() {
           }}
           className="space-y-4"
         >
-          <InputField label="Название" value={formName} onChange={setFormName} required />
-          <InputField label="Описание" value={formDescription} onChange={setFormDescription} />
+          <InputField
+            label="Название"
+            value={formName}
+            onChange={setFormName}
+            required
+            hint="Название будет видно в списке команд."
+          />
+          <InputField
+            label="Описание"
+            value={formDescription}
+            onChange={setFormDescription}
+            hint="Краткое описание команды."
+          />
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
@@ -663,13 +741,25 @@ export function Teams() {
             >
               Отмена
             </button>
-            <SubmitButton loading={formLoading}>Сохранить</SubmitButton>
+            <SubmitButton loading={formLoading} className="min-w-28">Сохранить</SubmitButton>
           </div>
         </form>
       </Modal>
 
       <Modal open={showAddMemberModal} onClose={() => setShowAddMemberModal(false)} title="Добавить участника">
         <ErrorMessage message={formError} />
+        {availableUsersError ? (
+          <div className="mb-4 space-y-3">
+            <ErrorMessage message={availableUsersError} />
+            <button
+              type="button"
+              onClick={() => void teamMembersQuery.refetch()}
+              className="rounded-lg bg-[#4880ff] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#3a6fe0]"
+            >
+              Повторить
+            </button>
+          </div>
+        ) : null}
         <form
           onSubmit={(event) => {
             event.preventDefault()
@@ -682,8 +772,30 @@ export function Teams() {
             value={memberUserId}
             onChange={setMemberUserId}
             required
+            disabled={Boolean(
+              availableUsersLoading || availableUsersError || noAvailableUsers || formLoading,
+            )}
+            hint={
+              availableUsersError
+                ? 'Не удалось загрузить список пользователей.'
+                : availableUsersLoading
+                  ? 'Подбираем доступных пользователей...'
+                  : noAvailableUsers
+                    ? 'Все подходящие участники уже добавлены.'
+                    : 'Можно добавить только пользователей, которых ещё нет в команде.'
+            }
             options={[
-              { value: '', label: 'Выберите пользователя...' },
+              {
+                value: '',
+                label:
+                  availableUsersLoading
+                    ? 'Загрузка...'
+                    : availableUsersError
+                      ? 'Источник недоступен'
+                      : noAvailableUsers
+                        ? 'Нет доступных пользователей'
+                        : 'Выберите...',
+              },
               ...availableUsers.map((user) => ({
                 value: String(user.id),
                 label: `${user.fullName} (${user.login})`,
@@ -694,6 +806,7 @@ export function Teams() {
             label="Роль в команде"
             value={memberRole}
             onChange={(value) => setMemberRole(value as TeamRole)}
+            hint="Роль задаётся только для этой команды."
             options={Object.entries(TEAM_ROLE_LABELS).map(([value, label]) => ({
               value,
               label,
@@ -707,10 +820,18 @@ export function Teams() {
             >
               Отмена
             </button>
-            <SubmitButton loading={formLoading}>Добавить</SubmitButton>
+            <SubmitButton
+              loading={formLoading}
+              disabled={Boolean(availableUsersLoading || availableUsersError || noAvailableUsers)}
+              className="min-w-28"
+            >
+              Добавить
+            </SubmitButton>
           </div>
         </form>
       </Modal>
     </PageShell>
   )
 }
+
+

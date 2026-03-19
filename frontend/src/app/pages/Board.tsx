@@ -1,9 +1,10 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
   ArrowLeft,
   Calendar,
+  LoaderCircle,
   Eye,
   Edit3,
   MoreHorizontal,
@@ -14,7 +15,7 @@ import {
 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
 import { Modal, InputField, SelectField, SubmitButton, ErrorMessage } from '../components/Modal'
-import { PageShell, PageShellHeaderSkeleton } from '../components/PageShell'
+import { PageShell, PageShellHeaderSkeleton, RefreshBadge } from '../components/PageShell'
 import { useTheme } from '../context/useTheme'
 import { tasksApi } from '../api/tasks'
 import { formatLocalDateInput, toLocalEndOfDayIso } from '../utils/dateTime'
@@ -25,6 +26,8 @@ import { useProjectBoardViewQuery, type ProjectBoardTask } from '../features/boa
 import { PROJECT_BOARD_COLUMNS, getColumnTasks, getOverdueLabel, getRiskBadgeClasses } from '../features/board/board-view.constants'
 import { ProjectBoardSkeleton } from '../features/board/board-view'
 import type { TaskRiskOutput } from '../types'
+
+type TaskPendingAction = 'status' | 'delete'
 
 function formatDateLabel(value: string) {
   return new Date(value).toLocaleDateString('ru-RU')
@@ -60,6 +63,7 @@ export function Board() {
   const [taskFormAssigneeId, setTaskFormAssigneeId] = useState('')
   const [taskFormStatus, setTaskFormStatus] = useState<TaskStatus>(TaskStatus.NEW)
   const [taskFormError, setTaskFormError] = useState('')
+  const [pendingTaskActions, setPendingTaskActions] = useState<Record<number, TaskPendingAction>>({})
 
   const pageBg = isDark ? 'bg-[#1c2534]' : 'bg-[#f5f6fa]'
   const cardBg = isDark ? 'bg-[#273142]' : 'bg-white'
@@ -67,6 +71,25 @@ export function Board() {
   const columnBg = isDark ? 'bg-[#1e2a3a]' : 'bg-[#f0f4f8]'
   const textPrimary = isDark ? 'text-[#f4f3f2]' : 'text-[#202224]'
   const textSecondary = isDark ? 'text-[#94a3b8]' : 'text-[#737373]'
+
+  const setTaskPendingAction = (taskId: number, action: TaskPendingAction) => {
+    setPendingTaskActions((current) => ({
+      ...current,
+      [taskId]: action,
+    }))
+  }
+
+  const clearTaskPendingAction = (taskId: number) => {
+    setPendingTaskActions((current) => {
+      if (!(taskId in current)) {
+        return current
+      }
+
+      const next = { ...current }
+      delete next[taskId]
+      return next
+    })
+  }
 
   const invalidateBoardData = async () => {
     if (!hasProjectId) {
@@ -136,18 +159,30 @@ export function Board() {
 
   const deleteTaskMutation = useMutation({
     mutationFn: async (taskId: number) => tasksApi.delete(taskId),
+    onMutate: (taskId) => {
+      setTaskPendingAction(taskId, 'delete')
+    },
     onSuccess: async () => {
       setOpenedTaskMenuId(null)
       await invalidateBoardData()
+    },
+    onSettled: (_data, _error, taskId) => {
+      clearTaskPendingAction(taskId)
     },
   })
 
   const changeTaskStatusMutation = useMutation({
     mutationFn: async ({ taskId, status }: { taskId: number; status: TaskStatus }) =>
       tasksApi.update(taskId, { status }),
+    onMutate: ({ taskId }) => {
+      setTaskPendingAction(taskId, 'status')
+    },
     onSuccess: async () => {
       setOpenedTaskMenuId(null)
       await invalidateBoardData()
+    },
+    onSettled: (_data, _error, variables) => {
+      clearTaskPendingAction(variables.taskId)
     },
   })
 
@@ -222,7 +257,7 @@ export function Board() {
 
   const projectMembers = projectBoardView.members
   const boardTasks = projectBoardView.tasks
-  const isRefreshing = boardQuery.isFetching && !boardQuery.isLoading
+  const isBoardRefreshing = boardQuery.isFetching && !boardQuery.isLoading && Boolean(projectBoardView)
   const canEditTasks = user?.accountRole === AccountRole.ADMIN || user?.accountRole === AccountRole.MEMBER
   const taskAssigneeOptions = [
     { value: '', label: 'Не назначен' },
@@ -231,6 +266,15 @@ export function Board() {
       label: `${member.user.fullName} (${PROJECT_ROLE_LABELS[member.role as ProjectRole] ?? member.role})`,
     })),
   ]
+  const boardColumns = PROJECT_BOARD_COLUMNS.map((column) => {
+    const columnTasks = getColumnTasks(boardTasks, column.status)
+    return {
+      ...column,
+      tasks: columnTasks,
+      isRefreshing:
+        isBoardRefreshing || columnTasks.some((task) => pendingTaskActions[task.id] !== undefined),
+    }
+  })
 
   const openTaskCreation = () => {
     setSelectedTaskForEditing(null)
@@ -311,12 +355,14 @@ export function Board() {
           </button>
           <button
             onClick={() => boardQuery.refetch()}
-            className={`rounded-lg border px-4 py-2.5 text-sm font-semibold transition-colors ${
+            disabled={boardQuery.isFetching}
+            className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-wait disabled:opacity-70 ${
               isDark
                 ? 'border-[#313d4f] text-[#94a3b8] hover:text-[#f4f3f2] hover:bg-[#273142]'
                 : 'border-gray-200 text-[#737373] hover:bg-gray-50'
             }`}
           >
+            {boardQuery.isFetching ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
             Обновить
           </button>
           {canEditTasks && (
@@ -331,19 +377,20 @@ export function Board() {
         </div>
       }
     >
-      {isRefreshing && (
-        <div className={`mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${isDark ? 'bg-[#273142] text-[#94a3b8]' : 'bg-white text-[#737373] shadow-sm'}`}>
-          <span className="h-2 w-2 rounded-full bg-[#4880ff]" />
-          Обновление данных доски
-        </div>
-      )}
+      <div className="mb-4 flex items-center justify-end">
+        <RefreshBadge isRefreshing={isBoardRefreshing} label="Обновление доски" />
+      </div>
 
-      <div className="grid grid-cols-1 gap-3 overflow-x-auto sm:grid-cols-2 xl:grid-cols-5 md:gap-4">
-        {PROJECT_BOARD_COLUMNS.map((column) => {
-          const columnTasks = getColumnTasks(boardTasks, column.status)
+      <div className="grid grid-cols-1 gap-3 overflow-x-auto sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 md:gap-4 grid-slide-in-up">
+        {boardColumns.map((column, columnIndex) => {
+          const columnTasks = column.tasks
 
           return (
-            <section key={column.status} className={`${columnBg} rounded-xl p-4`}>
+            <section
+              key={column.status}
+              className={`${columnBg} rounded-xl p-4 stagger-row`}
+              style={{ animationDelay: `${columnIndex * 75}ms` }}
+            >
               <div className="mb-4 flex items-center gap-2">
                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: column.accent }} />
                 <span className={`text-sm font-bold ${textPrimary}`}>{column.title}</span>
@@ -351,118 +398,151 @@ export function Board() {
                   className="rounded-full px-2 py-0.5 text-xs font-semibold"
                   style={{ backgroundColor: `${column.accent}20`, color: column.accent }}
                 >
-                  {columnTasks.length}
+                  {column.tasks.length}
                 </span>
+                {column.isRefreshing && (
+                  <span
+                    className={`ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                      isDark ? 'bg-white/5 text-[#94a3b8]' : 'bg-black/5 text-[#737373]'
+                    }`}
+                  >
+                    <LoaderCircle className="h-3 w-3 animate-spin" />
+                    {columnTasks.some((task) => pendingTaskActions[task.id] !== undefined)
+                      ? 'Сохраняем'
+                      : 'Обновление'}
+                  </span>
+                )}
               </div>
 
               <div className="space-y-3">
-                {columnTasks.map((task) => {
+                {columnTasks.map((task, taskIndex) => {
                   const risk = projectBoardView.riskByTaskId[task.id]
                   const overdue = getOverdueLabel(task)
                   const canTransition = (ALLOWED_TASK_TRANSITIONS[task.status as TaskStatus] ?? []) as TaskStatus[]
+                  const pendingAction = pendingTaskActions[task.id]
+                  const isTaskBusy = pendingAction !== undefined
 
                   return (
                     <article
                       key={task.id}
-                      className={`${cardBg} border ${cardBorder} rounded-xl p-4 shadow-sm transition-all duration-200 card-hover`}
+                      aria-busy={isTaskBusy}
+                      className={`${cardBg} border ${cardBorder} rounded-xl p-4 shadow-sm transition-all duration-200 card-hover stagger-card ${
+                        isTaskBusy ? 'opacity-80' : ''
+                      }`}
+                      style={{ animationDelay: `${columnIndex * 75 + taskIndex * 50}ms` }}
                     >
                       <div className="mb-2 flex items-start justify-between gap-2">
                         <h3 className={`text-sm font-semibold leading-snug ${textPrimary}`}>{task.name}</h3>
-                        <div className="relative">
-                          <button
-                            onClick={() =>
-                              setOpenedTaskMenuId(openedTaskMenuId === task.id ? null : task.id)
-                            }
-                            className={`shrink-0 transition-colors ${textSecondary}`}
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </button>
-                          {openedTaskMenuId === task.id && (
-                            <div
-                              className={`dropdown-enter absolute right-0 top-6 z-20 w-52 overflow-hidden rounded-xl border shadow-xl ${
-                                isDark
-                                  ? 'border-[#313d4f] bg-[#273142]'
-                                  : 'border-[#e8e8e8] bg-white'
+                        <div className="flex items-start gap-2">
+                          {isTaskBusy && (
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                isDark ? 'bg-[#1c2534] text-[#94a3b8]' : 'bg-gray-100 text-[#737373]'
                               }`}
                             >
-                              <button
-                                onClick={() => {
-                                  openTaskDetails(task)
-                                  setOpenedTaskMenuId(null)
-                                }}
-                                className={`flex w-full items-center gap-2 px-3 py-2 text-xs ${textPrimary} ${
-                                  isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'
+                              <LoaderCircle className="h-3 w-3 animate-spin" />
+                              {pendingAction === 'delete' ? 'Удаление' : 'Перевод'}
+                            </span>
+                          )}
+                          <div className="relative">
+                            <button
+                              onClick={() =>
+                                setOpenedTaskMenuId(openedTaskMenuId === task.id ? null : task.id)
+                              }
+                              disabled={isTaskBusy}
+                              className={`shrink-0 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${textSecondary}`}
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </button>
+                            {openedTaskMenuId === task.id && !isTaskBusy && (
+                              <div
+                                className={`dropdown-enter absolute right-0 top-6 z-20 w-52 overflow-hidden rounded-xl border shadow-xl ${
+                                  isDark
+                                    ? 'border-[#313d4f] bg-[#273142]'
+                                    : 'border-[#e8e8e8] bg-white'
                                 }`}
                               >
-                                <Eye className="h-3.5 w-3.5" />
-                                Подробности
-                              </button>
-                              {canEditTasks && (
                                 <button
                                   onClick={() => {
-                                    openTaskEditing(task)
+                                    openTaskDetails(task)
                                     setOpenedTaskMenuId(null)
                                   }}
                                   className={`flex w-full items-center gap-2 px-3 py-2 text-xs ${textPrimary} ${
                                     isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'
                                   }`}
                                 >
-                                  <Edit3 className="h-3.5 w-3.5" />
-                                  Редактировать
+                                  <Eye className="h-3.5 w-3.5" />
+                                  Подробности
                                 </button>
-                              )}
-                              {risk && (
-                                <button
-                                  onClick={() => {
-                                    openTaskRisk(task)
-                                    setOpenedTaskMenuId(null)
-                                  }}
-                                  className={`flex w-full items-center gap-2 px-3 py-2 text-xs ${textPrimary} ${
-                                    isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'
-                                  }`}
-                                >
-                                  <AlertTriangle className="h-3.5 w-3.5" />
-                                  Оценка рисков
-                                </button>
-                              )}
-                              {canEditTasks && canTransition.length > 0 && (
-                                <div className={`border-t ${isDark ? 'border-[#313d4f]' : 'border-gray-100'}`}>
-                                  <p className={`px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider ${textSecondary}`}>
-                                    Перевести в
-                                  </p>
-                                  {canTransition.map((transitionStatus) => (
-                                    <button
-                                      key={transitionStatus}
-                                      onClick={() =>
-                                        changeTaskStatusMutation.mutate({
-                                          taskId: task.id,
-                                          status: transitionStatus,
-                                        })
-                                      }
-                                      className={`flex w-full items-center gap-2 px-3 py-2 text-xs ${textPrimary} ${
-                                        isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'
-                                      }`}
-                                    >
-                                      {TASK_STATUS_LABELS[transitionStatus]}
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
-                              {canEditTasks && (
-                                <div className={`border-t ${isDark ? 'border-[#313d4f]' : 'border-gray-100'}`}>
+                                {canEditTasks && (
                                   <button
-                                    onClick={() => deleteTaskMutation.mutate(task.id)}
-                                    className={`flex w-full items-center gap-2 px-3 py-2 text-xs text-red-500 ${
+                                    onClick={() => {
+                                      openTaskEditing(task)
+                                      setOpenedTaskMenuId(null)
+                                    }}
+                                    className={`flex w-full items-center gap-2 px-3 py-2 text-xs ${textPrimary} ${
                                       isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'
                                     }`}
                                   >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                    Удалить
+                                    <Edit3 className="h-3.5 w-3.5" />
+                                    Редактировать
                                   </button>
-                                </div>
-                              )}
-                            </div>
-                          )}
+                                )}
+                                {risk && (
+                                  <button
+                                    onClick={() => {
+                                      openTaskRisk(task)
+                                      setOpenedTaskMenuId(null)
+                                    }}
+                                    className={`flex w-full items-center gap-2 px-3 py-2 text-xs ${textPrimary} ${
+                                      isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'
+                                    }`}
+                                  >
+                                    <AlertTriangle className="h-3.5 w-3.5" />
+                                    Оценка рисков
+                                  </button>
+                                )}
+                                {canEditTasks && canTransition.length > 0 && (
+                                  <div className={`border-t ${isDark ? 'border-[#313d4f]' : 'border-gray-100'}`}>
+                                    <p className={`px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider ${textSecondary}`}>
+                                      Перевести в
+                                    </p>
+                                    {canTransition.map((transitionStatus) => (
+                                      <button
+                                        key={transitionStatus}
+                                        onClick={() =>
+                                          changeTaskStatusMutation.mutate({
+                                            taskId: task.id,
+                                            status: transitionStatus,
+                                          })
+                                        }
+                                        disabled={isTaskBusy}
+                                        className={`flex w-full items-center gap-2 px-3 py-2 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${textPrimary} ${
+                                          isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'
+                                        }`}
+                                      >
+                                        {TASK_STATUS_LABELS[transitionStatus]}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                                {canEditTasks && (
+                                  <div className={`border-t ${isDark ? 'border-[#313d4f]' : 'border-gray-100'}`}>
+                                    <button
+                                      onClick={() => deleteTaskMutation.mutate(task.id)}
+                                      disabled={isTaskBusy}
+                                      className={`flex w-full items-center gap-2 px-3 py-2 text-xs text-red-500 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                                        isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'
+                                      }`}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                      Удалить
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
 

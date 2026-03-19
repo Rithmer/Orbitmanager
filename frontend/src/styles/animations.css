@@ -353,7 +353,7 @@ html {
 @keyframes fade-in-up {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(18px);
   }
   to {
     opacity: 1;
@@ -362,7 +362,23 @@ html {
 }
 
 .fade-in-up {
-  animation: fade-in-up 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: fade-in-up 0.38s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  opacity: 0;
+}
+
+@keyframes fade-in-down {
+  from {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-down {
+  animation: fade-in-down 0.26s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   opacity: 0;
 }
 
@@ -431,7 +447,17 @@ body, .dark {
 
 .stagger-row {
   opacity: 0;
-  animation: fade-in-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: fade-in-up 0.42s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.stagger-card {
+  opacity: 0;
+  animation: fade-in-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.support-enter {
+  opacity: 0;
+  animation: fade-in-down 0.24s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 /* ═══════════════════════════════════════
@@ -449,6 +475,77 @@ body, .dark {
 
 .chart-draw-ltr {
   animation: chart-reveal-ltr 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes refresh-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.page-refresh-shell {
+  position: relative;
+  overflow: hidden;
+}
+
+.page-refresh-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  animation: refresh-overlay-in 0.24s ease-out forwards;
+  background:
+    linear-gradient(180deg, rgba(72, 128, 255, 0.08) 0%, rgba(72, 128, 255, 0.03) 100%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.18) 50%, rgba(255, 255, 255, 0.06) 100%);
+  background-size: auto, 220% 100%;
+  backdrop-filter: blur(2px);
+}
+
+.page-refresh-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.18) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+  opacity: 0.55;
+}
+
+@keyframes grid-slide-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.grid-slide-in-up {
+  animation: grid-slide-in-up 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes row-collapse-out {
+  from {
+    opacity: 1;
+    transform: scaleY(1);
+    max-height: 120px;
+  }
+  to {
+    opacity: 0;
+    transform: scaleY(0.9);
+    max-height: 0;
+  }
+}
+
+.row-collapse-out {
+  transform-origin: top;
+  overflow: hidden;
+  animation: row-collapse-out 0.22s ease-in forwards;
 }
 
 /* ═══════════════════════════════════════
@@ -492,6 +589,7 @@ input:focus, select:focus, textarea:focus {
   .page-enter,
   .stagger-row,
   .fade-in-up,
+  .fade-in-down,
   .chart-draw-ltr,
   .nav-bounce-item,
   .letter-bounce,
@@ -503,6 +601,11 @@ input:focus, select:focus, textarea:focus {
   .modal-content-enter,
   .modal-content-exit,
   .skeleton-shimmer,
+  .page-refresh-overlay,
+  .grid-slide-in-up,
+  .support-enter,
+  .stagger-card,
+  .row-collapse-out,
   .btn-fizzy:active:not(:disabled) {
     animation: none !important;
   }
