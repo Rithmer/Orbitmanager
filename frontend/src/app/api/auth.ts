@@ -1,4 +1,4 @@
-import { api } from './client'
+import { api, type ApiRequestOptions } from './client'
 import type { AuthTokens, LoginDto, RegisterDto, User } from '../types'
 
 export const authApi = {
@@ -14,7 +14,7 @@ export const authApi = {
     return api.post<AuthTokens>('/auth/refresh', { refreshToken })
   },
 
-  me(): Promise<User> {
-    return api.get<User>('/auth/me')
+  me(options: ApiRequestOptions = {}): Promise<User> {
+    return api.get<User>('/auth/me', options)
   },
 }

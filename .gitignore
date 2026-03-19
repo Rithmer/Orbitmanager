@@ -37,3 +37,4 @@ coverage/
 
 # === TypeScript ===
 *.tsbuildinfo
+documentation_archive/

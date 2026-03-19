@@ -11,6 +11,7 @@ import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
+import { parseOptionalInt } from '@/common/helpers/query.helper';
 
 @ApiTags('Audit Logs')
 @ApiBearerAuth()
@@ -45,17 +46,20 @@ export class AuditLogsController {
     @Query('limit') limit?: string,
     @Query('sort') sort?: string,
   ) {
+    const parsedUserId = parseOptionalInt(userId);
+    const parsedEntityId = parseOptionalInt(entityId);
+
     return this.auditService.findAll(
       {
         search,
-        page: page ? parseInt(page, 10) : undefined,
-        limit: limit ? parseInt(limit, 10) : undefined,
+        page: parseOptionalInt(page),
+        limit: parseOptionalInt(limit),
         sort,
       },
       {
-        userId: userId ? parseInt(userId, 10) : undefined,
+        userId: parsedUserId,
         entityType,
-        entityId: entityId ? parseInt(entityId, 10) : undefined,
+        entityId: parsedEntityId,
         action,
         from,
         to,

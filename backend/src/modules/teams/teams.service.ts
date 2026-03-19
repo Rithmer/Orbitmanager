@@ -1,6 +1,7 @@
 import {
   Injectable,
   Inject,
+  Optional,
   NotFoundException,
   ForbiddenException,
   ConflictException,
@@ -26,12 +27,13 @@ import { CreateTeamDto } from './dto/create-team.dto';
 import { UpdateTeamDto } from './dto/update-team.dto';
 import { AddTeamMemberDto } from './dto/add-team-member.dto';
 import { UpdateTeamMemberDto } from './dto/update-team-member.dto';
-import type {
+import {
   QueryParams,
   PaginatedResult,
 } from '@/common/helpers/query.helper';
 import { AuditService } from '@/modules/audit-logs/audit.service';
 import { AuditAction } from '@/common/enums/audit-action.enum';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 
 @Injectable()
 export class TeamsService {
@@ -49,13 +51,39 @@ export class TeamsService {
     @Inject(TASK_REPOSITORY)
     private readonly taskRepository: ITaskRepository,
     private readonly auditService: AuditService,
+    @Optional() private readonly prisma?: PrismaService,
   ) {}
 
   async findAll(params: QueryParams): Promise<PaginatedResult<Team>> {
-    return this.teamRepository.findPaginated({
-      ...params,
-      searchFields: params.searchFields ?? ['name', 'description'],
-    });
+    const page = normalizePage(params.page);
+    const limit = normalizeLimit(params.limit);
+
+    if (this.teamRepository.findPage) {
+      const result = await this.teamRepository.findPage({
+        page,
+        limit,
+        search: params.search,
+        sort: params.sort,
+      });
+
+      return toPaginatedResult(result.items, result.total, page, limit);
+    }
+
+    const teams = await this.teamRepository.findAll();
+    return applyInMemoryPagination(
+      teams.filter((team) => {
+        if (!params.search) {
+          return true;
+        }
+
+        const search = params.search.toLowerCase();
+        return [team.name, team.description].some((field) =>
+          field.toLowerCase().includes(search),
+        );
+      }),
+      page,
+      limit,
+    );
   }
 
   async findById(id: number): Promise<Team> {
@@ -65,19 +93,38 @@ export class TeamsService {
   }
 
   async create(dto: CreateTeamDto, userId: number): Promise<Team> {
-    const now = new Date().toISOString();
-    const team = await this.teamRepository.create({
-      name: dto.name,
-      description: dto.description ?? '',
-      createdAt: now,
-      createdById: userId,
-    });
+    if (this.prisma) {
+      return this.createWithTransaction(dto, userId);
+    }
 
-    await this.teamMemberRepository.create({
-      userId,
-      teamId: team.id,
-      teamRole: TeamRole.OWNER,
-    });
+    const now = new Date().toISOString();
+    let team: Team | null = null;
+
+    try {
+      team = await this.teamRepository.create({
+        name: dto.name,
+        description: dto.description ?? '',
+        createdAt: now,
+        createdById: userId,
+      });
+
+      await this.teamMemberRepository.create({
+        userId,
+        teamId: team.id,
+        teamRole: TeamRole.OWNER,
+      });
+    } catch (error) {
+      if (team) {
+        // Best-effort rollback to avoid orphan teams if owner membership creation fails.
+        try {
+          await this.teamRepository.delete(team.id);
+        } catch {
+          // ignore rollback errors and rethrow the original failure below
+        }
+      }
+
+      throw error;
+    }
 
     await this.auditService.log(
       userId,
@@ -252,6 +299,11 @@ export class TeamsService {
       }
     }
 
+    if (this.prisma) {
+      await this.removeMemberWithTransaction(member, userId);
+      return;
+    }
+
     await this.detachUserFromTeamProjects(member.userId, member.teamId, userId);
 
     await this.teamMemberRepository.delete(memberId);
@@ -269,6 +321,117 @@ export class TeamsService {
     const member = await this.teamMemberRepository.findById(id);
     if (!member) throw new NotFoundException(`Участник #${id} не найден`);
     return member;
+  }
+
+  private async createWithTransaction(
+    dto: CreateTeamDto,
+    userId: number,
+  ): Promise<Team> {
+    const timestamp = new Date();
+    const team = await this.prisma!.$transaction(async (tx) => {
+      const createdTeam = await tx.team.create({
+        data: {
+          name: dto.name,
+          description: dto.description ?? '',
+          createdAt: timestamp,
+          createdById: userId,
+        },
+      });
+
+      await tx.teamMember.create({
+        data: {
+          userId,
+          teamId: createdTeam.id,
+          teamRole: TeamRole.OWNER,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: createAuditLogData(
+          userId,
+          AuditAction.CREATE,
+          'team',
+          createdTeam.id,
+          `Создана команда "${createdTeam.name}"`,
+          timestamp,
+        ),
+      });
+
+      return createdTeam;
+    });
+
+    return mapTeamRecord(team);
+  }
+
+  private async removeMemberWithTransaction(
+    member: TeamMember,
+    actorUserId: number,
+  ): Promise<void> {
+    const teamProjectIds = await this.getTeamProjectIds(member.teamId);
+    const timestamp = new Date();
+
+    await this.prisma!.$transaction(async (tx) => {
+      const projectMemberships =
+        teamProjectIds.length === 0
+          ? []
+          : await tx.projectMember.findMany({
+              where: {
+                userId: member.userId,
+                projectId: { in: teamProjectIds },
+              },
+            });
+
+      if (teamProjectIds.length > 0) {
+        await tx.task.updateMany({
+          where: {
+            assigneeId: member.userId,
+            projectId: { in: teamProjectIds },
+          },
+          data: {
+            assigneeId: null,
+          },
+        });
+
+        await tx.projectMember.deleteMany({
+          where: {
+            userId: member.userId,
+            projectId: { in: teamProjectIds },
+          },
+        });
+
+        if (projectMemberships.length > 0) {
+          await tx.auditLog.createMany({
+            data: projectMemberships.map((membership) =>
+              createAuditLogData(
+                actorUserId,
+                AuditAction.DELETE,
+                'project_member',
+                membership.id,
+                `Участник #${member.userId} автоматически удалён из проекта #${membership.projectId} после удаления из команды #${member.teamId}`,
+                timestamp,
+              ),
+            ),
+          });
+        }
+      }
+
+      await tx.teamMember.delete({
+        where: {
+          id: member.id,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: createAuditLogData(
+          actorUserId,
+          AuditAction.DELETE,
+          'team_member',
+          member.id,
+          `Участник #${member.userId} удалён из команды #${member.teamId}`,
+          timestamp,
+        ),
+      });
+    });
   }
 
   private async assertOwnerOrAdmin(
@@ -312,15 +475,13 @@ export class TeamsService {
       teamProjectIds,
     );
 
-    if (projectMemberships.length > 0) {
-      await this.auditService.logMany(
-        projectMemberships.map((membership) => ({
-          userId: actorUserId,
-          action: AuditAction.DELETE,
-          entityType: 'project_member',
-          entityId: membership.id,
-          description: `Участник #${userId} автоматически удалён из проекта #${membership.projectId} после удаления из команды #${teamId}`,
-        })),
+    for (const membership of projectMemberships) {
+      await this.auditService.log(
+        actorUserId,
+        AuditAction.DELETE,
+        'project_member',
+        membership.id,
+        `Участник #${userId} автоматически удалён из проекта #${membership.projectId} после удаления из команды #${teamId}`,
       );
     }
   }
@@ -341,29 +502,22 @@ export class TeamsService {
         membership.role !== ProjectRole.OBSERVER,
     );
 
-    if (memberships.length === 0) return;
-
-    const auditEntries: Parameters<typeof this.auditService.logMany>[0] = [];
-
     for (const membership of memberships) {
       const updated = await this.projectMemberRepository.update(membership.id, {
         role: ProjectRole.OBSERVER,
       });
+
       if (!updated) continue;
 
-      auditEntries.push({
-        userId: actorUserId,
-        action: AuditAction.UPDATE,
-        entityType: 'project_member',
-        entityId: membership.id,
-        description: `Роль участника #${membership.id} автоматически изменена на observer после перевода в observer в команде #${teamId}`,
-        oldValue: membership.role,
-        newValue: ProjectRole.OBSERVER,
-      });
-    }
-
-    if (auditEntries.length > 0) {
-      await this.auditService.logMany(auditEntries);
+      await this.auditService.log(
+        actorUserId,
+        AuditAction.UPDATE,
+        'project_member',
+        membership.id,
+        `Роль участника #${membership.id} автоматически изменена на observer после перевода в observer в команде #${teamId}`,
+        membership.role,
+        ProjectRole.OBSERVER,
+      );
     }
   }
 
@@ -371,4 +525,82 @@ export class TeamsService {
     const teamProjects = await this.projectRepository.findByTeam(teamId);
     return teamProjects.map((project) => project.id);
   }
+}
+
+function normalizePage(page: number | undefined): number {
+  if (!Number.isFinite(page)) {
+    return 1;
+  }
+
+  return Math.max(1, Math.trunc(page as number));
+}
+
+function normalizeLimit(limit: number | undefined): number {
+  if (!Number.isFinite(limit)) {
+    return 20;
+  }
+
+  return Math.min(100, Math.max(1, Math.trunc(limit as number)));
+}
+
+function toPaginatedResult<T>(
+  items: T[],
+  total: number,
+  page: number,
+  limit: number,
+): PaginatedResult<T> {
+  return {
+    items,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit) || 1,
+  };
+}
+
+function applyInMemoryPagination<T>(
+  items: T[],
+  page: number,
+  limit: number,
+): PaginatedResult<T> {
+  const offset = (page - 1) * limit;
+  return toPaginatedResult(items.slice(offset, offset + limit), items.length, page, limit);
+}
+
+function mapTeamRecord(team: {
+  id: number;
+  name: string;
+  description: string;
+  createdAt: Date;
+  createdById: number;
+}): Team {
+  return {
+    id: team.id,
+    name: team.name,
+    description: team.description,
+    createdAt: team.createdAt.toISOString(),
+    createdById: team.createdById,
+  };
+}
+
+function createAuditLogData(
+  userId: number,
+  action: AuditAction,
+  entityType: string,
+  entityId: number | null,
+  description: string,
+  timestamp: Date,
+  oldValue?: string | null,
+  newValue?: string | null,
+) {
+  return {
+    userId,
+    action,
+    entityType,
+    entityId,
+    description,
+    oldValue: oldValue ?? null,
+    newValue: newValue ?? null,
+    timestamp,
+  };
 }

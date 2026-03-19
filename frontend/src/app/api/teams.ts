@@ -1,13 +1,13 @@
-import { api, buildQuery } from './client'
+import { api, buildQuery, type ApiRequestOptions } from './client'
 import type { Team, TeamMember, PaginatedResult, QueryParams } from '../types'
 
 export const teamsApi = {
-  list(params: QueryParams = {}): Promise<PaginatedResult<Team>> {
-    return api.get(`/teams${buildQuery(params)}`)
+  list(params: QueryParams = {}, options: ApiRequestOptions = {}): Promise<PaginatedResult<Team>> {
+    return api.get(`/teams${buildQuery(params)}`, options)
   },
 
-  getById(id: number): Promise<Team> {
-    return api.get(`/teams/${id}`)
+  getById(id: number, options: ApiRequestOptions = {}): Promise<Team> {
+    return api.get(`/teams/${id}`, options)
   },
 
   create(dto: { name: string; description?: string }): Promise<Team> {
@@ -22,12 +22,12 @@ export const teamsApi = {
     return api.delete(`/teams/${id}`)
   },
 
-  getMembers(teamId: number): Promise<TeamMember[]> {
-    return api.get(`/teams/${teamId}/members`)
+  getMembers(teamId: number, options: ApiRequestOptions = {}): Promise<TeamMember[]> {
+    return api.get(`/teams/${teamId}/members`, options)
   },
 
-  getAllMembersBatch(): Promise<Record<number, TeamMember[]>> {
-    return api.get('/teams/members/batch')
+  getAllMembersBatch(options: ApiRequestOptions = {}): Promise<Record<number, TeamMember[]>> {
+    return api.get('/teams/members/batch', options)
   },
 
   addMember(teamId: number, dto: { userId: number; teamRole: string }): Promise<TeamMember> {

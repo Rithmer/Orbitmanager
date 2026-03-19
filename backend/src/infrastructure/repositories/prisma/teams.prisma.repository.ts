@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
-import type { ITeamRepository } from '@/domain/repositories/team.repository';
+import type {
+  ITeamRepository,
+  TeamListQuery,
+} from '@/domain/repositories/team.repository';
 import { Team } from '@/domain/models/team.model';
-import type { Team as PrismaTeam, Prisma } from '@prisma/client';
-import type { QueryParams, PaginatedResult } from '@/common/helpers/query.helper';
-import { buildDbPagination, buildDbSort, buildPaginatedResult } from '@/common/helpers/query.helper';
+import type { Team as PrismaTeam } from '@prisma/client';
+import { buildOrderBy, buildStringSearch, getPagination } from './prisma-query.utils';
 
 @Injectable()
 export class TeamsPrismaRepository implements ITeamRepository {
@@ -13,6 +15,30 @@ export class TeamsPrismaRepository implements ITeamRepository {
   async findAll(): Promise<Team[]> {
     const rows = await this.prisma.team.findMany({ orderBy: { id: 'asc' } });
     return rows.map((r) => this.toDomain(r));
+  }
+
+  async findPage(params: TeamListQuery) {
+    const { skip, take } = getPagination(params.page, params.limit);
+    const where = buildStringSearch(params.search, ['name', 'description']);
+
+    const [rows, total] = await Promise.all([
+      this.prisma.team.findMany({
+        where,
+        orderBy: buildOrderBy(
+          params.sort,
+          ['id', 'name', 'description', 'createdAt', 'createdById'],
+          'id',
+        ),
+        skip,
+        take,
+      }),
+      this.prisma.team.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((row) => this.toDomain(row)),
+      total,
+    };
   }
 
   async findById(id: number): Promise<Team | null> {
@@ -26,39 +52,6 @@ export class TeamsPrismaRepository implements ITeamRepository {
       orderBy: { id: 'asc' },
     });
     return rows.map((r) => this.toDomain(r));
-  }
-
-  async findPaginated(params: QueryParams): Promise<PaginatedResult<Team>> {
-    const where: Prisma.TeamWhereInput = {};
-
-    if (params.search) {
-      const searchFields = params.searchFields ?? ['name', 'description'];
-      where.OR = searchFields.map((field) => ({
-        [field]: { contains: params.search, mode: 'insensitive' as const },
-      }));
-    }
-
-    const pagination = buildDbPagination(params.page, params.limit);
-    const sortSpec = buildDbSort(params.sort);
-    const orderBy = sortSpec
-      ? { [sortSpec.field]: sortSpec.direction }
-      : { id: 'asc' as const };
-
-    const [rows, total] = await Promise.all([
-      this.prisma.team.findMany({
-        where,
-        orderBy,
-        skip: pagination.skip,
-        take: pagination.take,
-      }),
-      this.prisma.team.count({ where }),
-    ]);
-
-    return buildPaginatedResult(
-      rows.map((r) => this.toDomain(r)),
-      total,
-      pagination,
-    );
   }
 
   async create(team: Omit<Team, 'id'>): Promise<Team> {

@@ -6,10 +6,9 @@ const { spawn } = require('node:child_process');
 
 const backendDir = path.resolve(__dirname, '..');
 const rootDir = path.resolve(backendDir, '..');
-const composeFiles = [
-  path.join(rootDir, 'docker-compose.yml'),
-  path.join(rootDir, 'docker-compose.e2e.yml'),
-];
+const composeFile = path.join(rootDir, 'docker-compose.yml');
+const composeProject = 'taskmanager-e2e';
+const composeProfile = 'e2e';
 const serviceName = 'postgres-e2e';
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const cliArgs = process.argv.slice(2);
@@ -109,10 +108,12 @@ async function stopDatabase(testEnv) {
 function composeArgs(...args) {
   return [
     'compose',
+    '-p',
+    composeProject,
     '-f',
-    composeFiles[0],
-    '-f',
-    composeFiles[1],
+    composeFile,
+    '--profile',
+    composeProfile,
     ...args,
   ];
 }

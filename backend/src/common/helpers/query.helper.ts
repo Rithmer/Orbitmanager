@@ -15,47 +15,18 @@ export interface PaginatedResult<T> {
   totalPages: number;
 }
 
-export interface DbPaginationArgs {
-  page: number;
-  limit: number;
-  skip: number;
-  take: number;
-}
+export function parseOptionalInt(value?: string): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
 
-export function buildDbPagination(
-  page?: number,
-  limit?: number,
-): DbPaginationArgs {
-  const safePage = Math.max(1, page ?? 1);
-  const safeLimit = Math.min(100, Math.max(1, limit ?? 20));
-  return {
-    page: safePage,
-    limit: safeLimit,
-    skip: (safePage - 1) * safeLimit,
-    take: safeLimit,
-  };
-}
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return undefined;
+  }
 
-export function buildPaginatedResult<T>(
-  items: T[],
-  total: number,
-  pagination: DbPaginationArgs,
-): PaginatedResult<T> {
-  return {
-    items,
-    total,
-    page: pagination.page,
-    limit: pagination.limit,
-    totalPages: Math.ceil(total / pagination.limit) || 1,
-  };
-}
-
-export function buildDbSort(
-  sort?: string,
-): { field: string; direction: 'asc' | 'desc' } | null {
-  if (!sort) return null;
-  const desc = sort.startsWith('-');
-  return { field: desc ? sort.slice(1) : sort, direction: desc ? 'desc' : 'asc' };
+  const parsed = Number.parseInt(trimmed, 10);
+  return Number.isNaN(parsed) ? undefined : parsed;
 }
 
 export class QueryHelper {
@@ -153,8 +124,8 @@ export class QueryHelper {
     page?: number,
     limit?: number,
   ): PaginatedResult<T> {
-    const safePage = Math.max(1, page ?? 1);
-    const safeLimit = Math.min(100, Math.max(1, limit ?? 20));
+    const safePage = QueryHelper.normalizePositiveInteger(page, 1);
+    const safeLimit = QueryHelper.normalizePositiveInteger(limit, 20, 100);
     const total = items.length;
     const totalPages = Math.ceil(total / safeLimit) || 1;
     const offset = (safePage - 1) * safeLimit;
@@ -219,5 +190,18 @@ export class QueryHelper {
       default:
         return null;
     }
+  }
+
+  private static normalizePositiveInteger(
+    value: number | undefined,
+    fallback: number,
+    max?: number,
+  ): number {
+    if (!Number.isFinite(value)) {
+      return fallback;
+    }
+
+    const normalized = Math.max(1, Math.trunc(value as number));
+    return typeof max === 'number' ? Math.min(max, normalized) : normalized;
   }
 }

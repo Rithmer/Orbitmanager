@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Moon, Sun, Bell, Lock, User, Shield, ChevronRight, LogOut } from 'lucide-react'
-import { useTheme } from '../context/ThemeContext'
-import { useAuth } from '../context/AuthContext'
+import { useTheme } from '../context/useTheme'
+import { useAuth } from '../context/useAuth'
 import { usersApi } from '../api/users'
 import { ErrorMessage } from '../components/Modal'
 import { ACCOUNT_ROLE_LABELS, AccountRole } from '../types'
@@ -57,15 +57,15 @@ export function Settings() {
   const roleLabel = user ? ACCOUNT_ROLE_LABELS[user.accountRole as AccountRole] || user.accountRole : ''
 
   return (
-    <div className={`${pageBg} min-h-full p-4 md:p-8`}>
-      <div className="mb-6 md:mb-8">
+    <div className={`${pageBg} min-h-full p-4 md:p-8 page-load-stagger`}>
+      <div className="mb-6 md:mb-8 page-load-stagger">
         <h1 className={`text-xl md:text-2xl font-bold ${textPrimary}`}>Настройки</h1>
         <p className={`mt-1 text-sm ${textSecondary}`}>Управление аккаунтом и предпочтениями</p>
       </div>
 
-      <div className="max-w-3xl space-y-6">
+      <div className="max-w-3xl space-y-6 page-load-stagger">
         {/* Profile */}
-        <div className={`${cardBg} border ${cardBorder} rounded-xl overflow-hidden card-hover`}>
+        <div className={`${cardBg} border ${cardBorder} rounded-xl overflow-hidden card-hover stagger-row`}>
           <div className={`flex items-center gap-3 px-6 py-4 border-b ${dividerColor}`}>
             <div className={`w-8 h-8 ${sectionIconBg} rounded-lg flex items-center justify-center`}>
               <User className="w-4 h-4 text-[#4880ff]" />
@@ -138,7 +138,7 @@ export function Settings() {
         </div>
 
         {/* Appearance */}
-        <div className={`${cardBg} border ${cardBorder} rounded-xl overflow-hidden card-hover`}>
+        <div className={`${cardBg} border ${cardBorder} rounded-xl overflow-hidden card-hover stagger-row`}>
           <div className={`flex items-center gap-3 px-6 py-4 border-b ${dividerColor}`}>
             <div className={`w-8 h-8 ${sectionIconBg} rounded-lg flex items-center justify-center`}>
               {isDark ? <Sun className="w-4 h-4 text-[#4880ff]" /> : <Moon className="w-4 h-4 text-[#4880ff]" />}
@@ -181,7 +181,7 @@ export function Settings() {
         </div>
 
         {/* Notifications */}
-        <div className={`${cardBg} border ${cardBorder} rounded-xl overflow-hidden card-hover`}>
+        <div className={`${cardBg} border ${cardBorder} rounded-xl overflow-hidden card-hover stagger-row`}>
           <div className={`flex items-center gap-3 px-6 py-4 border-b ${dividerColor}`}>
             <div className={`w-8 h-8 ${sectionIconBg} rounded-lg flex items-center justify-center`}>
               <Bell className="w-4 h-4 text-[#4880ff]" />
@@ -209,7 +209,7 @@ export function Settings() {
         </div>
 
         {/* Security */}
-        <div className={`${cardBg} border ${cardBorder} rounded-xl overflow-hidden card-hover`}>
+        <div className={`${cardBg} border ${cardBorder} rounded-xl overflow-hidden card-hover stagger-row`}>
           <div className={`flex items-center gap-3 px-6 py-4 border-b ${dividerColor}`}>
             <div className={`w-8 h-8 ${sectionIconBg} rounded-lg flex items-center justify-center`}>
               <Shield className="w-4 h-4 text-[#4880ff]" />

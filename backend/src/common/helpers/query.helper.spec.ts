@@ -105,6 +105,13 @@ describe('QueryHelper', () => {
       const result = QueryHelper.applyPagination(items, -5, 20);
       expect(result.page).toBe(1);
     });
+
+    it('should fallback when page or limit is NaN', () => {
+      const result = QueryHelper.applyPagination(items, Number.NaN, Number.NaN);
+      expect(result.page).toBe(1);
+      expect(result.limit).toBe(20);
+      expect(result.items).toHaveLength(5);
+    });
   });
 
   describe('apply (full pipeline)', () => {

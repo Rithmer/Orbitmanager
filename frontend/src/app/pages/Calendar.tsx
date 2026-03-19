@@ -12,7 +12,7 @@ import {
   CalendarDays,
   Tag,
 } from 'lucide-react'
-import { useTheme } from '../context/ThemeContext'
+import { useTheme } from '../context/useTheme'
 import { useAuth } from '../context/AuthContext'
 import { tasksApi } from '../api/tasks'
 import { calendarApi } from '../api/calendar'
@@ -374,8 +374,8 @@ export function Calendar() {
   }
 
   return (
-    <div className={`${pageBg} min-h-full p-4 md:p-8`}>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+    <div className={`${pageBg} min-h-full p-4 md:p-8 page-load-stagger`}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4 page-load-stagger">
         <div>
           <h1 className={`text-2xl font-bold ${textPrimary}`}>{MONTHS[currentMonth - 1]} {currentYear}</h1>
           <p className={`mt-1 text-sm ${textSecondary}`}>Дедлайны задач и события на календаре</p>
@@ -402,7 +402,7 @@ export function Calendar() {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
+      <div className="flex items-center gap-2 mb-4 flex-wrap page-load-stagger">
         <Filter className={`w-4 h-4 ${textSecondary}`} />
         {filterBtns.map((f) => (
           <button

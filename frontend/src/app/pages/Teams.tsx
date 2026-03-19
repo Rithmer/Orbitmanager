@@ -11,7 +11,7 @@ import {
   Crown,
   Eye,
 } from 'lucide-react'
-import { useTheme } from '../context/ThemeContext'
+import { useTheme } from '../context/useTheme'
 import { useAuth } from '../context/AuthContext'
 import { teamsApi } from '../api/teams'
 import { usersApi } from '../api/users'
@@ -212,7 +212,7 @@ export function Teams() {
   }
 
   return (
-    <div className={`${pageBg} min-h-full p-4 md:p-8`}>
+    <div className={`${pageBg} min-h-full p-4 md:p-8 page-load-stagger`}>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className={`text-xl md:text-2xl font-bold ${textPrimary}`}>Команды</h1>
@@ -247,7 +247,7 @@ export function Teams() {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5 page-load-stagger">
         {filteredTeams.length > 0 ? (
           filteredTeams.map((team, idx) => {
             const ci = idx % colors.length
@@ -257,7 +257,8 @@ export function Teams() {
             return (
               <div
                 key={team.id}
-                className={`${cardBg} border ${cardBorder} rounded-xl p-6 card-hover transition-all duration-200`}
+                className={`${cardBg} border ${cardBorder} rounded-xl p-6 card-hover transition-all duration-200 stagger-row`}
+                style={{ animationDelay: `${idx * 80}ms` }}
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">

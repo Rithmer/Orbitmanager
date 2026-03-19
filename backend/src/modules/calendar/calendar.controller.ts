@@ -24,6 +24,7 @@ import { CreateCalendarEventDto, UpdateCalendarEventDto } from './dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
+import { parseOptionalInt } from '@/common/helpers/query.helper';
 
 @ApiTags('Calendar Events')
 @ApiBearerAuth()
@@ -61,17 +62,19 @@ export class CalendarController {
     @Query('limit') limit?: string,
     @Query('sort') sort?: string,
   ) {
+    const parsedProjectId = parseOptionalInt(projectId);
+
     return this.calendarService.findAll(
       {
         search,
         sort,
-        page: page ? parseInt(page, 10) : undefined,
-        limit: limit ? parseInt(limit, 10) : undefined,
+        page: parseOptionalInt(page),
+        limit: parseOptionalInt(limit),
       },
       userId,
       userRole,
       {
-        projectId: projectId ? parseInt(projectId, 10) : undefined,
+        projectId: parsedProjectId,
         from,
         to,
       },

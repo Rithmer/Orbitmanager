@@ -11,7 +11,7 @@ import { authApi } from '../api/auth'
 import type { User, LoginDto, RegisterDto } from '../types'
 import { AccountRole } from '../types'
 
-interface AuthContextType {
+export interface AuthContextType {
   user: User | null
   loading: boolean
   isAuthenticated: boolean
@@ -22,7 +22,7 @@ interface AuthContextType {
   refreshUser: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthContextType>({
+export const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   isAuthenticated: false,

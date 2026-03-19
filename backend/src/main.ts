@@ -51,6 +51,7 @@ async function bootstrap() {
       transports: winstonTransports,
     }),
   });
+  app.enableShutdownHooks();
 
   app.use(helmet());
   app.enableCors({

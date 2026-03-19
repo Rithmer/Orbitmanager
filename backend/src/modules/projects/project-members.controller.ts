@@ -6,6 +6,7 @@ import {
   Delete,
   Param,
   Body,
+  Query,
   ParseIntPipe,
   UseGuards,
   HttpCode,
@@ -14,6 +15,7 @@ import {
 import {
   ApiTags,
   ApiBearerAuth,
+  ApiQuery,
   ApiOperation,
   ApiResponse,
 } from '@nestjs/swagger';
@@ -24,26 +26,57 @@ import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
+import { ReadModelResponseFactory } from '@/common/read-models/read-model-response.factory';
 
 @ApiTags('Project Members')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, AccountRolesGuard)
 @Controller()
 export class ProjectMembersController {
-  constructor(private readonly projectsService: ProjectsService) {}
+  constructor(
+    private readonly projectsService: ProjectsService,
+    private readonly readModelResponseFactory: ReadModelResponseFactory,
+  ) {}
 
   @Get('projects/members/batch')
   @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
+  @ApiQuery({
+    name: 'projectIds',
+    required: false,
+    type: String,
+    description: 'Comma-separated list of project ids',
+  })
   @ApiOperation({ summary: 'Получить участников всех видимых проектов' })
   @ApiResponse({
     status: 200,
     description: 'Участники сгруппированные по projectId',
   })
-  findAllMembersBatch(
+  async findAllMembersBatch(
     @CurrentUser('id') userId: number,
     @CurrentUser('accountRole') userRole: AccountRole,
+    @Query('projectIds') projectIds?: string | string[],
+    @Query('ids') legacyIds?: string | string[],
   ) {
-    return this.projectsService.findAllMembersBatch(userId, userRole);
+    const allMembersByProjectId = await this.projectsService.findAllMembersBatch(
+      userId,
+      userRole,
+    );
+    const requestedProjectIds = this.readModelResponseFactory.normalizeIds(
+      projectIds ?? legacyIds,
+    );
+
+    if (projectIds === undefined && legacyIds === undefined) {
+      return allMembersByProjectId;
+    }
+
+    if (requestedProjectIds.length === 0) {
+      return {};
+    }
+
+    return this.readModelResponseFactory.pickGroupedByIds(
+      allMembersByProjectId,
+      requestedProjectIds,
+    );
   }
 
   @Get('projects/:projectId/members')

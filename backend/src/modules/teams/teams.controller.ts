@@ -27,6 +27,7 @@ import { TeamRoles } from '@/common/decorators/team-roles.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { TeamRole } from '@/common/enums/team-role.enum';
+import { parseOptionalInt } from '@/common/helpers/query.helper';
 
 @ApiTags('Teams')
 @ApiBearerAuth()
@@ -51,8 +52,8 @@ export class TeamsController {
     return this.teamsService.findAll({
       search,
       sort,
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
+      page: parseOptionalInt(page),
+      limit: parseOptionalInt(limit),
     });
   }
 

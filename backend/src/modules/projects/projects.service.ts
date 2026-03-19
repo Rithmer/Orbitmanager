@@ -1,6 +1,7 @@
 import {
   Injectable,
   Inject,
+  Optional,
   NotFoundException,
   ConflictException,
   BadRequestException,
@@ -11,7 +12,7 @@ import { AuditAction } from '@/common/enums/audit-action.enum';
 import { ProjectRole } from '@/common/enums/project-role.enum';
 import { ProjectStatus } from '@/common/enums/project-status.enum';
 import { TeamRole } from '@/common/enums/team-role.enum';
-import type {
+import {
   PaginatedResult,
   QueryParams,
 } from '@/common/helpers/query.helper';
@@ -32,6 +33,7 @@ import { AddProjectMemberDto } from './dto/add-project-member.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectMemberDto } from './dto/update-project-member.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 
 @Injectable()
 export class ProjectsService {
@@ -48,6 +50,7 @@ export class ProjectsService {
     private readonly teamRepository: ITeamRepository,
     private readonly auditService: AuditService,
     private readonly projectAccessService: ProjectAccessService,
+    @Optional() private readonly prisma?: PrismaService,
   ) {}
 
   async findAll(
@@ -55,22 +58,62 @@ export class ProjectsService {
     userId: number,
     userRole: AccountRole,
   ): Promise<PaginatedResult<Project>> {
-    const queryParams = {
-      ...params,
-      searchFields: params.searchFields ?? ['name', 'description'],
-    };
+    const page = normalizePage(params.page);
+    const limit = normalizeLimit(params.limit);
+    const teamId =
+      typeof params.filters?.['teamId'] === 'number'
+        ? (params.filters['teamId'] as number)
+        : undefined;
+    const status =
+      typeof params.filters?.['status'] === 'string'
+        ? (params.filters['status'] as string)
+        : undefined;
 
-    if (userRole === AccountRole.ADMIN) {
-      return this.projectRepository.findPaginated(queryParams);
+    if (this.projectRepository.findPage) {
+      const projectIds =
+        userRole === AccountRole.ADMIN
+          ? undefined
+          : await this.projectAccessService.getVisibleProjectIds(userId);
+
+      if (projectIds && projectIds.length === 0) {
+        return toPaginatedResult([], 0, page, limit);
+      }
+
+      const result = await this.projectRepository.findPage({
+        page,
+        limit,
+        search: params.search,
+        sort: params.sort,
+        teamId,
+        status,
+        projectIds,
+      });
+
+      return toPaginatedResult(result.items, result.total, page, limit);
     }
 
-    const visibleProjectIds =
-      await this.projectAccessService.getVisibleProjectIds(userId);
-    if (visibleProjectIds.length === 0) {
-      return { items: [], total: 0, page: 1, limit: params.limit ?? 20, totalPages: 1 };
-    }
+    const projects =
+      userRole === AccountRole.ADMIN
+        ? await this.projectRepository.findAll()
+        : await this.projectAccessService.getVisibleProjects(userId);
 
-    return this.projectRepository.findPaginated(queryParams, visibleProjectIds);
+    return applyInMemoryPagination(
+      projects
+        .filter((project) => (teamId !== undefined ? project.teamId === teamId : true))
+        .filter((project) => (status ? project.status === status : true))
+        .filter((project) => {
+          if (!params.search) {
+            return true;
+          }
+
+          const search = params.search.toLowerCase();
+          return [project.name, project.description].some((field) =>
+            field.toLowerCase().includes(search),
+          );
+        }),
+      page,
+      limit,
+    );
   }
 
   async findById(
@@ -106,6 +149,10 @@ export class ProjectsService {
       userRole,
     );
 
+    if (this.prisma) {
+      return this.createWithTransaction(dto, userId);
+    }
+
     const now = new Date().toISOString();
     const project = await this.projectRepository.create({
       teamId: dto.teamId,
@@ -132,9 +179,8 @@ export class ProjectsService {
     dto: UpdateProjectDto,
     userId: number,
     userRole: AccountRole,
-    cachedProject?: Project,
   ): Promise<Project> {
-    const project = cachedProject ?? (await this.findById(id, userId, userRole));
+    const project = await this.findById(id, userId, userRole);
 
     await this.projectAccessService.assertCanManageProject(
       project,
@@ -203,11 +249,10 @@ export class ProjectsService {
     userId: number,
     userRole: AccountRole,
   ): Promise<Record<number, ProjectMember[]>> {
-    const { items: projects } = await this.findAll(
-      { limit: 200 },
-      userId,
-      userRole,
-    );
+    const projects =
+      userRole === AccountRole.ADMIN
+        ? await this.projectRepository.findAll()
+        : await this.projectAccessService.getVisibleProjects(userId);
     const projectIds = projects.map((p) => p.id);
     const allMembers =
       await this.projectMemberRepository.findByProjects(projectIds);
@@ -332,6 +377,11 @@ export class ProjectsService {
       userRole,
     );
 
+    if (this.prisma) {
+      await this.removeMemberWithTransaction(member, userId);
+      return;
+    }
+
     await this.taskRepository.clearAssigneeByUserAndProjects(member.userId, [
       member.projectId,
     ]);
@@ -356,6 +406,76 @@ export class ProjectsService {
     return member;
   }
 
+  private async createWithTransaction(
+    dto: CreateProjectDto,
+    userId: number,
+  ): Promise<Project> {
+    const timestamp = new Date();
+    const project = await this.prisma!.$transaction(async (tx) => {
+      const createdProject = await tx.project.create({
+        data: {
+          teamId: dto.teamId,
+          name: dto.name,
+          description: dto.description ?? '',
+          status: dto.status ?? ProjectStatus.ACTIVE,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: createAuditLogData(
+          userId,
+          AuditAction.CREATE,
+          'project',
+          createdProject.id,
+          `Создан проект "${createdProject.name}"`,
+          timestamp,
+        ),
+      });
+
+      return createdProject;
+    });
+
+    return mapProjectRecord(project);
+  }
+
+  private async removeMemberWithTransaction(
+    member: ProjectMember,
+    actorUserId: number,
+  ): Promise<void> {
+    const timestamp = new Date();
+
+    await this.prisma!.$transaction(async (tx) => {
+      await tx.task.updateMany({
+        where: {
+          assigneeId: member.userId,
+          projectId: member.projectId,
+        },
+        data: {
+          assigneeId: null,
+        },
+      });
+
+      await tx.projectMember.delete({
+        where: {
+          id: member.id,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: createAuditLogData(
+          actorUserId,
+          AuditAction.DELETE,
+          'project_member',
+          member.id,
+          `Участник #${member.userId} удалён из проекта #${member.projectId}`,
+          timestamp,
+        ),
+      });
+    });
+  }
+
   private validateProjectRole(
     teamRole: TeamRole,
     projectRole: ProjectRole,
@@ -377,4 +497,86 @@ export class ProjectsService {
       }
     }
   }
+}
+
+function normalizePage(page: number | undefined): number {
+  if (!Number.isFinite(page)) {
+    return 1;
+  }
+
+  return Math.max(1, Math.trunc(page as number));
+}
+
+function normalizeLimit(limit: number | undefined): number {
+  if (!Number.isFinite(limit)) {
+    return 20;
+  }
+
+  return Math.min(100, Math.max(1, Math.trunc(limit as number)));
+}
+
+function toPaginatedResult<T>(
+  items: T[],
+  total: number,
+  page: number,
+  limit: number,
+): PaginatedResult<T> {
+  return {
+    items,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit) || 1,
+  };
+}
+
+function applyInMemoryPagination<T>(
+  items: T[],
+  page: number,
+  limit: number,
+): PaginatedResult<T> {
+  const offset = (page - 1) * limit;
+  return toPaginatedResult(items.slice(offset, offset + limit), items.length, page, limit);
+}
+
+function mapProjectRecord(project: {
+  id: number;
+  teamId: number;
+  name: string;
+  description: string;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+}): Project {
+  return {
+    id: project.id,
+    teamId: project.teamId,
+    name: project.name,
+    description: project.description,
+    status: project.status as ProjectStatus,
+    createdAt: project.createdAt.toISOString(),
+    updatedAt: project.updatedAt.toISOString(),
+  };
+}
+
+function createAuditLogData(
+  userId: number,
+  action: AuditAction,
+  entityType: string,
+  entityId: number | null,
+  description: string,
+  timestamp: Date,
+  oldValue?: string | null,
+  newValue?: string | null,
+) {
+  return {
+    userId,
+    action,
+    entityType,
+    entityId,
+    description,
+    oldValue: oldValue ?? null,
+    newValue: newValue ?? null,
+    timestamp,
+  };
 }

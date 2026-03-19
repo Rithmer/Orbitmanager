@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
-import type { ITaskRepository } from '@/domain/repositories/task.repository';
+import type {
+  ITaskRepository,
+  TaskListQuery,
+} from '@/domain/repositories/task.repository';
 import { Task } from '@/domain/models/task.model';
-import type { Task as PrismaTask, Prisma } from '@prisma/client';
-import type { QueryParams, PaginatedResult } from '@/common/helpers/query.helper';
-import { buildDbPagination, buildDbSort, buildPaginatedResult } from '@/common/helpers/query.helper';
+import type { Task as PrismaTask } from '@prisma/client';
+import { buildOrderBy, buildStringSearch, getPagination } from './prisma-query.utils';
 
 @Injectable()
 export class TasksPrismaRepository implements ITaskRepository {
@@ -13,6 +15,49 @@ export class TasksPrismaRepository implements ITaskRepository {
   async findAll(): Promise<Task[]> {
     const rows = await this.prisma.task.findMany({ orderBy: { id: 'asc' } });
     return rows.map((r) => this.toDomain(r));
+  }
+
+  async findPage(params: TaskListQuery) {
+    const { skip, take } = getPagination(params.page, params.limit);
+    const where = {
+      ...(params.projectIds ? { projectId: { in: params.projectIds } } : {}),
+      ...(params.projectId !== undefined ? { projectId: params.projectId } : {}),
+      ...(params.status ? { status: params.status } : {}),
+      ...(params.difficulty !== undefined ? { difficulty: params.difficulty } : {}),
+      ...(params.assigneeId !== undefined ? { assigneeId: params.assigneeId } : {}),
+      ...buildStringSearch(params.search, ['name', 'description']),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.task.findMany({
+        where,
+        orderBy: buildOrderBy(
+          params.sort,
+          [
+            'id',
+            'projectId',
+            'name',
+            'description',
+            'deadline',
+            'status',
+            'difficulty',
+            'assigneeId',
+            'createdById',
+            'createdAt',
+            'updatedAt',
+          ],
+          'id',
+        ),
+        skip,
+        take,
+      }),
+      this.prisma.task.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((row) => this.toDomain(row)),
+      total,
+    };
   }
 
   async findById(id: number): Promise<Task | null> {
@@ -29,6 +74,7 @@ export class TasksPrismaRepository implements ITaskRepository {
   }
 
   async findByProjects(projectIds: number[]): Promise<Task[]> {
+    if (projectIds.length === 0) return [];
     const rows = await this.prisma.task.findMany({
       where: { projectId: { in: projectIds } },
       orderBy: { id: 'asc' },
@@ -42,54 +88,6 @@ export class TasksPrismaRepository implements ITaskRepository {
       orderBy: { id: 'asc' },
     });
     return rows.map((r) => this.toDomain(r));
-  }
-
-  async findPaginated(
-    params: QueryParams,
-    projectIds?: number[],
-  ): Promise<PaginatedResult<Task>> {
-    const where: Prisma.TaskWhereInput = {};
-
-    if (projectIds && projectIds.length > 0) {
-      where.projectId = { in: projectIds };
-    }
-
-    if (params.filters) {
-      for (const [key, value] of Object.entries(params.filters)) {
-        if (value !== undefined && value !== null) {
-          (where as Record<string, unknown>)[key] = value;
-        }
-      }
-    }
-
-    if (params.search) {
-      const searchFields = params.searchFields ?? ['name', 'description'];
-      where.OR = searchFields.map((field) => ({
-        [field]: { contains: params.search, mode: 'insensitive' as const },
-      }));
-    }
-
-    const pagination = buildDbPagination(params.page, params.limit);
-    const sortSpec = buildDbSort(params.sort);
-    const orderBy = sortSpec
-      ? { [sortSpec.field]: sortSpec.direction }
-      : { id: 'asc' as const };
-
-    const [rows, total] = await Promise.all([
-      this.prisma.task.findMany({
-        where,
-        orderBy,
-        skip: pagination.skip,
-        take: pagination.take,
-      }),
-      this.prisma.task.count({ where }),
-    ]);
-
-    return buildPaginatedResult(
-      rows.map((r) => this.toDomain(r)),
-      total,
-      pagination,
-    );
   }
 
   async clearAssigneeByUserAndProjects(

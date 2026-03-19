@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Param,
+  Query,
   ParseIntPipe,
   UseGuards,
   Inject,
@@ -11,6 +12,7 @@ import {
 import {
   ApiTags,
   ApiBearerAuth,
+  ApiQuery,
   ApiOperation,
   ApiResponse,
 } from '@nestjs/swagger';
@@ -22,6 +24,9 @@ import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { AuditAction } from '@/common/enums/audit-action.enum';
 import { TaskStatus } from '@/common/enums/task-status.enum';
+import type { AuditLog } from '@/domain/models/audit-log.model';
+import type { Project } from '@/domain/models/project.model';
+import type { Task } from '@/domain/models/task.model';
 import type { IAuditLogRepository } from '@/domain/repositories/audit-log.repository';
 import { AUDIT_LOG_REPOSITORY } from '@/domain/repositories/audit-log.repository';
 import type { IProjectRepository } from '@/domain/repositories/project.repository';
@@ -30,6 +35,7 @@ import type { ITaskRepository } from '@/domain/repositories/task.repository';
 import { TASK_REPOSITORY } from '@/domain/repositories/task.repository';
 import type { IRiskAssessmentService } from '@/domain/services/risk-assessment.interface';
 import { RISK_ASSESSMENT_SERVICE } from '@/domain/services/risk-assessment.interface';
+import { ReadModelResponseFactory } from '@/common/read-models/read-model-response.factory';
 import { ProjectRiskOutputDto, TaskRiskOutputDto } from './dto';
 import { buildTaskRiskInput } from './helpers/build-task-risk-input';
 
@@ -48,6 +54,7 @@ export class RiskController {
     @Inject(AUDIT_LOG_REPOSITORY)
     private readonly auditLogRepository: IAuditLogRepository,
     private readonly projectAccessService: ProjectAccessService,
+    private readonly readModelResponseFactory: ReadModelResponseFactory,
   ) {}
 
   @Get('tasks/:id/risk')
@@ -155,26 +162,16 @@ export class RiskController {
     const taskIds = allTasks.map((t) => t.id);
     const auditLogs =
       await this.auditLogRepository.findByEntityIds('task', taskIds);
+    const statusChangesByTaskId = buildStatusChangeMap(auditLogs);
+    const assigneeLoadByTaskId = buildAssigneeLoadMap(allTasks);
 
     const result: Record<number, TaskRiskOutputDto> = {};
     for (const task of allTasks) {
-      const statusChangesCount = auditLogs.filter(
-        (log) =>
-          log.entityId === task.id &&
-          log.action === AuditAction.STATUS_CHANGE,
-      ).length;
-
-      const assigneeLoad = task.assigneeId
-        ? allTasks.filter(
-            (c) =>
-              c.assigneeId === task.assigneeId &&
-              c.status !== TaskStatus.DONE &&
-              c.status !== TaskStatus.CANCELLED &&
-              c.id !== task.id,
-          ).length
-        : 0;
-
-      const input = buildTaskRiskInput(task, statusChangesCount, assigneeLoad);
+      const input = buildTaskRiskInput(
+        task,
+        statusChangesByTaskId.get(task.id) ?? 0,
+        assigneeLoadByTaskId.get(task.id) ?? 0,
+      );
       result[task.id] = await this.riskService.assessTask(input);
     }
 
@@ -183,6 +180,12 @@ export class RiskController {
 
   @Get('risks/projects')
   @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
+  @ApiQuery({
+    name: 'projectIds',
+    required: false,
+    type: String,
+    description: 'Comma-separated list of project ids',
+  })
   @ApiOperation({
     summary: 'Оценка рисков всех видимых проектов (пакетный)',
   })
@@ -190,14 +193,62 @@ export class RiskController {
   async getAllProjectsRisk(
     @CurrentUser('id') userId: number,
     @CurrentUser('accountRole') userRole: AccountRole,
+    @Query('projectIds') projectIdsParam?: string | string[],
+    @Query('ids') legacyIds?: string | string[],
   ): Promise<Record<number, ProjectRiskOutputDto>> {
-    const projects =
-      userRole === AccountRole.ADMIN
-        ? await this.projectRepository.findAll()
-        : await this.projectAccessService.getVisibleProjects(userId);
+    const requestedProjectIds = this.readModelResponseFactory.normalizeIds(
+      projectIdsParam ?? legacyIds,
+    );
+    let projects: Project[];
 
-    const projectIds = projects.map((p) => p.id);
-    return this.riskService.assessProjectsBatch(projectIds);
+    if (projectIdsParam === undefined && legacyIds === undefined) {
+      projects =
+        userRole === AccountRole.ADMIN
+          ? await this.projectRepository.findAll()
+          : await this.projectAccessService.getVisibleProjects(userId);
+    } else {
+      if (requestedProjectIds.length === 0) {
+        return {};
+      }
+
+      if (userRole === AccountRole.ADMIN && this.projectRepository.findByIds) {
+        projects = await this.projectRepository.findByIds(requestedProjectIds);
+      } else {
+        const visibleProjects = await this.projectAccessService.getVisibleProjects(
+          userId,
+        );
+        const requestedProjectIdSet = new Set(requestedProjectIds);
+        projects = visibleProjects.filter((project) =>
+          requestedProjectIdSet.has(project.id),
+        );
+      }
+    }
+
+    if (projects.length === 0) {
+      return {};
+    }
+
+    const selectedProjectIds = projects.map((project) => project.id);
+    const tasks = await this.taskRepository.findByProjects(selectedProjectIds);
+    const taskIds = tasks.map((task) => task.id);
+    const auditLogs =
+      taskIds.length > 0
+        ? await this.auditLogRepository.findByEntityIds('task', taskIds)
+        : [];
+
+    const tasksByProjectId = groupTasksByProjectId(tasks);
+    const statusChangesByTaskId = buildStatusChangeMap(auditLogs);
+
+    const result: Record<number, ProjectRiskOutputDto> = {};
+    for (const project of projects) {
+      result[project.id] = await buildProjectRiskOutput(
+        tasksByProjectId.get(project.id) ?? [],
+        statusChangesByTaskId,
+        this.riskService,
+      );
+    }
+
+    return result;
   }
 
   @Post('risk/retrain')
@@ -207,4 +258,144 @@ export class RiskController {
   retrain() {
     return { message: 'Retraining not implemented yet' };
   }
+}
+
+function buildStatusChangeMap(auditLogs: AuditLog[]): Map<number, number> {
+  const counts = new Map<number, number>();
+
+  for (const log of auditLogs) {
+    if (log.entityId === null || log.action !== AuditAction.STATUS_CHANGE) {
+      continue;
+    }
+
+    counts.set(log.entityId, (counts.get(log.entityId) ?? 0) + 1);
+  }
+
+  return counts;
+}
+
+function buildAssigneeLoadMap(tasks: Task[]): Map<number, number> {
+  const activeCountsByAssignee = new Map<number, number>();
+
+  for (const task of tasks) {
+    if (
+      task.assigneeId === null ||
+      task.status === TaskStatus.DONE ||
+      task.status === TaskStatus.CANCELLED
+    ) {
+      continue;
+    }
+
+    activeCountsByAssignee.set(
+      task.assigneeId,
+      (activeCountsByAssignee.get(task.assigneeId) ?? 0) + 1,
+    );
+  }
+
+  const result = new Map<number, number>();
+  for (const task of tasks) {
+    if (task.assigneeId === null) {
+      result.set(task.id, 0);
+      continue;
+    }
+
+    result.set(task.id, Math.max(0, (activeCountsByAssignee.get(task.assigneeId) ?? 0) - 1));
+  }
+
+  return result;
+}
+
+function groupTasksByProjectId(tasks: Task[]): Map<number, Task[]> {
+  const grouped = new Map<number, Task[]>();
+
+  for (const task of tasks) {
+    const projectTasks = grouped.get(task.projectId) ?? [];
+    projectTasks.push(task);
+    grouped.set(task.projectId, projectTasks);
+  }
+
+  return grouped;
+}
+
+async function buildProjectRiskOutput(
+  tasks: Task[],
+  statusChangesByTaskId: Map<number, number>,
+  riskService: IRiskAssessmentService,
+): Promise<ProjectRiskOutputDto> {
+  const activeTasks = tasks.filter(
+    (task) =>
+      task.status !== TaskStatus.DONE && task.status !== TaskStatus.CANCELLED,
+  );
+
+  if (activeTasks.length === 0) {
+    return {
+      riskScore: 0,
+      riskLevel: 'low',
+      tasksAtRisk: [],
+      summary: 'Р’ РїСЂРѕРµРєС‚Рµ РЅРµС‚ Р°РєС‚РёРІРЅС‹С… Р·Р°РґР°С‡. Р РёСЃРєРё РѕС‚СЃСѓС‚СЃС‚РІСѓСЋС‚.',
+    };
+  }
+
+  const assigneeLoadByTaskId = buildAssigneeLoadMap(tasks);
+  const tasksAtRisk: ProjectRiskOutputDto['tasksAtRisk'] = [];
+  let totalDelay = 0;
+
+  for (const task of activeTasks) {
+    const taskRisk = await riskService.assessTask(
+      buildTaskRiskInput(
+        task,
+        statusChangesByTaskId.get(task.id) ?? 0,
+        assigneeLoadByTaskId.get(task.id) ?? 0,
+      ),
+    );
+
+    totalDelay += taskRisk.delayProbability;
+    if (taskRisk.delayProbability > 0.3) {
+      tasksAtRisk.push({
+        taskId: task.id,
+        taskName: task.name,
+        delayProbability: taskRisk.delayProbability,
+      });
+    }
+  }
+
+  tasksAtRisk.sort((left, right) => right.delayProbability - left.delayProbability);
+
+  const averageDelay = totalDelay / activeTasks.length;
+  const riskScore = Math.round(averageDelay * 100);
+  const riskLevel =
+    averageDelay > 0.6 ? 'high' : averageDelay > 0.3 ? 'medium' : 'low';
+  const highRiskCount = tasksAtRisk.filter(
+    (task) => task.delayProbability > 0.6,
+  ).length;
+
+  return {
+    riskScore,
+    riskLevel,
+    tasksAtRisk,
+    summary: buildProjectRiskSummary(
+      riskLevel,
+      riskScore,
+      activeTasks.length,
+      tasksAtRisk.length,
+      highRiskCount,
+    ),
+  };
+}
+
+function buildProjectRiskSummary(
+  riskLevel: 'low' | 'medium' | 'high',
+  riskScore: number,
+  totalActive: number,
+  atRiskCount: number,
+  highRiskCount: number,
+): string {
+  if (riskLevel === 'low') {
+    return `РџСЂРѕРµРєС‚ РІ Р·РµР»С‘РЅРѕР№ Р·РѕРЅРµ (${riskScore}/100). РР· ${totalActive} Р°РєС‚РёРІРЅС‹С… Р·Р°РґР°С‡ РЅРµС‚ Р·Р°РґР°С‡ СЃ РІС‹СЃРѕРєРёРј СЂРёСЃРєРѕРј.`;
+  }
+  if (riskLevel === 'medium') {
+    return `РџСЂРѕРµРєС‚ РёРјРµРµС‚ СЃСЂРµРґРЅРёР№ СѓСЂРѕРІРµРЅСЊ СЂРёСЃРєР° (${riskScore}/100). ${atRiskCount} РёР· ${totalActive} Р°РєС‚РёРІРЅС‹С… Р·Р°РґР°С‡ С‚СЂРµР±СѓСЋС‚ РІРЅРёРјР°РЅРёСЏ.`;
+  }
+
+  return `РџСЂРѕРµРєС‚ РёРјРµРµС‚ РІС‹СЃРѕРєРёР№ СЂРёСЃРє СЃСЂС‹РІР° СЃСЂРѕРєРѕРІ (${riskScore}/100): ${highRiskCount} Р·Р°РґР°С‡ СЃ РІРµСЂРѕСЏС‚РЅРѕСЃС‚СЊСЋ Р·Р°РґРµСЂР¶РєРё > 60%.`;
 }

@@ -14,7 +14,7 @@ import {
   TaskStatus,
 } from '@/common/enums/task-status.enum';
 import { BusinessException } from '@/common/exceptions/business.exception';
-import type {
+import {
   PaginatedResult,
   QueryParams,
 } from '@/common/helpers/query.helper';
@@ -47,25 +47,81 @@ export class TasksService {
     userId: number,
     userRole: AccountRole,
   ): Promise<PaginatedResult<Task>> {
-    if (userRole === AccountRole.ADMIN) {
-      return this.taskRepository.findPaginated({
-        ...params,
-        searchFields: params.searchFields ?? ['name', 'description'],
+    const page = normalizePage(params.page);
+    const limit = normalizeLimit(params.limit);
+    const projectId =
+      typeof params.filters?.['projectId'] === 'number'
+        ? (params.filters['projectId'] as number)
+        : undefined;
+    const status =
+      typeof params.filters?.['status'] === 'string'
+        ? (params.filters['status'] as string)
+        : undefined;
+    const difficulty =
+      typeof params.filters?.['difficulty'] === 'number'
+        ? (params.filters['difficulty'] as number)
+        : undefined;
+    const assigneeId =
+      typeof params.filters?.['assigneeId'] === 'number'
+        ? (params.filters['assigneeId'] as number)
+        : undefined;
+
+    if (this.taskRepository.findPage) {
+      const visibleProjectIds =
+        userRole === AccountRole.ADMIN
+          ? undefined
+          : await this.projectAccessService.getVisibleProjectIds(userId);
+
+      if (visibleProjectIds && visibleProjectIds.length === 0) {
+        return toPaginatedResult([], 0, page, limit);
+      }
+
+      const result = await this.taskRepository.findPage({
+        page,
+        limit,
+        search: params.search,
+        sort: params.sort,
+        projectIds: visibleProjectIds,
+        projectId,
+        status,
+        difficulty,
+        assigneeId,
       });
+
+      return toPaginatedResult(result.items, result.total, page, limit);
     }
 
-    const visibleProjectIds =
-      await this.projectAccessService.getVisibleProjectIds(userId);
-    if (visibleProjectIds.length === 0) {
-      return { items: [], total: 0, page: 1, limit: params.limit ?? 20, totalPages: 1 };
+    let tasks: Task[];
+
+    if (userRole === AccountRole.ADMIN) {
+      tasks = await this.taskRepository.findAll();
+    } else {
+      const visibleProjectIds =
+        await this.projectAccessService.getVisibleProjectIds(userId);
+      tasks =
+        visibleProjectIds.length > 0
+          ? await this.taskRepository.findByProjects(visibleProjectIds)
+          : [];
     }
 
-    return this.taskRepository.findPaginated(
-      {
-        ...params,
-        searchFields: params.searchFields ?? ['name', 'description'],
-      },
-      visibleProjectIds,
+    return applyInMemoryPagination(
+      tasks
+        .filter((task) => (projectId !== undefined ? task.projectId === projectId : true))
+        .filter((task) => (status ? task.status === status : true))
+        .filter((task) => (difficulty !== undefined ? task.difficulty === difficulty : true))
+        .filter((task) => (assigneeId !== undefined ? task.assigneeId === assigneeId : true))
+        .filter((task) => {
+          if (!params.search) {
+            return true;
+          }
+
+          const search = params.search.toLowerCase();
+          return [task.name, task.description].some((field) =>
+            field.toLowerCase().includes(search),
+          );
+        }),
+      page,
+      limit,
     );
   }
 
@@ -296,4 +352,44 @@ export class TasksService {
       );
     }
   }
+}
+
+function normalizePage(page: number | undefined): number {
+  if (!Number.isFinite(page)) {
+    return 1;
+  }
+
+  return Math.max(1, Math.trunc(page as number));
+}
+
+function normalizeLimit(limit: number | undefined): number {
+  if (!Number.isFinite(limit)) {
+    return 20;
+  }
+
+  return Math.min(100, Math.max(1, Math.trunc(limit as number)));
+}
+
+function toPaginatedResult<T>(
+  items: T[],
+  total: number,
+  page: number,
+  limit: number,
+): PaginatedResult<T> {
+  return {
+    items,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit) || 1,
+  };
+}
+
+function applyInMemoryPagination<T>(
+  items: T[],
+  page: number,
+  limit: number,
+): PaginatedResult<T> {
+  const offset = (page - 1) * limit;
+  return toPaginatedResult(items.slice(offset, offset + limit), items.length, page, limit);
 }

@@ -1,13 +1,13 @@
-import { api, buildQuery } from './client'
+import { api, buildQuery, type ApiRequestOptions } from './client'
 import type { Task, PaginatedResult, QueryParams } from '../types'
 
 export const tasksApi = {
-  list(params: QueryParams = {}): Promise<PaginatedResult<Task>> {
-    return api.get(`/tasks${buildQuery(params)}`)
+  list(params: QueryParams = {}, options: ApiRequestOptions = {}): Promise<PaginatedResult<Task>> {
+    return api.get(`/tasks${buildQuery(params)}`, options)
   },
 
-  getById(id: number): Promise<Task> {
-    return api.get(`/tasks/${id}`)
+  getById(id: number, options: ApiRequestOptions = {}): Promise<Task> {
+    return api.get(`/tasks/${id}`, options)
   },
 
   create(dto: {

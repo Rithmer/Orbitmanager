@@ -4,7 +4,6 @@ import { ProjectRole } from '@/common/enums/project-role.enum';
 import { TeamRole } from '@/common/enums/team-role.enum';
 import { TtlCacheService } from '@/common/cache/ttl-cache.service';
 import type { Project } from '@/domain/models/project.model';
-import type { TeamMember } from '@/domain/models/team-member.model';
 import type { IProjectRepository } from '@/domain/repositories/project.repository';
 import { PROJECT_REPOSITORY } from '@/domain/repositories/project.repository';
 import type { IProjectMemberRepository } from '@/domain/repositories/project-member.repository';
@@ -34,12 +33,12 @@ export class ProjectAccessService {
     );
   }
 
-  async getVisibleProjectIds(userId: number): Promise<number[]> {
-    const projects = await this.getVisibleProjects(userId);
-    return projects.map((project) => project.id);
-  }
-
   private async computeVisibleProjects(userId: number): Promise<Project[]> {
+    const visibleProjectIds = await this.getVisibleProjectIds(userId);
+    if (visibleProjectIds.length === 0) {
+      return [];
+    }
+
     const teamMemberships = await this.teamMemberRepository.findByUser(userId);
     if (teamMemberships.length === 0) {
       return [];
@@ -49,19 +48,42 @@ export class ProjectAccessService {
       ...new Set(teamMemberships.map((membership) => membership.teamId)),
     ];
     const allTeamProjects = await this.projectRepository.findByTeams(teamIds);
-    if (allTeamProjects.length === 0) {
+
+    return this.dedupeProjects(
+      allTeamProjects.filter((project) => visibleProjectIds.includes(project.id)),
+    );
+  }
+
+  async getVisibleProjectIds(userId: number): Promise<number[]> {
+    const teamMemberships = await this.teamMemberRepository.findByUser(userId);
+    if (teamMemberships.length === 0) {
       return [];
     }
 
-    const visibleProjectIds = await this.buildVisibleProjectIds(
-      teamMemberships,
-      userId,
-      allTeamProjects,
-    );
+    const fullAccessTeamIds = [
+      ...new Set(
+        teamMemberships
+          .filter((membership) =>
+            this.canViewAllTeamProjects(membership.teamRole),
+          )
+          .map((membership) => membership.teamId),
+      ),
+    ];
 
-    return this.dedupeProjects(
-      allTeamProjects.filter((project) => visibleProjectIds.has(project.id)),
-    );
+    const observerTeamIds = [
+      ...new Set(
+        teamMemberships
+          .filter((membership) => membership.teamRole === TeamRole.OBSERVER)
+          .map((membership) => membership.teamId),
+      ),
+    ];
+
+    const [fullAccessProjectIds, observerProjectIds] = await Promise.all([
+      this.getProjectIdsForTeams(fullAccessTeamIds),
+      this.getObserverProjectIds(userId, observerTeamIds),
+    ]);
+
+    return [...new Set([...fullAccessProjectIds, ...observerProjectIds])];
   }
 
   async assertProjectVisibility(
@@ -176,49 +198,49 @@ export class ProjectAccessService {
     return projectMembership?.role === ProjectRole.TEAM_LEAD;
   }
 
-  private async buildVisibleProjectIds(
-    teamMemberships: TeamMember[],
+  private async getProjectIdsForTeams(teamIds: number[]): Promise<number[]> {
+    if (teamIds.length === 0) {
+      return [];
+    }
+
+    if (this.projectRepository.findIdsByTeams) {
+      return this.projectRepository.findIdsByTeams(teamIds);
+    }
+
+    const projects = await this.projectRepository.findByTeams(teamIds);
+    return projects.map((project) => project.id);
+  }
+
+  private async getObserverProjectIds(
     userId: number,
-    allTeamProjects: Project[],
-  ): Promise<Set<number>> {
-    const ownerOrMemberTeams = new Set(
-      teamMemberships
-        .filter((membership) =>
-          this.canViewAllTeamProjects(membership.teamRole),
-        )
-        .map((membership) => membership.teamId),
-    );
-
-    const observerTeams = new Set(
-      teamMemberships
-        .filter((membership) => membership.teamRole === TeamRole.OBSERVER)
-        .map((membership) => membership.teamId),
-    );
-
-    if (observerTeams.size === 0) {
-      return new Set(
-        allTeamProjects
-          .filter((project) => ownerOrMemberTeams.has(project.teamId))
-          .map((project) => project.id),
-      );
+    observerTeamIds: number[],
+  ): Promise<number[]> {
+    if (observerTeamIds.length === 0) {
+      return [];
     }
 
     const projectMemberships =
       await this.projectMemberRepository.findByUser(userId);
-    const assignedProjectIds = new Set(
-      projectMemberships.map((membership) => membership.projectId),
-    );
+    if (projectMemberships.length === 0) {
+      return [];
+    }
 
-    return new Set(
-      allTeamProjects
-        .filter(
-          (project) =>
-            ownerOrMemberTeams.has(project.teamId) ||
-            (observerTeams.has(project.teamId) &&
-              assignedProjectIds.has(project.id)),
-        )
-        .map((project) => project.id),
-    );
+    const membershipProjectIds = [
+      ...new Set(projectMemberships.map((membership) => membership.projectId)),
+    ];
+    const membershipProjects = this.projectRepository.findByIds
+      ? await this.projectRepository.findByIds(membershipProjectIds)
+      : await this.projectRepository.findByTeams(observerTeamIds);
+
+    const observerTeamSet = new Set(observerTeamIds);
+    const membershipProjectIdSet = new Set(membershipProjectIds);
+    return membershipProjects
+      .filter(
+        (project) =>
+          observerTeamSet.has(project.teamId) &&
+          membershipProjectIdSet.has(project.id),
+      )
+      .map((project) => project.id);
   }
 
   private canViewAllTeamProjects(teamRole: TeamRole): boolean {

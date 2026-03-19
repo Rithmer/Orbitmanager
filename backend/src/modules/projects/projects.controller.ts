@@ -7,7 +7,6 @@ import {
   Param,
   Body,
   Query,
-  Req,
   ParseIntPipe,
   UseGuards,
   HttpCode,
@@ -29,8 +28,7 @@ import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { ProjectRole } from '@/common/enums/project-role.enum';
 import { ProjectStatus } from '@/common/enums/project-status.enum';
-import type { AuthenticatedRequest } from '@/common/http/authenticated-request';
-import type { Project } from '@/domain/models/project.model';
+import { parseOptionalInt } from '@/common/helpers/query.helper';
 
 @ApiTags('Projects')
 @ApiBearerAuth()
@@ -58,14 +56,16 @@ export class ProjectsController {
     @Query('limit') limit?: string,
     @Query('sort') sort?: string,
   ) {
+    const parsedTeamId = parseOptionalInt(teamId);
+
     return this.projectsService.findAll(
       {
         search,
         sort,
-        page: page ? parseInt(page, 10) : undefined,
-        limit: limit ? parseInt(limit, 10) : undefined,
+        page: parseOptionalInt(page),
+        limit: parseOptionalInt(limit),
         filters: {
-          ...(teamId ? { teamId: parseInt(teamId, 10) } : {}),
+          ...(parsedTeamId !== undefined ? { teamId: parsedTeamId } : {}),
           ...(status ? { status } : {}),
         },
       },
@@ -111,12 +111,8 @@ export class ProjectsController {
     @Body() dto: UpdateProjectDto,
     @CurrentUser('id') userId: number,
     @CurrentUser('accountRole') userRole: AccountRole,
-    @Req() req: AuthenticatedRequest,
   ) {
-    const cachedProject = req.projectAccessCache?.project as
-      | Project
-      | undefined;
-    return this.projectsService.update(id, dto, userId, userRole, cachedProject);
+    return this.projectsService.update(id, dto, userId, userRole);
   }
 
   @Delete(':id')

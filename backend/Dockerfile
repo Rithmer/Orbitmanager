@@ -1,10 +1,11 @@
 # Build stage
 FROM node:20-alpine AS builder
 WORKDIR /app
+ARG DATABASE_URL=postgresql://postgres:postgres@localhost:5432/task_manager
+ENV DATABASE_URL=${DATABASE_URL}
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 COPY . .
-RUN npx prisma generate
 RUN npm run build
 
 # Production stage
