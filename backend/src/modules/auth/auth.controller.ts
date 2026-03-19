@@ -7,6 +7,7 @@ import {
   HttpStatus,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -18,12 +19,20 @@ import { RegisterDto, LoginDto, RefreshDto } from './dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 
+const authThrottleOptions = {
+  default: {
+    ttl: () => parseInt(process.env['THROTTLE_AUTH_TTL'] ?? '60000', 10),
+    limit: () => parseInt(process.env['THROTTLE_AUTH_LIMIT'] ?? '20', 10),
+  },
+} as const;
+
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
+  @Throttle(authThrottleOptions)
   @ApiOperation({ summary: 'Регистрация нового пользователя' })
   @ApiResponse({
     status: 201,
@@ -35,6 +44,7 @@ export class AuthController {
   }
 
   @Post('login')
+  @Throttle(authThrottleOptions)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Авторизация (получение токенов)' })
   @ApiResponse({ status: 200, description: 'Токены выданы' })
@@ -44,6 +54,7 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @Throttle(authThrottleOptions)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Обновление токенов' })
   @ApiResponse({ status: 200, description: 'Новая пара токенов' })

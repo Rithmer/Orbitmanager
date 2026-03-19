@@ -1,9 +1,12 @@
 FROM node:20-alpine
 WORKDIR /app
 RUN apk add --no-cache bash postgresql-client
+ARG DATABASE_URL=postgresql://postgres:postgres@localhost:5432/task_manager
+ENV DATABASE_URL=${DATABASE_URL}
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 COPY . .
-RUN npx prisma generate
+RUN npm run db:generate
 EXPOSE 3000
-CMD ["sh", "-c", "npx prisma migrate deploy --config ./prisma/prisma.config.ts && npm run seed && npm run start:dev"]
+ENTRYPOINT ["scripts/docker-entrypoint.sh"]
+CMD ["npm", "run", "start:dev"]

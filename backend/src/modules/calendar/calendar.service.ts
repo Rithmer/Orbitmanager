@@ -8,9 +8,8 @@ import {
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { AuditAction } from '@/common/enums/audit-action.enum';
 import {
-  type PaginatedResult,
-  QueryHelper,
-  type QueryParams,
+  PaginatedResult,
+  QueryParams,
 } from '@/common/helpers/query.helper';
 import { CalendarEvent } from '@/domain/models/calendar-event.model';
 import type { ICalendarEventRepository } from '@/domain/repositories/calendar-event.repository';
@@ -33,6 +32,24 @@ export class CalendarService {
     userRole: AccountRole,
     filters?: { projectId?: number; from?: string; to?: string },
   ): Promise<PaginatedResult<CalendarEvent>> {
+    const page = normalizePage(params.page);
+    const limit = normalizeLimit(params.limit);
+
+    if (this.calendarEventRepository.findPage) {
+      const result = await this.calendarEventRepository.findPage({
+        page,
+        limit,
+        search: params.search,
+        sort: params.sort,
+        userId: userRole === AccountRole.ADMIN ? undefined : userId,
+        projectId: filters?.projectId,
+        from: filters?.from,
+        to: filters?.to,
+      });
+
+      return toPaginatedResult(result.items, result.total, page, limit);
+    }
+
     let events: CalendarEvent[];
 
     if (filters?.from && filters?.to) {
@@ -59,10 +76,20 @@ export class CalendarService {
       events = events.filter((e) => e.projectId === filters.projectId);
     }
 
-    return QueryHelper.apply(events, {
-      ...params,
-      searchFields: params.searchFields ?? ['title', 'description'],
-    });
+    return applyInMemoryPagination(
+      events.filter((event) => {
+        if (!params.search) {
+          return true;
+        }
+
+        const search = params.search.toLowerCase();
+        return [event.title, event.description].some((field) =>
+          field.toLowerCase().includes(search),
+        );
+      }),
+      page,
+      limit,
+    );
   }
 
   async findById(
@@ -183,4 +210,44 @@ export class CalendarService {
       `Удалено событие "${event.title}"`,
     );
   }
+}
+
+function normalizePage(page: number | undefined): number {
+  if (!Number.isFinite(page)) {
+    return 1;
+  }
+
+  return Math.max(1, Math.trunc(page as number));
+}
+
+function normalizeLimit(limit: number | undefined): number {
+  if (!Number.isFinite(limit)) {
+    return 20;
+  }
+
+  return Math.min(100, Math.max(1, Math.trunc(limit as number)));
+}
+
+function toPaginatedResult<T>(
+  items: T[],
+  total: number,
+  page: number,
+  limit: number,
+): PaginatedResult<T> {
+  return {
+    items,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit) || 1,
+  };
+}
+
+function applyInMemoryPagination<T>(
+  items: T[],
+  page: number,
+  limit: number,
+): PaginatedResult<T> {
+  const offset = (page - 1) * limit;
+  return toPaginatedResult(items.slice(offset, offset + limit), items.length, page, limit);
 }

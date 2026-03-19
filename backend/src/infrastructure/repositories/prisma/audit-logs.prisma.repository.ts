@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
-import type { IAuditLogRepository, AuditLogFilters } from '@/domain/repositories/audit-log.repository';
+import type {
+  AuditLogListQuery,
+  IAuditLogRepository,
+} from '@/domain/repositories/audit-log.repository';
 import { AuditLog } from '@/domain/models/audit-log.model';
-import type { AuditLog as PrismaAuditLog, Prisma } from '@prisma/client';
-import type { QueryParams, PaginatedResult } from '@/common/helpers/query.helper';
-import { buildDbPagination, buildDbSort, buildPaginatedResult } from '@/common/helpers/query.helper';
+import type { AuditLog as PrismaAuditLog } from '@prisma/client';
+import { buildOrderBy, buildStringSearch, getPagination } from './prisma-query.utils';
 
 @Injectable()
 export class AuditLogsPrismaRepository implements IAuditLogRepository {
@@ -15,6 +17,44 @@ export class AuditLogsPrismaRepository implements IAuditLogRepository {
       orderBy: { id: 'asc' },
     });
     return rows.map((r) => this.toDomain(r));
+  }
+
+  async findPage(params: AuditLogListQuery) {
+    const { skip, take } = getPagination(params.page, params.limit);
+    const where = {
+      ...(params.userId !== undefined ? { userId: params.userId } : {}),
+      ...(params.entityType ? { entityType: params.entityType } : {}),
+      ...(params.entityId !== undefined ? { entityId: params.entityId } : {}),
+      ...(params.action ? { action: params.action } : {}),
+      ...(params.from || params.to
+        ? {
+            timestamp: {
+              ...(params.from ? { gte: new Date(params.from) } : {}),
+              ...(params.to ? { lte: new Date(params.to) } : {}),
+            },
+          }
+        : {}),
+      ...buildStringSearch(params.search, ['description', 'entityType', 'action']),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.auditLog.findMany({
+        where,
+        orderBy: buildOrderBy(
+          params.sort,
+          ['id', 'userId', 'action', 'entityType', 'entityId', 'timestamp'],
+          'id',
+        ),
+        skip,
+        take,
+      }),
+      this.prisma.auditLog.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((row) => this.toDomain(row)),
+      total,
+    };
   }
 
   async findById(id: number): Promise<AuditLog | null> {
@@ -54,53 +94,43 @@ export class AuditLogsPrismaRepository implements IAuditLogRepository {
   }
 
   async findPaginated(
-    params: QueryParams,
-    filters?: AuditLogFilters,
-  ): Promise<PaginatedResult<AuditLog>> {
-    const where: Prisma.AuditLogWhereInput = {};
-
-    if (filters?.userId) where.userId = filters.userId;
-    if (filters?.entityType) where.entityType = filters.entityType;
-    if (filters?.entityId) where.entityId = filters.entityId;
-    if (filters?.action) where.action = filters.action;
-    if (filters?.from || filters?.to) {
-      where.timestamp = {};
-      if (filters.from) where.timestamp.gte = new Date(filters.from);
-      if (filters.to) where.timestamp.lte = new Date(filters.to);
-    }
-
-    if (params.search) {
-      const searchFields = params.searchFields ?? [
-        'description',
-        'entityType',
-        'action',
-      ];
-      where.OR = searchFields.map((field) => ({
-        [field]: { contains: params.search, mode: 'insensitive' as const },
-      }));
-    }
-
-    const pagination = buildDbPagination(params.page, params.limit);
-    const sortSpec = buildDbSort(params.sort);
-    const orderBy = sortSpec
-      ? { [sortSpec.field]: sortSpec.direction }
-      : { id: 'desc' as const };
+    params: AuditLogListQuery,
+  ) {
+    const { skip, take } = getPagination(params.page, params.limit);
+    const where = {
+      ...(params.userId !== undefined ? { userId: params.userId } : {}),
+      ...(params.entityType ? { entityType: params.entityType } : {}),
+      ...(params.entityId !== undefined ? { entityId: params.entityId } : {}),
+      ...(params.action ? { action: params.action } : {}),
+      ...(params.from || params.to
+        ? {
+            timestamp: {
+              ...(params.from ? { gte: new Date(params.from) } : {}),
+              ...(params.to ? { lte: new Date(params.to) } : {}),
+            },
+          }
+        : {}),
+      ...buildStringSearch(params.search, ['description', 'entityType', 'action']),
+    };
 
     const [rows, total] = await Promise.all([
       this.prisma.auditLog.findMany({
         where,
-        orderBy,
-        skip: pagination.skip,
-        take: pagination.take,
+        orderBy: buildOrderBy(
+          params.sort,
+          ['id', 'userId', 'action', 'entityType', 'entityId', 'timestamp'],
+          'id',
+        ),
+        skip,
+        take,
       }),
       this.prisma.auditLog.count({ where }),
     ]);
 
-    return buildPaginatedResult(
-      rows.map((r) => this.toDomain(r)),
+    return {
+      items: rows.map((row) => this.toDomain(row)),
       total,
-      pagination,
-    );
+    };
   }
 
   async create(log: Omit<AuditLog, 'id'>): Promise<AuditLog> {

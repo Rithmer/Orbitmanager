@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
-import type { IProjectRepository } from '@/domain/repositories/project.repository';
+import type {
+  IProjectRepository,
+  ProjectListQuery,
+} from '@/domain/repositories/project.repository';
 import { Project } from '@/domain/models/project.model';
-import type { Project as PrismaProject, Prisma } from '@prisma/client';
-import type { QueryParams, PaginatedResult } from '@/common/helpers/query.helper';
-import { buildDbPagination, buildDbSort, buildPaginatedResult } from '@/common/helpers/query.helper';
+import type { Project as PrismaProject } from '@prisma/client';
+import { buildOrderBy, buildStringSearch, getPagination } from './prisma-query.utils';
 
 @Injectable()
 export class ProjectsPrismaRepository implements IProjectRepository {
@@ -15,9 +17,50 @@ export class ProjectsPrismaRepository implements IProjectRepository {
     return rows.map((r) => this.toDomain(r));
   }
 
+  async findPage(params: ProjectListQuery) {
+    const { skip, take } = getPagination(params.page, params.limit);
+    const where = {
+      ...(params.projectIds ? { id: { in: params.projectIds } } : {}),
+      ...(params.teamId !== undefined ? { teamId: params.teamId } : {}),
+      ...(params.status ? { status: params.status } : {}),
+      ...buildStringSearch(params.search, ['name', 'description']),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.project.findMany({
+        where,
+        orderBy: buildOrderBy(
+          params.sort,
+          ['id', 'teamId', 'name', 'description', 'status', 'createdAt', 'updatedAt'],
+          'id',
+        ),
+        skip,
+        take,
+      }),
+      this.prisma.project.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((row) => this.toDomain(row)),
+      total,
+    };
+  }
+
   async findById(id: number): Promise<Project | null> {
     const row = await this.prisma.project.findUnique({ where: { id } });
     return row ? this.toDomain(row) : null;
+  }
+
+  async findByIds(ids: number[]): Promise<Project[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const rows = await this.prisma.project.findMany({
+      where: { id: { in: ids } },
+      orderBy: { id: 'asc' },
+    });
+    return rows.map((row) => this.toDomain(row));
   }
 
   async findByTeam(teamId: number): Promise<Project[]> {
@@ -29,6 +72,7 @@ export class ProjectsPrismaRepository implements IProjectRepository {
   }
 
   async findByTeams(teamIds: number[]): Promise<Project[]> {
+    if (teamIds.length === 0) return [];
     const rows = await this.prisma.project.findMany({
       where: { teamId: { in: teamIds } },
       orderBy: { id: 'asc' },
@@ -36,52 +80,18 @@ export class ProjectsPrismaRepository implements IProjectRepository {
     return rows.map((r) => this.toDomain(r));
   }
 
-  async findPaginated(
-    params: QueryParams,
-    projectIds?: number[],
-  ): Promise<PaginatedResult<Project>> {
-    const where: Prisma.ProjectWhereInput = {};
-
-    if (projectIds && projectIds.length > 0) {
-      where.id = { in: projectIds };
+  async findIdsByTeams(teamIds: number[]): Promise<number[]> {
+    if (teamIds.length === 0) {
+      return [];
     }
 
-    if (params.filters) {
-      for (const [key, value] of Object.entries(params.filters)) {
-        if (value !== undefined && value !== null) {
-          (where as Record<string, unknown>)[key] = value;
-        }
-      }
-    }
+    const rows = await this.prisma.project.findMany({
+      where: { teamId: { in: teamIds } },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+    });
 
-    if (params.search) {
-      const searchFields = params.searchFields ?? ['name', 'description'];
-      where.OR = searchFields.map((field) => ({
-        [field]: { contains: params.search, mode: 'insensitive' as const },
-      }));
-    }
-
-    const pagination = buildDbPagination(params.page, params.limit);
-    const sortSpec = buildDbSort(params.sort);
-    const orderBy = sortSpec
-      ? { [sortSpec.field]: sortSpec.direction }
-      : { id: 'asc' as const };
-
-    const [rows, total] = await Promise.all([
-      this.prisma.project.findMany({
-        where,
-        orderBy,
-        skip: pagination.skip,
-        take: pagination.take,
-      }),
-      this.prisma.project.count({ where }),
-    ]);
-
-    return buildPaginatedResult(
-      rows.map((r) => this.toDomain(r)),
-      total,
-      pagination,
-    );
+    return rows.map((row) => row.id);
   }
 
   async create(project: Omit<Project, 'id'>): Promise<Project> {

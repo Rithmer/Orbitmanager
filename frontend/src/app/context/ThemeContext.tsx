@@ -1,22 +1,37 @@
-import { createContext, useContext, useState } from 'react'
+import { useLayoutEffect, useState, type ReactNode } from 'react'
+import { ThemeContext, type Theme } from './theme-context'
 
-type Theme = 'light' | 'dark'
+const THEME_STORAGE_KEY = 'orbit-manager-theme'
 
-interface ThemeContextType {
-  theme: Theme
-  isDark: boolean
-  toggleTheme: () => void
+function getInitialTheme(): Theme {
+  if (typeof window === 'undefined') {
+    return 'light'
+  }
+
+  const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY)
+  if (storedTheme === 'dark' || storedTheme === 'light') {
+    return storedTheme
+  }
+
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
-const ThemeContext = createContext<ThemeContextType>({
-  theme: 'light',
-  isDark: false,
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
-  toggleTheme: () => {},
-})
+function applyTheme(theme: Theme) {
+  const isDark = theme === 'dark'
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('light')
+  document.documentElement.classList.toggle('dark', isDark)
+  document.body.classList.toggle('dark', isDark)
+  document.documentElement.style.colorScheme = theme
+  document.body.style.colorScheme = theme
+}
+
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const [theme, setTheme] = useState<Theme>(getInitialTheme)
+
+  useLayoutEffect(() => {
+    applyTheme(theme)
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme)
+  }, [theme])
 
   const toggleTheme = () => {
     setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))
@@ -24,12 +39,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <ThemeContext.Provider value={{ theme, isDark: theme === 'dark', toggleTheme }}>
-      <div className={theme === 'dark' ? 'dark' : ''}>{children}</div>
+      {children}
     </ThemeContext.Provider>
   )
 }
-
-export function useTheme() {
-  return useContext(ThemeContext)
-}
-

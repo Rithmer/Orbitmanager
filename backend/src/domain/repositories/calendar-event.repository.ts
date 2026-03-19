@@ -1,7 +1,21 @@
 import { CalendarEvent } from '../models/calendar-event.model';
+import {
+  RepositoryPageParams,
+  RepositoryPageResult,
+} from './paginated-query.types';
+
+export interface CalendarEventListQuery extends RepositoryPageParams {
+  userId?: number;
+  projectId?: number;
+  from?: string;
+  to?: string;
+}
 
 export interface ICalendarEventRepository {
   findAll(): Promise<CalendarEvent[]>;
+  findPage?(
+    params: CalendarEventListQuery,
+  ): Promise<RepositoryPageResult<CalendarEvent>>;
   findById(id: number): Promise<CalendarEvent | null>;
   findByUser(userId: number): Promise<CalendarEvent[]>;
   findByProject(projectId: number): Promise<CalendarEvent[]>;

@@ -6,6 +6,7 @@ import {
   Delete,
   Param,
   Body,
+  Query,
   ParseIntPipe,
   UseGuards,
   HttpCode,
@@ -14,6 +15,7 @@ import {
 import {
   ApiTags,
   ApiBearerAuth,
+  ApiQuery,
   ApiOperation,
   ApiResponse,
 } from '@nestjs/swagger';
@@ -25,22 +27,51 @@ import { TeamRoles } from '@/common/decorators/team-roles.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { TeamRole } from '@/common/enums/team-role.enum';
+import { ReadModelResponseFactory } from '@/common/read-models/read-model-response.factory';
 
 @ApiTags('Team Members')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller()
 export class TeamMembersController {
-  constructor(private readonly teamsService: TeamsService) {}
+  constructor(
+    private readonly teamsService: TeamsService,
+    private readonly readModelResponseFactory: ReadModelResponseFactory,
+  ) {}
 
   @Get('teams/members/batch')
+  @ApiQuery({
+    name: 'teamIds',
+    required: false,
+    type: String,
+    description: 'Comma-separated list of team ids',
+  })
   @ApiOperation({ summary: 'Получить участников всех команд' })
   @ApiResponse({
     status: 200,
     description: 'Участники сгруппированные по teamId',
   })
-  findAllMembersBatch() {
-    return this.teamsService.findAllMembersBatch();
+  async findAllMembersBatch(
+    @Query('teamIds') teamIds?: string | string[],
+    @Query('ids') legacyIds?: string | string[],
+  ) {
+    const allMembersByTeamId = await this.teamsService.findAllMembersBatch();
+    const requestedTeamIds = this.readModelResponseFactory.normalizeIds(
+      teamIds ?? legacyIds,
+    );
+
+    if (teamIds === undefined && legacyIds === undefined) {
+      return allMembersByTeamId;
+    }
+
+    if (requestedTeamIds.length === 0) {
+      return {};
+    }
+
+    return this.readModelResponseFactory.pickGroupedByIds(
+      allMembersByTeamId,
+      requestedTeamIds,
+    );
   }
 
   @Get('teams/:teamId/members')

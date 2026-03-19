@@ -1,0 +1,28 @@
+# Ensure LF line endings for all files on checkout
+* text=auto eol=lf
+
+# Force LF for shell scripts (critical for Docker/Linux)
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Force LF for nginx config
+*.conf text eol=lf
+
+# Binary files — no conversion
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.otf binary
+*.zip binary
+*.gz binary
+*.sql binary
+*.joblib binary
+*.onnx binary
+*.csv text eol=lf

@@ -1,13 +1,13 @@
-import { api, buildQuery } from './client'
+import { api, buildQuery, type ApiRequestOptions } from './client'
 import type { Project, ProjectMember, PaginatedResult, QueryParams } from '../types'
 
 export const projectsApi = {
-  list(params: QueryParams = {}): Promise<PaginatedResult<Project>> {
-    return api.get(`/projects${buildQuery(params)}`)
+  list(params: QueryParams = {}, options: ApiRequestOptions = {}): Promise<PaginatedResult<Project>> {
+    return api.get(`/projects${buildQuery(params)}`, options)
   },
 
-  getById(id: number): Promise<Project> {
-    return api.get(`/projects/${id}`)
+  getById(id: number, options: ApiRequestOptions = {}): Promise<Project> {
+    return api.get(`/projects/${id}`, options)
   },
 
   create(dto: {
@@ -30,12 +30,12 @@ export const projectsApi = {
     return api.delete(`/projects/${id}`)
   },
 
-  getMembers(projectId: number): Promise<ProjectMember[]> {
-    return api.get(`/projects/${projectId}/members`)
+  getMembers(projectId: number, options: ApiRequestOptions = {}): Promise<ProjectMember[]> {
+    return api.get(`/projects/${projectId}/members`, options)
   },
 
-  getAllMembersBatch(): Promise<Record<number, ProjectMember[]>> {
-    return api.get('/projects/members/batch')
+  getAllMembersBatch(options: ApiRequestOptions = {}): Promise<Record<number, ProjectMember[]>> {
+    return api.get('/projects/members/batch', options)
   },
 
   addMember(

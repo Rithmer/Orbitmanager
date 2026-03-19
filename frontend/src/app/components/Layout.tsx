@@ -16,8 +16,8 @@ import {
   ShieldCheck,
   X,
 } from 'lucide-react'
-import { useTheme } from '../context/ThemeContext'
-import { useAuth } from '../context/AuthContext'
+import { useTheme } from '../context/useTheme'
+import { useAuth } from '../context/useAuth'
 import { AccountRole, ACCOUNT_ROLE_LABELS } from '../types'
 
 export function Layout() {
@@ -276,7 +276,7 @@ export function Layout() {
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
             className={`p-2 rounded-lg transition-all duration-200 btn-press md:hidden ${burgerColor} ${burgerHover}`}
-            aria-label="Toggle sidebar"
+            aria-label="Переключить боковое меню"
           >
             <Menu className="w-5 h-5" />
           </button>
@@ -286,7 +286,7 @@ export function Layout() {
             <button
               onClick={toggleTheme}
               className={`p-2 rounded-lg transition-all duration-200 icon-btn-hover ${themeIconColor} ${themeIconHover}`}
-              aria-label="Toggle theme"
+              aria-label="Переключить тему"
             >
               {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>

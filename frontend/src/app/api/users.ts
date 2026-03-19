@@ -1,13 +1,13 @@
-import { api, buildQuery } from './client'
+import { api, buildQuery, type ApiRequestOptions } from './client'
 import type { User, PaginatedResult, QueryParams } from '../types'
 
 export const usersApi = {
-  list(params: QueryParams = {}): Promise<PaginatedResult<User>> {
-    return api.get(`/users${buildQuery(params)}`)
+  list(params: QueryParams = {}, options: ApiRequestOptions = {}): Promise<PaginatedResult<User>> {
+    return api.get(`/users${buildQuery(params)}`, options)
   },
 
-  getById(id: number): Promise<User> {
-    return api.get(`/users/${id}`)
+  getById(id: number, options: ApiRequestOptions = {}): Promise<User> {
+    return api.get(`/users/${id}`, options)
   },
 
   create(dto: {

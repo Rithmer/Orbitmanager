@@ -1,5 +1,9 @@
 const API_BASE = '/api'
 
+export interface ApiRequestOptions {
+  signal?: AbortSignal
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -105,30 +109,41 @@ class ApiClient {
     return text ? JSON.parse(text) : (undefined as T)
   }
 
-  get<T>(path: string) {
-    return this.request<T>(path)
+  get<T>(path: string, options: ApiRequestOptions = {}) {
+    return this.request<T>(path, options)
   }
 
-  post<T>(path: string, body?: unknown) {
+  post<T>(path: string, body?: unknown, options: ApiRequestOptions = {}) {
     return this.request<T>(path, {
+      ...options,
       method: 'POST',
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
   }
 
-  patch<T>(path: string, body: unknown) {
+  patch<T>(path: string, body: unknown, options: ApiRequestOptions = {}) {
     return this.request<T>(path, {
+      ...options,
       method: 'PATCH',
       body: JSON.stringify(body),
     })
   }
 
-  delete<T>(path: string) {
-    return this.request<T>(path, { method: 'DELETE' })
+  delete<T>(path: string, options: ApiRequestOptions = {}) {
+    return this.request<T>(path, { ...options, method: 'DELETE' })
   }
 }
 
 export const api = new ApiClient()
+
+export function isAbortError(error: unknown): boolean {
+  return (
+    !!error &&
+    typeof error === 'object' &&
+    'name' in error &&
+    (error as { name?: string }).name === 'AbortError'
+  )
+}
 
 export function buildQuery(params: Record<string, string | number | undefined>): string {
   const entries = Object.entries(params).filter(

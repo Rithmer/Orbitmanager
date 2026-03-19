@@ -1,20 +1,20 @@
-import { api } from './client'
+import { api, type ApiRequestOptions } from './client'
 import type { TaskRiskOutput, ProjectRiskOutput } from '../types'
 
 export const riskApi = {
-  getProjectRisk(projectId: number): Promise<ProjectRiskOutput> {
-    return api.get(`/projects/${projectId}/risk`)
+  getProjectRisk(projectId: number, options: ApiRequestOptions = {}): Promise<ProjectRiskOutput> {
+    return api.get(`/projects/${projectId}/risk`, options)
   },
 
-  getTaskRisk(taskId: number): Promise<TaskRiskOutput> {
-    return api.get(`/tasks/${taskId}/risk`)
+  getTaskRisk(taskId: number, options: ApiRequestOptions = {}): Promise<TaskRiskOutput> {
+    return api.get(`/tasks/${taskId}/risk`, options)
   },
 
-  getProjectTasksRisk(projectId: number): Promise<Record<number, TaskRiskOutput>> {
-    return api.get(`/projects/${projectId}/tasks-risk`)
+  getProjectTasksRisk(projectId: number, options: ApiRequestOptions = {}): Promise<Record<number, TaskRiskOutput>> {
+    return api.get(`/projects/${projectId}/tasks-risk`, options)
   },
 
-  getAllProjectsRisk(): Promise<Record<number, ProjectRiskOutput>> {
-    return api.get('/risks/projects')
+  getAllProjectsRisk(options: ApiRequestOptions = {}): Promise<Record<number, ProjectRiskOutput>> {
+    return api.get('/risks/projects', options)
   },
 }

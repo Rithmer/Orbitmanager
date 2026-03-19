@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router'
 import { Eye, EyeOff } from 'lucide-react'
-import { useTheme } from '../context/ThemeContext'
-import { useAuth } from '../context/AuthContext'
+import { useTheme } from '../context/useTheme'
+import { useAuth } from '../context/useAuth'
 
 export function Register() {
   const { isDark } = useTheme()
@@ -64,12 +64,12 @@ export function Register() {
   const fields = [
     { key: 'fullName', label: 'ФИО', placeholder: 'Иванов Иван Иванович', required: true },
     { key: 'login', label: 'Логин', placeholder: 'ivanov', required: true },
-    { key: 'profession', label: 'Должность', placeholder: 'Frontend Developer', required: false },
+    { key: 'profession', label: 'Должность', placeholder: 'Фронтенд-разработчик', required: false },
   ] as const
 
   return (
-    <div className={`${pageBg} min-h-screen flex items-center justify-center p-4`}>
-      <div className={`${cardBg} border ${cardBorder} rounded-2xl p-8 w-full max-w-md fade-in-up`}>
+    <div className={`${pageBg} min-h-screen flex items-center justify-center p-4 page-load-stagger`}>
+      <div className={`${cardBg} border ${cardBorder} rounded-2xl p-8 w-full max-w-md stagger-row`}>
         <div className="text-center mb-8">
           <h1 className="text-2xl font-extrabold mb-1">
             <span className="text-[#4880ff]">Orbit</span>

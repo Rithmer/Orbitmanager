@@ -25,6 +25,7 @@ import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { TaskStatus } from '@/common/enums/task-status.enum';
+import { parseOptionalInt } from '@/common/helpers/query.helper';
 
 @ApiTags('Tasks')
 @ApiBearerAuth()
@@ -56,17 +57,21 @@ export class TasksController {
     @Query('limit') limit?: string,
     @Query('sort') sort?: string,
   ) {
+    const parsedProjectId = parseOptionalInt(projectId);
+    const parsedDifficulty = parseOptionalInt(difficulty);
+    const parsedAssigneeId = parseOptionalInt(assigneeId);
+
     return this.tasksService.findAll(
       {
         search,
         sort,
-        page: page ? parseInt(page, 10) : undefined,
-        limit: limit ? parseInt(limit, 10) : undefined,
+        page: parseOptionalInt(page),
+        limit: parseOptionalInt(limit),
         filters: {
-          ...(projectId ? { projectId: parseInt(projectId, 10) } : {}),
+          ...(parsedProjectId !== undefined ? { projectId: parsedProjectId } : {}),
           ...(status ? { status } : {}),
-          ...(difficulty ? { difficulty: parseInt(difficulty, 10) } : {}),
-          ...(assigneeId ? { assigneeId: parseInt(assigneeId, 10) } : {}),
+          ...(parsedDifficulty !== undefined ? { difficulty: parsedDifficulty } : {}),
+          ...(parsedAssigneeId !== undefined ? { assigneeId: parsedAssigneeId } : {}),
         },
       },
       userId,

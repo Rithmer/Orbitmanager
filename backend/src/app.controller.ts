@@ -13,4 +13,19 @@ export class AppController {
   getHealth() {
     return this.appService.getHealth();
   }
+
+  @Get('health/live')
+  @ApiOperation({ summary: 'Liveness probe' })
+  @ApiResponse({ status: 200, description: 'Приложение принимает запросы' })
+  getLiveHealth() {
+    return this.appService.getLiveHealth();
+  }
+
+  @Get('health/ready')
+  @ApiOperation({ summary: 'Readiness probe' })
+  @ApiResponse({ status: 200, description: 'Приложение и база данных готовы' })
+  @ApiResponse({ status: 503, description: 'База данных недоступна' })
+  getReadyHealth() {
+    return this.appService.getReadyHealth();
+  }
 }

@@ -1,7 +1,10 @@
 import { AuditLog } from '../models/audit-log.model';
-import type { PaginatedResult, QueryParams } from '@/common/helpers/query.helper';
+import {
+  RepositoryPageParams,
+  RepositoryPageResult,
+} from './paginated-query.types';
 
-export interface AuditLogFilters {
+export interface AuditLogListQuery extends RepositoryPageParams {
   userId?: number;
   entityType?: string;
   entityId?: number;
@@ -12,6 +15,9 @@ export interface AuditLogFilters {
 
 export interface IAuditLogRepository {
   findAll(): Promise<AuditLog[]>;
+  findPage?(
+    params: AuditLogListQuery,
+  ): Promise<RepositoryPageResult<AuditLog>>;
   findById(id: number): Promise<AuditLog | null>;
   findByEntity(entityType: string, entityId: number): Promise<AuditLog[]>;
   findByEntityIds(
@@ -19,10 +25,6 @@ export interface IAuditLogRepository {
     entityIds: number[],
   ): Promise<AuditLog[]>;
   findByUser(userId: number): Promise<AuditLog[]>;
-  findPaginated(
-    params: QueryParams,
-    filters?: AuditLogFilters,
-  ): Promise<PaginatedResult<AuditLog>>;
   create(log: Omit<AuditLog, 'id'>): Promise<AuditLog>;
   createMany(logs: Omit<AuditLog, 'id'>[]): Promise<number>;
 }

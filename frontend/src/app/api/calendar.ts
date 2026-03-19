@@ -1,13 +1,16 @@
-import { api, buildQuery } from './client'
+import { api, buildQuery, type ApiRequestOptions } from './client'
 import type { CalendarEvent, PaginatedResult, QueryParams } from '../types'
 
 export const calendarApi = {
-  list(params: QueryParams & { from?: string; to?: string; projectId?: number } = {}): Promise<PaginatedResult<CalendarEvent>> {
-    return api.get(`/calendar-events${buildQuery(params)}`)
+  list(
+    params: QueryParams & { from?: string; to?: string; projectId?: number } = {},
+    options: ApiRequestOptions = {},
+  ): Promise<PaginatedResult<CalendarEvent>> {
+    return api.get(`/calendar-events${buildQuery(params)}`, options)
   },
 
-  getById(id: number): Promise<CalendarEvent> {
-    return api.get(`/calendar-events/${id}`)
+  getById(id: number, options: ApiRequestOptions = {}): Promise<CalendarEvent> {
+    return api.get(`/calendar-events/${id}`, options)
   },
 
   create(dto: {

@@ -1,15 +1,23 @@
 import { Project } from '../models/project.model';
-import type { PaginatedResult, QueryParams } from '@/common/helpers/query.helper';
+import {
+  RepositoryPageParams,
+  RepositoryPageResult,
+} from './paginated-query.types';
+
+export interface ProjectListQuery extends RepositoryPageParams {
+  projectIds?: number[];
+  teamId?: number;
+  status?: string;
+}
 
 export interface IProjectRepository {
   findAll(): Promise<Project[]>;
+  findPage?(params: ProjectListQuery): Promise<RepositoryPageResult<Project>>;
   findById(id: number): Promise<Project | null>;
+  findByIds?(ids: number[]): Promise<Project[]>;
   findByTeam(teamId: number): Promise<Project[]>;
   findByTeams(teamIds: number[]): Promise<Project[]>;
-  findPaginated(
-    params: QueryParams,
-    projectIds?: number[],
-  ): Promise<PaginatedResult<Project>>;
+  findIdsByTeams?(teamIds: number[]): Promise<number[]>;
   create(project: Omit<Project, 'id'>): Promise<Project>;
   update(id: number, partial: Partial<Project>): Promise<Project | null>;
   delete(id: number): Promise<boolean>;

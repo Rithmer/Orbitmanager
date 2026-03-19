@@ -1,16 +1,24 @@
 import { Task } from '../models/task.model';
-import type { PaginatedResult, QueryParams } from '@/common/helpers/query.helper';
+import {
+  RepositoryPageParams,
+  RepositoryPageResult,
+} from './paginated-query.types';
+
+export interface TaskListQuery extends RepositoryPageParams {
+  projectIds?: number[];
+  projectId?: number;
+  status?: string;
+  difficulty?: number;
+  assigneeId?: number;
+}
 
 export interface ITaskRepository {
   findAll(): Promise<Task[]>;
+  findPage?(params: TaskListQuery): Promise<RepositoryPageResult<Task>>;
   findById(id: number): Promise<Task | null>;
   findByProject(projectId: number): Promise<Task[]>;
   findByProjects(projectIds: number[]): Promise<Task[]>;
   findByCreator(userId: number): Promise<Task[]>;
-  findPaginated(
-    params: QueryParams,
-    projectIds?: number[],
-  ): Promise<PaginatedResult<Task>>;
   clearAssigneeByUserAndProjects(
     userId: number,
     projectIds: number[],

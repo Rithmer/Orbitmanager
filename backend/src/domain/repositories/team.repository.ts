@@ -1,11 +1,16 @@
 import { Team } from '../models/team.model';
-import type { PaginatedResult, QueryParams } from '@/common/helpers/query.helper';
+import {
+  RepositoryPageParams,
+  RepositoryPageResult,
+} from './paginated-query.types';
+
+export interface TeamListQuery extends RepositoryPageParams {}
 
 export interface ITeamRepository {
   findAll(): Promise<Team[]>;
+  findPage?(params: TeamListQuery): Promise<RepositoryPageResult<Team>>;
   findById(id: number): Promise<Team | null>;
   findByCreator(userId: number): Promise<Team[]>;
-  findPaginated(params: QueryParams): Promise<PaginatedResult<Team>>;
   create(team: Omit<Team, 'id'>): Promise<Team>;
   update(id: number, partial: Partial<Team>): Promise<Team | null>;
   delete(id: number): Promise<boolean>;

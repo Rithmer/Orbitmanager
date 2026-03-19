@@ -26,6 +26,7 @@ import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
+import { parseOptionalInt } from '@/common/helpers/query.helper';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -52,8 +53,8 @@ export class UsersController {
     return this.usersService.findAll({
       search,
       sort,
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
+      page: parseOptionalInt(page),
+      limit: parseOptionalInt(limit),
       filters: accountRole ? { accountRole } : undefined,
     });
   }
