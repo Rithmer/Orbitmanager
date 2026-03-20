@@ -2,9 +2,9 @@ import { RiskLevel } from '../../types'
 import type { ProjectBoardTask } from './types'
 
 export const PROJECT_BOARD_COLUMNS = [
-  { status: 'new', title: 'К выполнению', accent: '#4880ff' },
+  { status: 'new', title: 'Запланировано', accent: '#4880ff' },
   { status: 'in_progress', title: 'В процессе', accent: '#f59e0b' },
-  { status: 'review', title: 'На проверке', accent: '#8b5cf6' },
+  { status: 'review', title: 'Тестирование', accent: '#8b5cf6' },
   { status: 'done', title: 'Выполнено', accent: '#10b981' },
   { status: 'cancelled', title: 'Отменено', accent: '#ef4444' },
 ] as const

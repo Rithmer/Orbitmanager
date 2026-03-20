@@ -23,11 +23,15 @@ export interface ProjectBoardTask {
   deadline: string
   status: string
   difficulty: number
-  assigneeId: number | null
+  // Multi-assignees (new contract)
+  assigneeIds?: number[] | null
+  // Legacy single-assignee (old contract)
+  assigneeId?: number | null
   createdById: number
   createdAt: string
   updatedAt: string
-  assignee: ProjectBoardUserSummary | null
+  // Legacy single-assignee summary (old contract)
+  assignee?: ProjectBoardUserSummary | null
 }
 
 export interface ProjectBoardProject {

@@ -16,7 +16,7 @@ export const tasksApi = {
     description?: string
     deadline: string
     difficulty: number
-    assigneeId?: number
+    assigneeIds?: number[]
   }): Promise<Task> {
     return api.post('/tasks', dto)
   },
@@ -29,7 +29,7 @@ export const tasksApi = {
       deadline: string
       difficulty: number
       status: string
-      assigneeId: number | null
+      assigneeIds: number[]
     }>,
   ): Promise<Task> {
     return api.patch(`/tasks/${id}`, dto)

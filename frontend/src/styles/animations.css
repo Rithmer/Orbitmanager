@@ -11,6 +11,15 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Smooth theme transitions (light <-> dark) */
+body,
+body * {
+  transition:
+    background-color 250ms ease,
+    color 250ms ease,
+    border-color 250ms ease;
+}
+
 /* ═══════════════════════════════════════
      Button Press Effect (scale bounce)
      ═══════════════════════════════════════ */
