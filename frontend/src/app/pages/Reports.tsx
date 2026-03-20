@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import {
   BarChart,
   Bar,
@@ -14,7 +15,10 @@ import {
   Area,
 } from 'recharts'
 import { AlertCircle, CheckCircle2, Clock, TrendingUp, RefreshCw } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { useTheme } from '../context/useTheme'
+import { appQueryKeys } from '../query'
+import { reportsApi } from '../api/reports'
 import {
   AnalyticsChartSkeleton,
   PageRefreshOverlay,
@@ -29,7 +33,22 @@ import { useReportsSummaryQuery } from '../features/reports'
 
 export function Reports() {
   const { isDark } = useTheme()
-  const summaryQuery = useReportsSummaryQuery()
+
+  const [selectedProjectId, setSelectedProjectId] = useState<number | undefined>(undefined)
+  const projectsQuery = useQuery({
+    queryKey: appQueryKeys.reports.projects(),
+    queryFn: ({ signal }) => reportsApi.getProjects({ signal }),
+    staleTime: 60_000,
+  })
+
+  const projects = projectsQuery.data ?? []
+
+  useEffect(() => {
+    if (selectedProjectId !== undefined) return
+    if (projects.length > 0) setSelectedProjectId(projects[0].id)
+  }, [projects, selectedProjectId])
+
+  const summaryQuery = useReportsSummaryQuery(selectedProjectId)
   const summary = summaryQuery.data
   const isInitialLoading = summaryQuery.isPending && !summary
   const isRefreshing = summaryQuery.isFetching && !!summary
@@ -141,7 +160,28 @@ export function Reports() {
       title="Аналитика"
       description={isRefreshing ? 'Сводка обновляется в фоне.' : 'Обзор производительности и прогресса.'}
       actions={
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          {projectsQuery.isPending ? (
+            <div className={`px-3 py-2 rounded-lg text-xs font-semibold ${textSecondary} bg-transparent border border-transparent`}>
+              Загрузка проектов...
+            </div>
+          ) : projects.length > 0 ? (
+            <select
+              value={selectedProjectId ?? ''}
+              onChange={(e) => {
+                const next = e.target.value ? Number(e.target.value) : undefined
+                setSelectedProjectId(next)
+              }}
+              className={`px-3 py-2 rounded-lg border text-sm ${isDark ? 'bg-[#1c2534] border-[#313d4f] text-[#f4f3f2]' : 'bg-white border-[#e8e8e8] text-[#202224]'}`}
+            >
+              <option value="">Все доступные проекты</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          ) : null}
           {isRefreshing ? <RefreshBadge isRefreshing label="Обновляем отчёты" /> : null}
           <button
             onClick={() => void summaryQuery.refetch()}
@@ -297,7 +337,7 @@ export function Reports() {
         refreshLabel="Обновляем распределение по сложности"
         headerSlot={isRefreshing ? <RefreshBadge isRefreshing label="Обновляем" /> : null}
       >
-        <div style={{ height: 200 }}>
+        <div style={{ height: 200 }} className="overflow-hidden">
           {difficultyDistribution.length === 0 ? (
             <p className={`text-sm ${textSecondary} text-center py-10`}>Нет данных</p>
           ) : (
@@ -321,8 +361,8 @@ export function Reports() {
                     strokeWidth={2.5}
                     fill="url(#prodGradient)"
                     name="Количество задач"
-                    dot={{ fill: '#4880ff', strokeWidth: 0, r: 4 }}
-                    activeDot={{ r: 6, fill: '#4880ff' }}
+                    dot={{ fill: '#4880ff', strokeWidth: 0, r: 4, stroke: 'none' }}
+                    activeDot={{ r: 6, fill: '#4880ff', strokeWidth: 0, stroke: 'none' }}
                     isAnimationActive
                     animationBegin={0}
                     animationDuration={1000}

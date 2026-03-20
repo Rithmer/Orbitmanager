@@ -25,6 +25,7 @@ export const appQueryKeys = {
   reports: {
     summary: (params?: Record<string, unknown>) =>
       ['reports', 'summary', params ?? null] as const,
+    projects: () => ['reports', 'projects'] as const,
   },
   admin: {
     users: (params?: Record<string, unknown>) => ['admin', 'users', params ?? null] as const,
