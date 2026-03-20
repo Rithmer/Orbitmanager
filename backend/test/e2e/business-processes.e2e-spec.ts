@@ -312,13 +312,13 @@ describe('Business Processes (e2e)', () => {
           description: 'JWT access + refresh',
           deadline: deadline.toISOString(),
           difficulty: 3,
-          assigneeId: secondUserId,
+          assigneeIds: [secondUserId],
         })
         .expect(201);
 
       expect(res.body.id).toBeDefined();
       expect(res.body.name).toBe('Implement authentication');
-      expect(res.body.assigneeId).toBe(secondUserId);
+      expect(res.body.assigneeIds).toContain(secondUserId);
     });
 
     it('Step 9: verify audit entries with admin account', async () => {
@@ -406,10 +406,10 @@ describe('Business Processes (e2e)', () => {
       const res = await server()
         .patch(`/tasks/${taskId}`)
         .set('Authorization', `Bearer ${ownerToken}`)
-        .send({ assigneeId: devId })
+        .send({ assigneeIds: [devId] })
         .expect(200);
 
-      expect(res.body.assigneeId).toBe(devId);
+      expect(res.body.assigneeIds).toContain(devId);
     });
 
     it('Step 5: move status new -> in_progress', async () => {
@@ -660,7 +660,7 @@ describe('Business Processes (e2e)', () => {
           name: 'Cleanup task',
           deadline: deadline.toISOString(),
           difficulty: 2,
-          assigneeId: developer.userId,
+          assigneeIds: [developer.userId],
         })
         .expect(201);
       const taskId = taskRes.body.id as number;
@@ -684,7 +684,7 @@ describe('Business Processes (e2e)', () => {
         .set('Authorization', `Bearer ${owner.accessToken}`)
         .expect(200);
 
-      expect(updatedTask.body.assigneeId).toBeNull();
+      expect(updatedTask.body.assigneeIds).toEqual([]);
     });
   });
 });

@@ -447,13 +447,10 @@ export class ProjectsService {
     const timestamp = new Date();
 
     await this.prisma!.$transaction(async (tx) => {
-      await tx.task.updateMany({
+      await tx.taskAssignee.deleteMany({
         where: {
-          assigneeId: member.userId,
-          projectId: member.projectId,
-        },
-        data: {
-          assigneeId: null,
+          userId: member.userId,
+          task: { projectId: member.projectId },
         },
       });
 

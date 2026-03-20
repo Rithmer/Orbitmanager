@@ -95,15 +95,20 @@ export class RiskController {
       (log) => log.action === AuditAction.STATUS_CHANGE,
     ).length;
 
-    const assigneeLoad = task.assigneeId
-      ? allTasks.filter(
-          (candidate) =>
-            candidate.assigneeId === task.assigneeId &&
-            candidate.status !== TaskStatus.DONE &&
-            candidate.status !== TaskStatus.CANCELLED &&
-            candidate.id !== task.id,
-        ).length
-      : 0;
+    const assigneeLoad =
+      task.assigneeIds.length > 0
+        ? Math.max(
+            ...task.assigneeIds.map((uid) =>
+              allTasks.filter(
+                (candidate) =>
+                  candidate.assigneeIds.includes(uid) &&
+                  candidate.status !== TaskStatus.DONE &&
+                  candidate.status !== TaskStatus.CANCELLED &&
+                  candidate.id !== task.id,
+              ).length,
+            ),
+          )
+        : 0;
 
     const input = buildTaskRiskInput(task, statusChangesCount, assigneeLoad);
 
@@ -279,27 +284,28 @@ function buildAssigneeLoadMap(tasks: Task[]): Map<number, number> {
 
   for (const task of tasks) {
     if (
-      task.assigneeId === null ||
       task.status === TaskStatus.DONE ||
       task.status === TaskStatus.CANCELLED
     ) {
       continue;
     }
 
-    activeCountsByAssignee.set(
-      task.assigneeId,
-      (activeCountsByAssignee.get(task.assigneeId) ?? 0) + 1,
-    );
+    for (const uid of task.assigneeIds) {
+      activeCountsByAssignee.set(uid, (activeCountsByAssignee.get(uid) ?? 0) + 1);
+    }
   }
 
   const result = new Map<number, number>();
   for (const task of tasks) {
-    if (task.assigneeId === null) {
+    if (task.assigneeIds.length === 0) {
       result.set(task.id, 0);
       continue;
     }
 
-    result.set(task.id, Math.max(0, (activeCountsByAssignee.get(task.assigneeId) ?? 0) - 1));
+    const maxLoad = Math.max(
+      ...task.assigneeIds.map((uid) => activeCountsByAssignee.get(uid) ?? 0),
+    );
+    result.set(task.id, Math.max(0, maxLoad - 1));
   }
 
   return result;

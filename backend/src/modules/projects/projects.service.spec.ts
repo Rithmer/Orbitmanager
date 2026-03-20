@@ -56,7 +56,7 @@ const paginatedProjects = {
 const mockProjectRepository = {
   findAll: jest.fn().mockResolvedValue([mockProject]),
   findById: jest.fn().mockResolvedValue(mockProject),
-  findPaginated: jest.fn().mockResolvedValue(paginatedProjects),
+  findPage: jest.fn().mockResolvedValue(paginatedProjects),
   findByTeam: jest.fn().mockResolvedValue([mockProject]),
   findByTeams: jest.fn().mockResolvedValue([mockProject]),
   create: jest
@@ -196,8 +196,8 @@ describe('ProjectsService', () => {
     it('admin sees all projects', async () => {
       const result = await service.findAll({}, 10, AccountRole.ADMIN);
       expect(result.items).toHaveLength(1);
-      expect(mockProjectRepository.findPaginated).toHaveBeenCalledWith(
-        expect.objectContaining({ searchFields: ['name', 'description'] }),
+      expect(mockProjectRepository.findPage).toHaveBeenCalledWith(
+        expect.objectContaining({ page: 1, limit: 20 }),
       );
     });
 
@@ -207,9 +207,8 @@ describe('ProjectsService', () => {
       expect(
         mockProjectAccessService.getVisibleProjectIds,
       ).toHaveBeenCalledWith(10);
-      expect(mockProjectRepository.findPaginated).toHaveBeenCalledWith(
-        expect.objectContaining({ searchFields: ['name', 'description'] }),
-        [mockProject.id],
+      expect(mockProjectRepository.findPage).toHaveBeenCalledWith(
+        expect.objectContaining({ page: 1, limit: 20, projectIds: [mockProject.id] }),
       );
     });
   });

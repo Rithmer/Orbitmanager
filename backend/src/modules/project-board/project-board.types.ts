@@ -37,11 +37,13 @@ export interface ProjectBoardTaskDto {
   deadline: string
   difficulty: number
   status: TaskStatus
+  assigneeIds: number[]
+  assignees: ProjectBoardUserSummaryDto[]
+  /** @deprecated обратная совместимость — первый исполнитель или null */
   assigneeId: number | null
   createdById: number
   createdAt: string
   updatedAt: string
-  assignee: ProjectBoardUserSummaryDto | null
 }
 
 export interface ProjectBoardViewResponseDto {

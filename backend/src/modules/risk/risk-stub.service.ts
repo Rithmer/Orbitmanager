@@ -82,15 +82,20 @@ export class RiskStubService implements IRiskAssessmentService {
           l.action === AuditAction.STATUS_CHANGE,
       ).length;
 
-      const assigneeLoad = task.assigneeId
-        ? tasks.filter(
-            (t) =>
-              t.assigneeId === task.assigneeId &&
-              t.status !== TaskStatus.DONE &&
-              t.status !== TaskStatus.CANCELLED &&
-              t.id !== task.id,
-          ).length
-        : 0;
+      const assigneeLoad =
+        task.assigneeIds.length > 0
+          ? Math.max(
+              ...task.assigneeIds.map((uid) =>
+                tasks.filter(
+                  (t) =>
+                    t.assigneeIds.includes(uid) &&
+                    t.status !== TaskStatus.DONE &&
+                    t.status !== TaskStatus.CANCELLED &&
+                    t.id !== task.id,
+                ).length,
+              ),
+            )
+          : 0;
 
       const input = buildTaskRiskInput(task, statusChangesCount, assigneeLoad);
 
@@ -186,15 +191,20 @@ export class RiskStubService implements IRiskAssessmentService {
             l.action === AuditAction.STATUS_CHANGE,
         ).length;
 
-        const assigneeLoad = task.assigneeId
-          ? tasks.filter(
-              (t) =>
-                t.assigneeId === task.assigneeId &&
-                t.status !== TaskStatus.DONE &&
-                t.status !== TaskStatus.CANCELLED &&
-                t.id !== task.id,
-            ).length
-          : 0;
+        const assigneeLoad =
+          task.assigneeIds.length > 0
+            ? Math.max(
+                ...task.assigneeIds.map((uid) =>
+                  tasks.filter(
+                    (t) =>
+                      t.assigneeIds.includes(uid) &&
+                      t.status !== TaskStatus.DONE &&
+                      t.status !== TaskStatus.CANCELLED &&
+                      t.id !== task.id,
+                  ).length,
+                ),
+              )
+            : 0;
 
         const input = buildTaskRiskInput(
           task,

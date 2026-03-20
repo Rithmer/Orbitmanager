@@ -286,7 +286,7 @@ describe('RiskStubService', () => {
           createdAt: new Date(
             now.getTime() - 15 * 24 * 60 * 60 * 1000,
           ).toISOString(),
-          assigneeId: 1,
+          assigneeIds: [1],
         },
         {
           id: 2,
@@ -296,7 +296,7 @@ describe('RiskStubService', () => {
           difficulty: 1,
           deadline: futureDate,
           createdAt: isoNow,
-          assigneeId: 2,
+          assigneeIds: [2],
         },
       ];
 
@@ -330,7 +330,7 @@ describe('RiskStubService', () => {
           createdAt: new Date(
             now.getTime() - 5 * 24 * 60 * 60 * 1000,
           ).toISOString(),
-          assigneeId: 1,
+          assigneeIds: [1],
         },
         {
           id: 2,
@@ -342,7 +342,7 @@ describe('RiskStubService', () => {
           createdAt: new Date(
             now.getTime() - 10 * 24 * 60 * 60 * 1000,
           ).toISOString(),
-          assigneeId: 2,
+          assigneeIds: [2],
         },
       ];
 
@@ -395,7 +395,7 @@ describe('RiskStubService', () => {
           createdAt: new Date(
             now.getTime() - 15 * 24 * 60 * 60 * 1000,
           ).toISOString(),
-          assigneeId: 1,
+          assigneeIds: [1],
         },
         {
           id: 2,
@@ -405,7 +405,7 @@ describe('RiskStubService', () => {
           difficulty: 1,
           deadline: futureDate,
           createdAt: isoNow,
-          assigneeId: 2,
+          assigneeIds: [2],
         },
       ];
       mockTaskRepository.findByProjects.mockResolvedValueOnce(tasks);

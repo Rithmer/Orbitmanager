@@ -53,7 +53,7 @@ const paginated = (items: AuditLog[]) => ({
 });
 
 const mockAuditLogRepository = {
-  findPaginated: jest.fn().mockResolvedValue(paginated(seedLogs)),
+  findPage: jest.fn().mockResolvedValue(paginated(seedLogs)),
   findById: jest.fn(),
   findByEntity: jest.fn(),
   create: jest
@@ -123,7 +123,7 @@ describe('AuditService', () => {
 
   describe('findAll', () => {
     it('returns all logs when no filters applied', async () => {
-      mockAuditLogRepository.findPaginated.mockResolvedValueOnce(
+      mockAuditLogRepository.findPage.mockResolvedValueOnce(
         paginated(seedLogs),
       );
       const result = await service.findAll({});
@@ -132,7 +132,7 @@ describe('AuditService', () => {
 
     it('filters by userId', async () => {
       const filtered = seedLogs.filter((l) => l.userId === 10);
-      mockAuditLogRepository.findPaginated.mockResolvedValueOnce(
+      mockAuditLogRepository.findPage.mockResolvedValueOnce(
         paginated(filtered),
       );
       const result = await service.findAll({}, { userId: 10 });
@@ -142,7 +142,7 @@ describe('AuditService', () => {
 
     it('filters by entityType', async () => {
       const filtered = seedLogs.filter((l) => l.entityType === 'task');
-      mockAuditLogRepository.findPaginated.mockResolvedValueOnce(
+      mockAuditLogRepository.findPage.mockResolvedValueOnce(
         paginated(filtered),
       );
       const result = await service.findAll({}, { entityType: 'task' });
@@ -152,7 +152,7 @@ describe('AuditService', () => {
 
     it('filters by entityId', async () => {
       const filtered = seedLogs.filter((l) => l.entityId === 7);
-      mockAuditLogRepository.findPaginated.mockResolvedValueOnce(
+      mockAuditLogRepository.findPage.mockResolvedValueOnce(
         paginated(filtered),
       );
       const result = await service.findAll({}, { entityId: 7 });
@@ -162,7 +162,7 @@ describe('AuditService', () => {
 
     it('filters by action', async () => {
       const filtered = seedLogs.filter((l) => l.action === AuditAction.DELETE);
-      mockAuditLogRepository.findPaginated.mockResolvedValueOnce(
+      mockAuditLogRepository.findPage.mockResolvedValueOnce(
         paginated(filtered),
       );
       const result = await service.findAll({}, { action: AuditAction.DELETE });
@@ -174,7 +174,7 @@ describe('AuditService', () => {
       const filtered = seedLogs.filter(
         (l) => l.timestamp >= '2026-03-02T00:00:00.000Z',
       );
-      mockAuditLogRepository.findPaginated.mockResolvedValueOnce(
+      mockAuditLogRepository.findPage.mockResolvedValueOnce(
         paginated(filtered),
       );
       const result = await service.findAll(
@@ -188,7 +188,7 @@ describe('AuditService', () => {
       const filtered = seedLogs.filter(
         (l) => l.timestamp <= '2026-03-01T23:59:59.000Z',
       );
-      mockAuditLogRepository.findPaginated.mockResolvedValueOnce(
+      mockAuditLogRepository.findPage.mockResolvedValueOnce(
         paginated(filtered),
       );
       const result = await service.findAll(
@@ -202,7 +202,7 @@ describe('AuditService', () => {
       const filtered = seedLogs.filter(
         (l) => l.userId === 10 && l.action === AuditAction.UPDATE,
       );
-      mockAuditLogRepository.findPaginated.mockResolvedValueOnce(
+      mockAuditLogRepository.findPage.mockResolvedValueOnce(
         paginated(filtered),
       );
       const result = await service.findAll(

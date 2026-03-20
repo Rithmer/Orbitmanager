@@ -40,10 +40,10 @@ type TaskRecord = {
   deadline: Date;
   status: string;
   difficulty: number;
-  assigneeId: number | null;
   createdById: number;
   createdAt: Date;
   updatedAt: Date;
+  assignees: Array<{ userId: number }>;
 };
 
 @Injectable()
@@ -125,10 +125,12 @@ export class ProjectsListViewService {
         deadline: true,
         status: true,
         difficulty: true,
-        assigneeId: true,
         createdById: true,
         createdAt: true,
         updatedAt: true,
+        assignees: {
+          select: { userId: true },
+        },
       },
     });
 
@@ -209,7 +211,7 @@ export class ProjectsListViewService {
               deadline: task.deadline.toISOString(),
               status: task.status as TaskStatus,
               difficulty: task.difficulty,
-              assigneeId: task.assigneeId,
+              assigneeIds: task.assignees.map((a) => a.userId),
               createdById: task.createdById,
               createdAt: task.createdAt.toISOString(),
               updatedAt: task.updatedAt.toISOString(),
@@ -326,27 +328,32 @@ function buildAssigneeLoadMap(tasks: TaskRecord[]): Map<number, number> {
   const activeCountsByAssignee = new Map<number, number>();
 
   for (const task of tasks) {
-    if (task.assigneeId === null || !isActiveTask(task.status)) {
+    if (!isActiveTask(task.status)) {
       continue;
     }
 
-    activeCountsByAssignee.set(
-      task.assigneeId,
-      (activeCountsByAssignee.get(task.assigneeId) ?? 0) + 1,
-    );
+    for (const { userId } of task.assignees) {
+      activeCountsByAssignee.set(
+        userId,
+        (activeCountsByAssignee.get(userId) ?? 0) + 1,
+      );
+    }
   }
 
   const assigneeLoadByTaskId = new Map<number, number>();
 
   for (const task of tasks) {
-    if (task.assigneeId === null) {
+    if (task.assignees.length === 0) {
       assigneeLoadByTaskId.set(task.id, 0);
       continue;
     }
 
+    const maxLoad = Math.max(
+      ...task.assignees.map((a) => activeCountsByAssignee.get(a.userId) ?? 0),
+    );
     assigneeLoadByTaskId.set(
       task.id,
-      Math.max(0, (activeCountsByAssignee.get(task.assigneeId) ?? 0) - 1),
+      Math.max(0, maxLoad - 1),
     );
   }
 

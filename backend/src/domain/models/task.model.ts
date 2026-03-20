@@ -8,7 +8,7 @@ export interface Task {
   deadline: string;
   status: TaskStatus;
   difficulty: number;
-  assigneeId: number | null;
+  assigneeIds: number[];
   createdById: number;
   createdAt: string;
   updatedAt: string;

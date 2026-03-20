@@ -8,6 +8,8 @@ export interface User {
   profession: string;
   accountStatus: 'active' | 'blocked';
   accountRole: AccountRole;
+  avatarUrl: string | null;
+  discriminator: string;
   createdAt: string;
   updatedAt: string;
 }

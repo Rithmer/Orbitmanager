@@ -42,7 +42,7 @@ const mockMember: TeamMember = {
 
 const mockTeamRepository = {
   findAll: jest.fn().mockResolvedValue([mockTeam]),
-  findPaginated: jest.fn().mockResolvedValue({
+  findPage: jest.fn().mockResolvedValue({
     items: [mockTeam],
     total: 1,
     page: 1,
@@ -168,10 +168,8 @@ describe('TeamsService', () => {
   describe('findAll', () => {
     it('should return all teams', async () => {
       const result = await service.findAll({});
-      expect(mockTeamRepository.findPaginated).toHaveBeenCalledWith(
-        expect.objectContaining({
-          searchFields: ['name', 'description'],
-        }),
+      expect(mockTeamRepository.findPage).toHaveBeenCalledWith(
+        expect.objectContaining({ page: 1, limit: 20 }),
       );
       expect(result.items).toHaveLength(1);
       expect(result.items[0].name).toBe('Test Team');

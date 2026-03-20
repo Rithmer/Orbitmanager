@@ -50,4 +50,10 @@ export class CreateUserDto {
   @IsEnum(AccountRole)
   @IsOptional()
   accountRole?: AccountRole;
+
+  @ApiPropertyOptional({ example: 'https://cdn.example.com/avatars/1.png', description: 'URL аватара' })
+  @IsString()
+  @IsOptional()
+  @MaxLength(500)
+  avatarUrl?: string | null;
 }

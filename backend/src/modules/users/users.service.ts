@@ -123,6 +123,7 @@ export class UsersService {
       profession: dto.profession,
       accountStatus: 'active',
       accountRole: dto.accountRole ?? AccountRole.MEMBER,
+      avatarUrl: dto.avatarUrl ?? null,
       createdAt: now,
       updatedAt: now,
     });
