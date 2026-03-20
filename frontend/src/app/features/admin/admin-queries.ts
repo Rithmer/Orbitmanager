@@ -18,6 +18,7 @@ export interface AdminAuditQueryParams {
   limit: number
   action: AuditAction | ''
   entityType: string
+  userId?: number
 }
 
 function buildUsersRequestParams(params: AdminUsersQueryParams) {
@@ -35,6 +36,7 @@ function buildAuditRequestParams(params: AdminAuditQueryParams) {
     limit: params.limit,
     action: params.action || undefined,
     entityType: params.entityType || undefined,
+    userId: params.userId ?? undefined,
   }
 }
 

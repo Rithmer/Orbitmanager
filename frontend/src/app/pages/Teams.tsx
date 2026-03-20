@@ -35,11 +35,18 @@ export function Teams() {
   const [editingTeam, setEditingTeam] = useState<Team | null>(null)
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null)
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
+  const [showTeamMembersModal, setShowTeamMembersModal] = useState(false)
+  const [membersModalTeamId, setMembersModalTeamId] = useState<number | null>(null)
+  const [membersModalSearch, setMembersModalSearch] = useState('')
 
   const [formName, setFormName] = useState('')
   const [formDesc, setFormDesc] = useState('')
   const [memberUserId, setMemberUserId] = useState('')
   const [memberRole, setMemberRole] = useState(TeamRole.MEMBER)
+  const [addMemberSearch, setAddMemberSearch] = useState('')
+  const [addMemberUsers, setAddMemberUsers] = useState<User[]>([])
+  const [addMemberUsersLoading, setAddMemberUsersLoading] = useState(false)
+  const [addMemberUsersError, setAddMemberUsersError] = useState('')
   const [formLoading, setFormLoading] = useState(false)
   const [formError, setFormError] = useState('')
 
@@ -86,8 +93,64 @@ export function Teams() {
   }, [])
 
   useEffect(() => {
+    if (openMenuId === null) return
+
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null
+      if (!target) return
+
+      const clickedMenu = target.closest(
+        `[data-team-menu-id="${openMenuId}"]`,
+      )
+      const clickedButton = target.closest(
+        `[data-team-menu-button-id="${openMenuId}"]`,
+      )
+
+      if (!clickedMenu && !clickedButton) {
+        setOpenMenuId(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [openMenuId])
+
+  useEffect(() => {
     loadData()
   }, [loadData])
+
+  useEffect(() => {
+    if (!showAddMemberModal) return
+    if (!selectedTeamId) return
+
+    const normalizedSearch = addMemberSearch.trim()
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        setAddMemberUsersLoading(true)
+        setAddMemberUsersError('')
+
+        const res = await usersApi.list(
+          {
+            page: 1,
+            limit: 30,
+            search: normalizedSearch || undefined,
+            sort: 'login',
+          },
+          {},
+        )
+
+        const existingMembers = new Set((teamMembers[selectedTeamId] || []).map((m) => m.userId))
+        setAddMemberUsers(res.items.filter((u) => !existingMembers.has(u.id)))
+      } catch (err) {
+        setAddMemberUsersError(err instanceof Error ? err.message : 'Ошибка загрузки пользователей')
+        setAddMemberUsers([])
+      } finally {
+        setAddMemberUsersLoading(false)
+      }
+    }, 300)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [addMemberSearch, selectedTeamId, showAddMemberModal, teamMembers])
 
   const getUserName = (userId: number) => {
     const u = allUsers.find((u) => u.id === userId)
@@ -102,6 +165,12 @@ export function Teams() {
   const isTeamOwner = (teamId: number) => {
     const members = teamMembers[teamId] || []
     return members.some((m) => m.userId === currentUser?.id && m.teamRole === TeamRole.OWNER)
+  }
+
+  const openTeamMembersModal = (teamId: number) => {
+    setMembersModalTeamId(teamId)
+    setMembersModalSearch('')
+    setShowTeamMembersModal(true)
   }
 
   const handleCreate = async () => {
@@ -203,6 +272,23 @@ export function Teams() {
     return null
   }
 
+  const membersModalMembers = membersModalTeamId
+    ? teamMembers[membersModalTeamId] || []
+    : []
+  const membersModalNormalizedSearch = membersModalSearch.trim().toLowerCase()
+  const filteredMembersForModal =
+    membersModalNormalizedSearch.length === 0
+      ? membersModalMembers
+      : membersModalMembers.filter((m) => {
+          const name = getUserName(m.userId).toLowerCase()
+          const role = getUserRole(m.userId).toLowerCase()
+          return name.includes(membersModalNormalizedSearch) || role.includes(membersModalNormalizedSearch)
+        })
+
+  const membersModalOwnerAccess = membersModalTeamId
+    ? isTeamOwner(membersModalTeamId)
+    : false
+
   if (loading) {
     return (
       <div className={`${pageBg} min-h-full flex items-center justify-center`}>
@@ -252,6 +338,8 @@ export function Teams() {
           filteredTeams.map((team, idx) => {
             const ci = idx % colors.length
             const members = teamMembers[team.id] || []
+            const visibleMembers = members.slice(0, 5)
+            const hiddenMembersCount = Math.max(0, members.length - visibleMembers.length)
             const ownerAccess = isTeamOwner(team.id)
 
             return (
@@ -274,8 +362,9 @@ export function Teams() {
                       )}
                     </div>
                   </div>
-                  <div className="relative">
+                  <div className={`relative ${openMenuId === team.id ? 'z-[70]' : ''}`}>
                     <button
+                      data-team-menu-button-id={team.id}
                       onClick={() => setOpenMenuId(openMenuId === team.id ? null : team.id)}
                       className={`p-1 rounded ${moreIconColor} transition-colors`}
                     >
@@ -283,7 +372,8 @@ export function Teams() {
                     </button>
                     {openMenuId === team.id && (
                       <div
-                        className={`absolute right-0 top-8 z-10 w-48 rounded-xl shadow-xl border overflow-hidden dropdown-enter ${
+                        data-team-menu-id={team.id}
+                        className={`absolute right-0 top-8 z-[80] w-48 rounded-xl shadow-xl border overflow-hidden dropdown-enter ${
                           isDark ? 'bg-[#273142] border-[#313d4f]' : 'bg-white border-[#e8e8e8]'
                         }`}
                       >
@@ -307,6 +397,9 @@ export function Teams() {
                                 setSelectedTeamId(team.id)
                                 setMemberUserId('')
                                 setMemberRole(TeamRole.MEMBER)
+                              setAddMemberSearch('')
+                              setAddMemberUsers([])
+                              setAddMemberUsersError('')
                                 setFormError('')
                                 setShowAddMemberModal(true)
                                 setOpenMenuId(null)
@@ -358,7 +451,7 @@ export function Teams() {
                     Участники
                   </p>
                   <div className="space-y-2.5">
-                    {members.map((member) => (
+                    {visibleMembers.map((member) => (
                       <div key={member.id} className="flex items-center justify-between">
                         <div className="flex items-center gap-2.5">
                           <div
@@ -386,9 +479,13 @@ export function Teams() {
                                 isDark ? 'bg-[#1c2534] border-[#313d4f] text-[#f4f3f2]' : 'bg-gray-50 border-gray-200 text-[#202224]'
                               }`}
                             >
-                              {Object.entries(TEAM_ROLE_LABELS).map(([val, lab]) => (
-                                <option key={val} value={val}>{lab}</option>
-                              ))}
+                              {Object.entries(TEAM_ROLE_LABELS)
+                                .filter(([val]) => val !== TeamRole.OWNER)
+                                .map(([val, lab]) => (
+                                  <option key={val} value={val}>
+                                    {lab}
+                                  </option>
+                                ))}
                             </select>
                             <button
                               onClick={() => handleRemoveMember(member.id)}
@@ -402,6 +499,16 @@ export function Teams() {
                     ))}
                     {members.length === 0 && (
                       <p className={`text-xs ${textSecondary} text-center py-2`}>Нет участников</p>
+                    )}
+                    {hiddenMembersCount > 0 && members.length > 0 && (
+                      <button
+                        onClick={() => openTeamMembersModal(team.id)}
+                        className={`w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold ${
+                          isDark ? 'hover:bg-[#1c2534] text-[#f4f3f2]' : 'hover:bg-gray-50 text-[#202224]'
+                        } transition-colors`}
+                      >
+                        +{hiddenMembersCount} ещё
+                      </button>
                     )}
                   </div>
                 </div>
@@ -475,26 +582,54 @@ export function Teams() {
           }}
           className="space-y-4"
         >
+          <InputField
+            label="Поиск пользователя"
+            value={addMemberSearch}
+            onChange={setAddMemberSearch}
+            placeholder="login#discriminator или ФИО"
+            required={false}
+            hint={addMemberUsersLoading ? 'Поиск...' : undefined}
+            disabled={addMemberUsersLoading || formLoading}
+          />
           <SelectField
             label="Пользователь"
             value={memberUserId}
             onChange={setMemberUserId}
             required
+            disabled={addMemberUsersLoading || addMemberUsersError !== '' || formLoading}
+            hint={
+              addMemberUsersError
+                ? addMemberUsersError
+                : addMemberUsersLoading
+                  ? 'Подбираем пользователей...'
+                  : addMemberUsers.length === 0 && addMemberSearch.trim()
+                    ? 'Ничего не найдено'
+                    : 'Введите запрос для поиска'
+            }
             options={[
-              { value: '', label: 'Выберите пользователя...' },
-              ...allUsers
-                .filter((u) => {
-                  const members = selectedTeamId ? teamMembers[selectedTeamId] || [] : []
-                  return !members.some((m) => m.userId === u.id)
-                })
-                .map((u) => ({ value: String(u.id), label: `${u.fullName} (${u.login})` })),
+              {
+                value: '',
+                label: addMemberUsersLoading
+                  ? 'Загрузка...'
+                  : addMemberUsersError
+                    ? 'Источник недоступен'
+                    : addMemberSearch.trim()
+                      ? 'Выберите пользователя...'
+                      : 'Введите запрос',
+              },
+              ...addMemberUsers.map((u) => ({
+                value: String(u.id),
+                label: `${u.login}${u.discriminator ? `#${u.discriminator}` : ''} · ${u.fullName}`,
+              })),
             ]}
           />
           <SelectField
             label="Роль в команде"
             value={memberRole}
             onChange={(v) => setMemberRole(v as TeamRole)}
-            options={Object.entries(TEAM_ROLE_LABELS).map(([val, lab]) => ({ value: val, label: lab }))}
+            options={Object.entries(TEAM_ROLE_LABELS)
+              .filter(([val]) => val !== TeamRole.OWNER)
+              .map(([val, lab]) => ({ value: val, label: lab }))}
           />
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => setShowAddMemberModal(false)} className={`px-4 py-2 rounded-lg text-sm font-semibold ${textSecondary}`}>
@@ -503,6 +638,88 @@ export function Teams() {
             <SubmitButton loading={formLoading}>Добавить</SubmitButton>
           </div>
         </form>
+      </Modal>
+
+      {/* Team Members Modal */}
+      <Modal
+        open={showTeamMembersModal}
+        onClose={() => {
+          setShowTeamMembersModal(false)
+          setMembersModalTeamId(null)
+          setMembersModalSearch('')
+        }}
+        title="Участники команды"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Search className={`w-4 h-4 ${textSecondary}`} />
+            <input
+              type="text"
+              placeholder="Поиск по участнику..."
+              value={membersModalSearch}
+              onChange={(e) => setMembersModalSearch(e.target.value)}
+              className={`w-full px-3 py-2 rounded-lg border text-sm transition-colors focus:outline-none focus:border-[#4880ff] ${inputBg}`}
+            />
+          </div>
+
+          <div className="max-h-[60vh] overflow-y-auto pr-1">
+            {filteredMembersForModal.length === 0 ? (
+              <p className={`text-sm ${textSecondary} text-center py-8`}>Нет участников</p>
+            ) : (
+              <div className="space-y-2.5">
+                {filteredMembersForModal.map((member) => (
+                  <div key={member.id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div
+                        className={`w-8 h-8 ${avatarBg} rounded-full flex items-center justify-center text-xs font-bold ${textSecondary}`}
+                      >
+                        {getUserName(member.userId).charAt(0)}
+                      </div>
+                      <div>
+                        <div className={`text-xs font-semibold flex items-center gap-1 ${textPrimary}`}>
+                          {getUserName(member.userId)}
+                          {roleIcon(member.teamRole as TeamRole)}
+                        </div>
+                        <div className={`text-xs ${textSecondary}`}>
+                          {TEAM_ROLE_LABELS[member.teamRole as TeamRole] || member.teamRole}
+                          {getUserRole(member.userId) && ` · ${getUserRole(member.userId)}`}
+                        </div>
+                      </div>
+                    </div>
+
+                    {membersModalOwnerAccess && member.userId !== currentUser?.id && (
+                      <div className="flex items-center gap-1">
+                        <select
+                          value={member.teamRole}
+                          onChange={(e) =>
+                            handleChangeRole(member.id, e.target.value as TeamRole)
+                          }
+                          className={`text-xs px-1.5 py-0.5 rounded border ${
+                            isDark ? 'bg-[#1c2534] border-[#313d4f] text-[#f4f3f2]' : 'bg-gray-50 border-gray-200 text-[#202224]'
+                          }`}
+                        >
+                          {Object.entries(TEAM_ROLE_LABELS)
+                            .filter(([val]) => val !== TeamRole.OWNER)
+                            .map(([val, lab]) => (
+                              <option key={val} value={val}>
+                                {lab}
+                              </option>
+                            ))}
+                        </select>
+                        <button
+                          onClick={() => handleRemoveMember(member.id)}
+                          className="p-1 rounded hover:bg-red-500/10 text-red-500 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </Modal>
     </div>
   )

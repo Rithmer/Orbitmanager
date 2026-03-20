@@ -8,7 +8,6 @@ import {
 import { ProjectAccessService } from '@/common/access/project-access.service';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { AuditAction } from '@/common/enums/audit-action.enum';
-import { ProjectRole } from '@/common/enums/project-role.enum';
 import {
   ALLOWED_TASK_TRANSITIONS,
   TaskStatus,
@@ -322,19 +321,6 @@ export class TasksService {
       );
 
     if (canManageTask) {
-      return;
-    }
-
-    const projectMembership =
-      await this.projectMemberRepository.findByUserAndProject(
-        userId,
-        task.projectId,
-      );
-
-    if (
-      projectMembership?.role === ProjectRole.DEVELOPER &&
-      task.assigneeId === userId
-    ) {
       return;
     }
 

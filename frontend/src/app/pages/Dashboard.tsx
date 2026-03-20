@@ -185,6 +185,17 @@ export function Dashboard() {
   const recentTasks = summary?.recentTasks ?? []
   const riskInsights = summary?.riskInsights ?? []
 
+  const formatRecentTaskAssigneesShort = (task: typeof recentTasks[number]): string => {
+    const namesFromList = task.assigneeNames ?? []
+    const firstName = task.assigneeName ?? namesFromList[0] ?? null
+    const totalCount =
+      typeof task.assigneeCount === 'number' ? task.assigneeCount : namesFromList.length ?? 0
+
+    if (totalCount <= 0 || !firstName) return 'Без исполнителя'
+    if (totalCount === 1) return firstName
+    return `${firstName} +${totalCount - 1}`
+  }
+
   const stats = [
     {
       label: 'Выполнено',
@@ -294,14 +305,23 @@ export function Dashboard() {
                 return (
                   <div
                     key={task.id}
-                    className={`flex items-center gap-4 py-3 border-b ${dividerColor} last:border-0 stagger-card`}
+                    className={`flex items-center gap-4 py-3 border-b ${dividerColor} last:border-0 stagger-card cursor-pointer ${isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'}`}
                     style={{ animationDelay: `${index * 45}ms` }}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => navigate(`/board/${task.projectId}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        navigate(`/board/${task.projectId}`)
+                      }
+                    }}
                   >
                     <div className={`w-2 h-2 rounded-full ${statusStyle.dot} shrink-0`} />
                     <div className="flex-1 min-w-0">
                       <div className={`text-sm font-medium truncate ${textPrimary}`}>{task.name}</div>
                       <div className={`text-xs ${textSecondary}`}>
-                        {task.projectName} · {task.assigneeName ?? 'Без исполнителя'} ·{' '}
+                        {task.projectName} · {formatRecentTaskAssigneesShort(task)} ·{' '}
                         {new Date(task.deadline).toLocaleDateString()}
                       </div>
                     </div>

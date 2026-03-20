@@ -1,8 +1,9 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
+import { parseOptionalInt } from '@/common/helpers/query.helper';
 import { ReportsService } from './reports.service';
 
 @ApiTags('Reports')
@@ -18,7 +19,22 @@ export class ReportsController {
   getSummary(
     @CurrentUser('id') userId: number,
     @CurrentUser('accountRole') accountRole: AccountRole,
+    @Query('projectId') projectId?: string,
   ) {
-    return this.reportsService.getSummary(userId, accountRole);
+    return this.reportsService.getSummary(
+      userId,
+      accountRole,
+      parseOptionalInt(projectId),
+    );
+  }
+
+  @Get('projects')
+  @ApiOperation({ summary: 'Получить доступные проекты для аналитики' })
+  @ApiResponse({ status: 200, description: 'Список проектов' })
+  getProjects(
+    @CurrentUser('id') userId: number,
+    @CurrentUser('accountRole') accountRole: AccountRole,
+  ) {
+    return this.reportsService.getAccessibleProjects(userId, accountRole);
   }
 }
