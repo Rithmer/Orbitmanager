@@ -357,7 +357,7 @@ export class DashboardService {
       case TaskStatus.IN_PROGRESS:
         return 'В процессе';
       case TaskStatus.REVIEW:
-        return 'На проверке';
+        return 'Тестирование';
       case TaskStatus.DONE:
         return 'Выполнена';
       case TaskStatus.CANCELLED:

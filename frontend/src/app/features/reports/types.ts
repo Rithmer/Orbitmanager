@@ -33,3 +33,8 @@ export interface ReportsSummaryResponse {
   projectTaskBreakdown: ReportsProjectTaskBreakdownItem[]
   difficultyDistribution: ReportsDifficultyDistributionItem[]
 }
+
+export interface ReportsAccessibleProject {
+  id: number
+  name: string
+}

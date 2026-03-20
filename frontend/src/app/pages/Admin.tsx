@@ -116,6 +116,10 @@ function UsersPanel() {
   const isRefreshing = usersQuery.isFetching && !!usersQuery.data
   const showInitialSkeleton = useSmoothPageSkeleton(isInitialLoad)
 
+  const filledRowsCount = users.length === 0 ? 1 : users.length
+  const emptyRowsCount =
+    showInitialSkeleton ? 0 : Math.max(0, limit - filledRowsCount)
+
   const invalidateAdminData = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: adminUsersQueryPrefix }),
@@ -319,6 +323,17 @@ function UsersPanel() {
                         </td>
                       </tr>
                     )}
+                    {Array.from({ length: emptyRowsCount }).map((_, idx) => (
+                      <tr
+                        // Intentionally stable blank rows for consistent table height
+                        key={`empty-user-row-${idx}`}
+                        className={`border-t ${isDark ? 'border-[#313d4f]' : 'border-gray-100'} transition-colors`}
+                      >
+                        <td colSpan={7} className={`px-4 py-3 text-sm ${textSecondary}`}>
+                          &nbsp;
+                        </td>
+                      </tr>
+                    ))}
                   </>
                 )}
               </tbody>
@@ -432,6 +447,7 @@ function AuditPanel() {
   const [page, setPage] = useState(1)
   const [filterAction, setFilterAction] = useState('')
   const [filterEntity, setFilterEntity] = useState('')
+  const [filterUserId, setFilterUserId] = useState('')
   const limit = AUDIT_PAGE_SIZE
 
   const cardBg = isDark ? 'bg-[#273142]' : 'bg-white'
@@ -440,11 +456,19 @@ function AuditPanel() {
   const textSecondary = isDark ? 'text-[#94a3b8]' : 'text-[#737373]'
   const rowHover = isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'
 
+  const parsedUserId = (() => {
+    const trimmed = filterUserId.trim()
+    if (!trimmed) return undefined
+    const value = Number.parseInt(trimmed, 10)
+    return Number.isFinite(value) ? value : undefined
+  })()
+
   const auditQuery = useAdminAuditQuery({
     page,
     limit,
     action: filterAction as AuditAction | '',
     entityType: filterEntity,
+    userId: parsedUserId,
   })
 
   const logs = auditQuery.data?.items ?? []
@@ -453,6 +477,10 @@ function AuditPanel() {
   const isInitialLoad = auditQuery.isPending && !auditQuery.data
   const isRefreshing = auditQuery.isFetching && !!auditQuery.data
   const showInitialSkeleton = useSmoothPageSkeleton(isInitialLoad)
+
+  const filledRowsCount = logs.length === 0 ? 1 : logs.length
+  const emptyRowsCount =
+    showInitialSkeleton ? 0 : Math.max(0, limit - filledRowsCount)
 
   const actionLabels: Record<string, { label: string; color: string }> = {
     [AuditAction.CREATE]: { label: 'Создание', color: 'text-emerald-500 bg-emerald-500/10' },
@@ -497,6 +525,15 @@ function AuditPanel() {
             </option>
           ))}
         </select>
+        <input
+          value={filterUserId}
+          onChange={(event) => {
+            setFilterUserId(event.target.value)
+            setPage(1)
+          }}
+          placeholder="ID пользователя"
+          className={`px-3 py-2 rounded-lg border text-sm ${isDark ? 'bg-[#1c2534] border-[#313d4f] text-[#f4f3f2]' : 'bg-white border-[#e8e8e8] text-[#202224]'}`}
+        />
       </div>
 
       {auditQuery.isError && !auditQuery.data && (
@@ -572,6 +609,17 @@ function AuditPanel() {
                       </td>
                     </tr>
                   )}
+                  {Array.from({ length: emptyRowsCount }).map((_, idx) => (
+                    <tr
+                      // Intentionally stable blank rows for consistent table height
+                      key={`empty-audit-row-${idx}`}
+                      className={`border-t ${isDark ? 'border-[#313d4f]' : 'border-gray-100'}`}
+                    >
+                      <td colSpan={8} className={`px-4 py-3 text-sm ${textSecondary}`}>
+                        &nbsp;
+                      </td>
+                    </tr>
+                  ))}
                 </>
               )}
             </tbody>

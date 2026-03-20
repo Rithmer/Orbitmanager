@@ -1,8 +1,17 @@
-import { api, type ApiRequestOptions } from './client'
-import type { ReportsSummaryResponse } from '../features/reports/types'
+import { api, buildQuery, type ApiRequestOptions } from './client'
+import type { ReportsAccessibleProject, ReportsSummaryResponse } from '../features/reports/types'
 
 export const reportsApi = {
-  getSummary(options: ApiRequestOptions = {}): Promise<ReportsSummaryResponse> {
-    return api.get('/reports/summary', options)
+  getSummary(
+    params: { projectId?: number } = {},
+    options: ApiRequestOptions = {},
+  ): Promise<ReportsSummaryResponse> {
+    return api.get(`/reports/summary${buildQuery({ projectId: params.projectId })}`, options)
+  },
+
+  getProjects(
+    options: ApiRequestOptions = {},
+  ): Promise<ReportsAccessibleProject[]> {
+    return api.get('/reports/projects', options)
   },
 }

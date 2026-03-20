@@ -58,10 +58,12 @@ export const ALLOWED_TASK_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
 export interface User {
   id: number
   login: string
+  discriminator?: string | null
   fullName: string
   profession?: string
   accountStatus: 'active' | 'blocked' | 'inactive'
   accountRole: AccountRole
+  avatarUrl?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -109,11 +111,15 @@ export interface Task {
   deadline: string
   status: TaskStatus
   difficulty: number
+  // Multi-assignees (new contract)
+  assigneeIds?: number[] | null
+  assignees?: User[]
+  // Legacy single-assignee (old contract)
   assigneeId?: number | null
   createdById: number
   createdAt: string
   updatedAt: string
-  assignee?: User
+  assignee?: User | null
 }
 
 export interface AuditLog {
@@ -188,7 +194,7 @@ export type QueryParams = Record<string, string | number | undefined>
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   [TaskStatus.NEW]: 'Новая',
   [TaskStatus.IN_PROGRESS]: 'В процессе',
-  [TaskStatus.REVIEW]: 'На проверке',
+  [TaskStatus.REVIEW]: 'Тестирование',
   [TaskStatus.DONE]: 'Выполнена',
   [TaskStatus.CANCELLED]: 'Отменена',
 }
