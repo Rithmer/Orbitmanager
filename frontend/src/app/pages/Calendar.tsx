@@ -85,10 +85,6 @@ function formatDuration(startDate: string, endDate: string): string {
   return `${hrs} ч ${remainMins} мин`
 }
 
-function getDaysInMonth(year: number, month: number) {
-  return new Date(year, month, 0).getDate()
-}
-
 function getFirstDayOfMonth(year: number, month: number) {
   return new Date(year, month - 1, 1).getDay()
 }
@@ -178,8 +174,8 @@ export function Calendar() {
     return projects.find((p) => p.id === projectId)?.name || ''
   }
 
-  const getItemsForDay = (day: number): CalItem[] => {
-    const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  const getItemsForDate = (year: number, month: number, day: number): CalItem[] => {
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
     const items: CalItem[] = []
 
     if (filterType === 'all' || filterType === 'tasks') {
@@ -224,7 +220,6 @@ export function Calendar() {
     return items.sort((a, b) => a.time.localeCompare(b.time))
   }
 
-  const daysInMonth = getDaysInMonth(currentYear, currentMonth)
   const firstDayOfMonth = getFirstDayOfMonth(currentYear, currentMonth)
 
   const prevMonth = () => {
@@ -237,14 +232,18 @@ export function Calendar() {
     else setCurrentMonth(currentMonth + 1)
   }
 
-  const isToday = (day: number) =>
-    today.getFullYear() === currentYear && today.getMonth() + 1 === currentMonth && today.getDate() === day
+  const isToday = (year: number, month: number, day: number) =>
+    today.getFullYear() === year &&
+    today.getMonth() + 1 === month &&
+    today.getDate() === day
 
   const handleDayClick = (day: number) => {
     setSelectedDay(day)
   }
 
-  const selectedDayItems = selectedDay ? getItemsForDay(selectedDay) : []
+  const selectedDayItems = selectedDay
+    ? getItemsForDate(currentYear, currentMonth, selectedDay)
+    : []
 
   const getDayOfWeek = (day: number) => {
     const date = new Date(currentYear, currentMonth - 1, day)
@@ -340,9 +339,40 @@ export function Calendar() {
     }
   }
 
-  const cells: Array<{ type: 'empty' } | { type: 'day'; day: number }> = []
-  for (let i = 0; i < firstDayOfMonth; i++) cells.push({ type: 'empty' })
-  for (let d = 1; d <= daysInMonth; d++) cells.push({ type: 'day', day: d })
+  // Build a stable 6-week calendar grid (42 cells) including previous/next month days.
+  // Next-month days are muted by reduced opacity.
+  const nextMonthDate = new Date(currentYear, currentMonth, 1)
+  const nextMonthNumber = nextMonthDate.getMonth() + 1
+  const nextYear = nextMonthDate.getFullYear()
+  const gridStartDate = new Date(currentYear, currentMonth - 1, 1 - firstDayOfMonth)
+
+  const cells: Array<{
+    year: number
+    month: number
+    day: number
+    inCurrentMonth: boolean
+    isNextMonth: boolean
+  }> = []
+
+  for (let i = 0; i < 42; i++) {
+    const date = new Date(
+      gridStartDate.getFullYear(),
+      gridStartDate.getMonth(),
+      gridStartDate.getDate() + i,
+    )
+
+    const year = date.getFullYear()
+    const month = date.getMonth() + 1
+    const day = date.getDate()
+
+    cells.push({
+      year,
+      month,
+      day,
+      inCurrentMonth: year === currentYear && month === currentMonth,
+      isNextMonth: year === nextYear && month === nextMonthNumber,
+    })
+  }
 
   const filterBtns: { key: EventFilterType; label: string }[] = [
     { key: 'all', label: 'Все' },
@@ -430,26 +460,34 @@ export function Calendar() {
 
         <div className="grid grid-cols-7">
           {cells.map((cell, idx) => {
-            if (cell.type === 'empty') {
-              return <div key={`empty-${idx}`} className={`border-t border-r ${dayCellBorder} min-h-[80px] md:min-h-[110px] ${idx % 7 === 6 ? 'border-r-0' : ''}`} />
-            }
-            const { day } = cell
-            const dayItems = getItemsForDay(day)
-            const todayCell = isToday(day)
-            const colIdx = (firstDayOfMonth + day - 1) % 7
+            const { year, month, day, inCurrentMonth, isNextMonth } = cell
+            const dayItems = getItemsForDate(year, month, day)
+            const todayCell = isToday(year, month, day)
+            const colIdx = idx % 7
+
+            const mutedOpacity = inCurrentMonth ? '' : isNextMonth ? 'opacity-40' : 'opacity-25'
+            const clickable = inCurrentMonth
 
             return (
               <div
-                key={`day-${day}`}
-                onClick={() => handleDayClick(day)}
-                className={`border-t border-r ${dayCellBorder} min-h-[80px] md:min-h-[110px] p-1.5 md:p-2 transition-colors cursor-pointer
-                  ${colIdx === 6 ? 'border-r-0' : ''}
-                  ${dayCellHover}
-                  ${todayCell ? (isDark ? 'bg-[#4880ff]/10' : 'bg-blue-50/60') : ''}
-                `}
+                key={`day-${year}-${month}-${day}`}
+                onClick={clickable ? () => handleDayClick(day) : undefined}
+                className={`border-t border-r ${dayCellBorder} min-h-[80px] md:min-h-[110px] p-1.5 md:p-2 transition-colors ${
+                  colIdx === 6 ? 'border-r-0' : ''
+                } ${clickable ? dayCellHover : ''} ${
+                  todayCell ? (isDark ? 'bg-[#4880ff]/10' : 'bg-blue-50/60') : ''
+                } ${mutedOpacity} ${clickable ? 'cursor-pointer' : 'cursor-default'}`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className={`text-xs md:text-sm font-bold w-6 h-6 md:w-7 md:h-7 flex items-center justify-center rounded-full ${todayCell ? 'bg-[#4880ff] text-white' : textPrimary}`}>
+                  <span
+                    className={`text-xs md:text-sm font-bold w-6 h-6 md:w-7 md:h-7 flex items-center justify-center rounded-full ${
+                      todayCell
+                        ? 'bg-[#4880ff] text-white'
+                        : inCurrentMonth
+                          ? textPrimary
+                          : textSecondary
+                    }`}
+                  >
                     {day}
                   </span>
                 </div>
@@ -462,14 +500,26 @@ export function Calendar() {
                           ? `${item.color} ${item.textColor}`
                           : 'text-white'
                       }`}
-                      style={item.type === 'event' ? { backgroundColor: events.find((e) => e.id === item.eventId)?.color || '#3b82f6' } : undefined}
+                      style={
+                        item.type === 'event'
+                          ? {
+                              backgroundColor:
+                                events.find((e) => e.id === item.eventId)?.color ||
+                                '#3b82f6',
+                            }
+                          : undefined
+                      }
                     >
-                      {item.type === 'event' && <span className="mr-0.5">&#9679;</span>}
+                      {item.type === 'event' && (
+                        <span className="mr-0.5">&#9679;</span>
+                      )}
                       {item.title}
                     </div>
                   ))}
                   {dayItems.length > 2 && (
-                    <div className={`text-[9px] md:text-[10px] font-semibold ${textSecondary}`}>+{dayItems.length - 2} ещё</div>
+                    <div className={`text-[9px] md:text-[10px] font-semibold ${textSecondary}`}>
+                      +{dayItems.length - 2} ещё
+                    </div>
                   )}
                 </div>
               </div>
@@ -487,7 +537,7 @@ export function Calendar() {
                 <h2 className={`font-bold text-lg ${textPrimary}`}>{selectedDay} {MONTHS[currentMonth - 1]}</h2>
                 <p className={`text-sm capitalize ${textSecondary}`}>
                   {getDayOfWeek(selectedDay)}
-                  {isToday(selectedDay) && (
+                  {isToday(currentYear, currentMonth, selectedDay) && (
                     <span className="ml-2 text-[10px] font-bold bg-[#4880ff] text-white px-2 py-0.5 rounded-full uppercase tracking-wide">Сегодня</span>
                   )}
                 </p>
