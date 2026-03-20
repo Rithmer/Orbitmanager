@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useMemo, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
   ArrowLeft,
@@ -19,16 +19,28 @@ import { PageShell, PageShellHeaderSkeleton, RefreshBadge } from '../components/
 import { useSmoothPageSkeleton } from '../hooks/useSmoothPageSkeleton'
 import { useTheme } from '../context/useTheme'
 import { tasksApi } from '../api/tasks'
+import { teamsApi } from '../api/teams'
 import { formatLocalDateInput, toLocalEndOfDayIso } from '../utils/dateTime'
 import { appQueryKeys } from '../query'
-import { AccountRole, ALLOWED_TASK_TRANSITIONS, PROJECT_ROLE_LABELS, ProjectRole, RISK_LEVEL_LABELS, RiskLevel, TASK_STATUS_LABELS, TaskStatus } from '../types'
+import { ALLOWED_TASK_TRANSITIONS, PROJECT_ROLE_LABELS, ProjectRole, RISK_LEVEL_LABELS, RiskLevel, TASK_STATUS_LABELS, TaskStatus, TeamRole } from '../types'
 import { useAuth } from '../context/useAuth'
 import { useProjectBoardViewQuery, type ProjectBoardTask } from '../features/board'
+import { projectsListViewApi } from '../api/projects-list-view'
 import { PROJECT_BOARD_COLUMNS, getColumnTasks, getOverdueLabel, getRiskBadgeClasses } from '../features/board/board-view.constants'
 import { ProjectBoardSkeleton } from '../features/board/board-view'
 import type { TaskRiskOutput } from '../types'
 
 type TaskPendingAction = 'status' | 'delete'
+
+const BOARD_PROJECT_SESSION_KEY = 'orbitmanager:boardProjectId'
+
+const BOARD_PROJECT_CARD_COLORS = [
+  'bg-[#4880ff]',
+  'bg-[#10b981]',
+  'bg-[#8b5cf6]',
+  'bg-[#f59e0b]',
+  'bg-[#ef4444]',
+]
 
 function formatDateLabel(value: string) {
   return new Date(value).toLocaleDateString('ru-RU')
@@ -50,6 +62,21 @@ export function Board() {
   const boardQuery = useProjectBoardViewQuery(hasProjectId ? projectId : null)
   const projectBoardView = boardQuery.data
 
+  const teamIdForBoard = hasProjectId ? projectBoardView?.project.teamId ?? null : null
+
+  // Determine whether the user is team owner to allow task creation.
+  // Note: backend allows task creation for team owner even if there's no project_member row.
+  const teamMembersQuery = useQuery({
+    queryKey: ['board', 'team-members', teamIdForBoard],
+    queryFn: ({ signal }) => {
+      if (!teamIdForBoard) return Promise.resolve([])
+      return teamsApi.getMembers(teamIdForBoard, { signal })
+    },
+    enabled: Boolean(user?.id) && Boolean(teamIdForBoard),
+  })
+
+  const currentUserTeamMember = teamMembersQuery.data?.find((m) => m.userId === user?.id)
+
   const [isTaskFormOpen, setIsTaskFormOpen] = useState(false)
   const [isRiskModalOpen, setIsRiskModalOpen] = useState(false)
   const [isTaskDetailsOpen, setIsTaskDetailsOpen] = useState(false)
@@ -61,11 +88,157 @@ export function Board() {
   const [taskFormDescription, setTaskFormDescription] = useState('')
   const [taskFormDeadline, setTaskFormDeadline] = useState('')
   const [taskFormDifficulty, setTaskFormDifficulty] = useState('3')
-  const [taskFormAssigneeId, setTaskFormAssigneeId] = useState('')
+  const [taskFormAssigneeIds, setTaskFormAssigneeIds] = useState<number[]>([])
   const [taskFormStatus, setTaskFormStatus] = useState<TaskStatus>(TaskStatus.NEW)
   const [taskFormError, setTaskFormError] = useState('')
   const [pendingTaskActions, setPendingTaskActions] = useState<Record<number, TaskPendingAction>>({})
   const [viewMode, setViewMode] = useState<'board' | 'list'>('board')
+
+  // Persist chosen project for `/board/0` across navigations within the same browser tab.
+  const [sessionSelectedProjectId, setSessionSelectedProjectId] = useState<number | null>(() => {
+    if (hasProjectId) return null
+    if (typeof window === 'undefined') return null
+
+    const raw = window.sessionStorage.getItem(BOARD_PROJECT_SESSION_KEY)
+    const parsed = raw ? Number(raw) : NaN
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+  })
+
+  const [isProjectSelectorOpen, setIsProjectSelectorOpen] = useState(() => !hasProjectId)
+  const [pendingProjectId, setPendingProjectId] = useState<number | null>(null)
+
+  const projectSelectorProjectsQuery = useQuery({
+    queryKey: ['board', 'project-selector-projects'],
+    queryFn: ({ signal }) =>
+      projectsListViewApi.getListView(
+        { page: 1, limit: 1000 },
+        { signal },
+      ),
+    enabled: !hasProjectId && isProjectSelectorOpen,
+  })
+
+  const allSelectorProjects = projectSelectorProjectsQuery.data?.items ?? []
+
+  const visibleSelectorProjectIds = useMemo(() => new Set(allSelectorProjects.map((p) => p.id)), [allSelectorProjects])
+
+  useEffect(() => {
+    if (hasProjectId) return
+    if (!sessionSelectedProjectId) return
+    if (!isProjectSelectorOpen) return
+    if (!projectSelectorProjectsQuery.isSuccess) return
+
+    // Allow the user to explicitly close the selector before auto-opening the stored project.
+    const projectIdToOpen = pendingProjectId ?? sessionSelectedProjectId
+    if (!projectIdToOpen) return
+
+    if (!visibleSelectorProjectIds.has(projectIdToOpen)) {
+      // Stored project is no longer available for this user.
+      try {
+        window.sessionStorage.removeItem(BOARD_PROJECT_SESSION_KEY)
+      } catch {
+        // Ignore storage failures (e.g., blocked storage)
+      }
+      setSessionSelectedProjectId(null)
+      setPendingProjectId(null)
+      return
+    }
+
+    const timeoutId = setTimeout(() => {
+      try {
+        window.sessionStorage.setItem(BOARD_PROJECT_SESSION_KEY, String(projectIdToOpen))
+      } catch {
+        // Ignore storage failures (e.g., blocked storage)
+      }
+
+      setSessionSelectedProjectId(projectIdToOpen)
+      navigate(`/board/${projectIdToOpen}`)
+    }, 500)
+
+    return () => clearTimeout(timeoutId)
+  }, [
+    hasProjectId,
+    sessionSelectedProjectId,
+    isProjectSelectorOpen,
+    pendingProjectId,
+    navigate,
+    projectSelectorProjectsQuery.isSuccess,
+    visibleSelectorProjectIds,
+  ])
+
+  useEffect(() => {
+    if (hasProjectId) return
+    if (!isProjectSelectorOpen) return
+    if (pendingProjectId !== null) return
+    if (sessionSelectedProjectId) return
+
+    if (!projectSelectorProjectsQuery.isSuccess) return
+
+    const firstProjectId = allSelectorProjects[0]?.id
+    if (firstProjectId) {
+      setPendingProjectId(firstProjectId)
+    }
+  }, [
+    hasProjectId,
+    isProjectSelectorOpen,
+    pendingProjectId,
+    sessionSelectedProjectId,
+    allSelectorProjects,
+    projectSelectorProjectsQuery.isSuccess,
+  ])
+
+  useEffect(() => {
+    if (hasProjectId) return
+    if (!isProjectSelectorOpen) return
+    if (!sessionSelectedProjectId) return
+    if (pendingProjectId !== null) return
+
+    if (!projectSelectorProjectsQuery.isSuccess) return
+
+    if (!visibleSelectorProjectIds.has(sessionSelectedProjectId)) {
+      try {
+        window.sessionStorage.removeItem(BOARD_PROJECT_SESSION_KEY)
+      } catch {
+        // Ignore storage failures (e.g., blocked storage)
+      }
+      setSessionSelectedProjectId(null)
+      setPendingProjectId(null)
+      return
+    }
+
+    setPendingProjectId(sessionSelectedProjectId)
+  }, [
+    hasProjectId,
+    isProjectSelectorOpen,
+    sessionSelectedProjectId,
+    pendingProjectId,
+    projectSelectorProjectsQuery.isSuccess,
+    visibleSelectorProjectIds,
+  ])
+
+  useEffect(() => {
+    if (openedTaskMenuId === null) return
+
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null
+      if (!target) return
+
+      const clickedMenu = target.closest(
+        `[data-task-menu-id="${openedTaskMenuId}"]`,
+      )
+      const clickedButton = target.closest(
+        `[data-task-menu-button-id="${openedTaskMenuId}"]`,
+      )
+
+      if (!clickedMenu && !clickedButton) {
+        setOpenedTaskMenuId(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick)
+    }
+  }, [openedTaskMenuId])
 
   const pageBg = isDark ? 'bg-[#1c2534]' : 'bg-[#f5f6fa]'
   const cardBg = isDark ? 'bg-[#273142]' : 'bg-white'
@@ -120,7 +293,7 @@ export function Board() {
         description: taskFormDescription.trim() || undefined,
         deadline: toLocalEndOfDayIso(taskFormDeadline),
         difficulty: Number(taskFormDifficulty),
-        assigneeId: taskFormAssigneeId ? Number(taskFormAssigneeId) : undefined,
+        assigneeIds: taskFormAssigneeIds,
       })
     },
     onSuccess: async () => {
@@ -145,7 +318,7 @@ export function Board() {
         deadline: taskFormDeadline ? toLocalEndOfDayIso(taskFormDeadline) : undefined,
         difficulty: Number(taskFormDifficulty),
         status: taskFormStatus,
-        assigneeId: taskFormAssigneeId ? Number(taskFormAssigneeId) : null,
+        assigneeIds: taskFormAssigneeIds,
       })
     },
     onSuccess: async () => {
@@ -205,10 +378,36 @@ export function Board() {
   }
 
   if (!hasProjectId) {
+    const projects = allSelectorProjects
+
+    const openBoardForProjectId = (projectId: number) => {
+      try {
+        window.sessionStorage.setItem(BOARD_PROJECT_SESSION_KEY, String(projectId))
+      } catch {
+        // Ignore storage failures (e.g., blocked storage)
+      }
+
+      setSessionSelectedProjectId(projectId)
+      setPendingProjectId(projectId)
+      navigate(`/board/${projectId}`)
+    }
+
+    const closeProjectSelector = () => {
+      try {
+        window.sessionStorage.removeItem(BOARD_PROJECT_SESSION_KEY)
+      } catch {
+        // Ignore storage failures (e.g., blocked storage)
+      }
+
+      setSessionSelectedProjectId(null)
+      setPendingProjectId(null)
+      setIsProjectSelectorOpen(false)
+    }
+
     return (
       <PageShell
         title="Доска проекта"
-        description="Выберите проект для просмотра канбан-доски."
+        description="Выберите доступный проект, чтобы открыть задачи."
         className={pageBg}
         actions={
           <button
@@ -220,10 +419,120 @@ export function Board() {
           </button>
         }
       >
-        <div className="rounded-xl border border-dashed border-black/10 bg-white/60 p-8 text-center dark:border-white/10 dark:bg-[#273142]">
-          <p className={`text-lg font-bold ${textPrimary}`}>Проект не выбран</p>
-          <p className={`mt-2 text-sm ${textSecondary}`}>Перейдите в список проектов и откройте доску нужного проекта.</p>
-        </div>
+        {isProjectSelectorOpen ? (
+          <div className="rounded-xl border border-dashed border-black/10 bg-white/60 p-8 dark:border-white/10 dark:bg-[#273142]">
+            <p className={`text-lg font-bold ${textPrimary}`}>Выбор проекта</p>
+            <p className={`mt-2 text-sm ${textSecondary}`}>
+              Кликните по плитке ниже: выбранный проект будет сохраняться в `sessionStorage`, пока список не будет закрыт.
+            </p>
+
+            <div className="mt-6">
+              {projectSelectorProjectsQuery.isPending ? (
+                <div className={`text-sm ${textSecondary}`}>Загрузка доступных проектов...</div>
+              ) : projectSelectorProjectsQuery.error instanceof Error ? (
+                <div className={`mt-2 text-sm text-red-500`}>{projectSelectorProjectsQuery.error.message}</div>
+              ) : projects.length === 0 ? (
+                <div
+                  className={`flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-black/10 bg-white/60 py-10 dark:border-white/10 dark:bg-[#273142]`}
+                >
+                  <p className={`text-sm font-semibold ${textSecondary}`}>Нет доступных проектов</p>
+                  <p className={`text-xs ${textSecondary}`}>Вы сможете открыть задачи, когда появится доступ к проекту.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 page-load-stagger">
+                    {projects.map((project, index) => {
+                      const colorIndex = index % BOARD_PROJECT_CARD_COLORS.length
+                      const isHighRisk = project.riskSummary.riskLevel === RiskLevel.HIGH
+                      const riskBadgeClasses = getRiskBadgeClasses(project.riskSummary.riskLevel)
+                      const isSelected = pendingProjectId === project.id
+
+                      return (
+                        <div
+                          key={project.id}
+                          role="button"
+                          tabIndex={0}
+                          className={`card-hover cursor-pointer rounded-xl border bg-white p-6 transition-all duration-200 dark:bg-[#273142] dark:border-[#313d4f] stagger-row ${
+                            isSelected ? 'border-[#4880ff] shadow-[0_0_0_2px_rgba(72,128,255,0.35)]' : 'border-[#e8e8e8]'
+                          }`}
+                          style={{ animationDelay: `${index * 80}ms` }}
+                          onClick={() => openBoardForProjectId(project.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              openBoardForProjectId(project.id)
+                            }
+                          }}
+                        >
+                          <div className="mb-3 flex items-start justify-between gap-3">
+                            <div className="flex min-w-0 flex-1 items-center gap-3">
+                              <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${BOARD_PROJECT_CARD_COLORS[colorIndex]} text-base font-bold text-white`}>
+                                {project.name.charAt(0)}
+                              </div>
+                              <div className="min-w-0">
+                                <h3 className={`truncate font-bold ${textPrimary}`}>{project.name}</h3>
+                                <div className="mt-1 flex flex-wrap items-center gap-2">
+                                  <span className={`rounded-full bg-black/5 px-2 py-0.5 text-xs font-semibold text-[#737373] dark:bg-white/5 dark:text-[#94a3b8]`}>
+                                    {project.teamName}
+                                  </span>
+                                  {project.riskSummary.riskLevel !== RiskLevel.LOW ? (
+                                    <span
+                                      className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${riskBadgeClasses.background} ${riskBadgeClasses.text}`}
+                                    >
+                                      <AlertTriangle className="h-3 w-3" />
+                                      {isHighRisk ? 'Высокий риск' : 'Средний риск'}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className={`flex items-center justify-between border-t pt-4`}>
+                            <div className={`flex items-center gap-1.5 text-xs ${textSecondary}`}>
+                              <UserIcon className="h-3.5 w-3.5" />
+                              <span>{project.memberCount} уч.</span>
+                            </div>
+                            <div className={`text-xs font-semibold ${textSecondary}`}>Открыть</div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={closeProjectSelector}
+                      className={`rounded-lg border px-4 py-2.5 text-sm font-semibold transition-colors ${
+                        isDark
+                          ? 'border-[#313d4f] text-[#94a3b8] hover:bg-[#273142]'
+                          : 'border-gray-200 text-[#737373] hover:bg-gray-50'
+                      }`}
+                    >
+                      Закрыть список
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-black/10 bg-white/60 p-8 text-center dark:border-white/10 dark:bg-[#273142]">
+            <p className={`text-lg font-bold ${textPrimary}`}>Проект не выбран</p>
+            <p className={`mt-2 text-sm ${textSecondary}`}>Список выбора проекта закрыт в этой вкладке.</p>
+            <button
+              type="button"
+              onClick={() => {
+                setIsProjectSelectorOpen(true)
+                setPendingProjectId(null)
+              }}
+              className="mt-4 inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-[#737373] transition-colors hover:bg-gray-50 dark:border-[#313d4f] dark:text-[#94a3b8] dark:hover:bg-[#273142]"
+            >
+              Выбрать проект
+            </button>
+          </div>
+        )}
       </PageShell>
     )
   }
@@ -263,14 +572,35 @@ export function Board() {
   const projectMembers = projectBoardView.members
   const boardTasks = projectBoardView.tasks
   const isBoardRefreshing = boardQuery.isFetching && !boardQuery.isLoading && Boolean(projectBoardView)
-  const canEditTasks = user?.accountRole === AccountRole.ADMIN || user?.accountRole === AccountRole.MEMBER
-  const taskAssigneeOptions = [
-    { value: '', label: 'Не назначен' },
-    ...projectMembers.map((member) => ({
-      value: String(member.userId),
-      label: `${member.user.fullName} (${PROJECT_ROLE_LABELS[member.role as ProjectRole] ?? member.role})`,
-    })),
-  ]
+  const currentUserMember = user ? projectMembers.find((m) => m.userId === user.id) : undefined
+  const canEditTasks =
+    currentUserMember?.role === ProjectRole.TEAM_LEAD || currentUserTeamMember?.teamRole === TeamRole.OWNER
+
+  const assigneeFullNameById = new Map(projectMembers.map((m) => [m.userId, m.user.fullName] as const))
+
+  const getTaskAssigneeIds = (task: ProjectBoardTask): number[] => {
+    const ids =
+      task.assigneeIds && task.assigneeIds.length >= 0
+        ? task.assigneeIds
+        : typeof task.assigneeId === 'number'
+          ? [task.assigneeId]
+          : task.assignee
+            ? [task.assignee.id]
+            : []
+
+    return ids.filter((id) => typeof id === 'number' && id > 0)
+  }
+
+  const formatTaskAssigneesShort = (task: ProjectBoardTask): string => {
+    const ids = getTaskAssigneeIds(task)
+    if (ids.length === 0) return 'Не назначен'
+
+    const firstName = assigneeFullNameById.get(ids[0])
+    if (!firstName) return 'Не назначен'
+
+    if (ids.length === 1) return firstName
+    return `${firstName} +${ids.length - 1}`
+  }
   const boardColumns = PROJECT_BOARD_COLUMNS.map((column) => {
     const columnTasks = getColumnTasks(boardTasks, column.status)
     return {
@@ -298,7 +628,15 @@ export function Board() {
     setTaskFormDescription(task.description)
     setTaskFormDeadline(formatLocalDateInput(task.deadline))
     setTaskFormDifficulty(String(task.difficulty))
-    setTaskFormAssigneeId(task.assigneeId ? String(task.assigneeId) : '')
+    setTaskFormAssigneeIds(
+      task.assigneeIds && task.assigneeIds.length > 0
+        ? task.assigneeIds
+        : typeof task.assigneeId === 'number' && task.assigneeId > 0
+          ? [task.assigneeId]
+          : task.assignee
+            ? [task.assignee.id]
+            : [],
+    )
     setTaskFormStatus(task.status as TaskStatus)
     setTaskFormError('')
     setIsTaskFormOpen(true)
@@ -335,7 +673,7 @@ export function Board() {
     setTaskFormDescription('')
     setTaskFormDeadline('')
     setTaskFormDifficulty('3')
-    setTaskFormAssigneeId('')
+    setTaskFormAssigneeIds([])
     setTaskFormStatus(TaskStatus.NEW)
     setTaskFormError('')
   }
@@ -347,6 +685,25 @@ export function Board() {
       className={pageBg}
       actions={
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => {
+              try {
+                window.sessionStorage.removeItem(BOARD_PROJECT_SESSION_KEY)
+              } catch {
+                // Ignore storage failures (e.g., blocked storage)
+              }
+
+              navigate('/board/0')
+            }}
+            className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition-colors ${
+              isDark
+                ? 'border-[#313d4f] text-[#f4f3f2] hover:bg-[#273142]'
+                : 'border-gray-200 text-[#202224] hover:bg-gray-50'
+            }`}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Выбор проектов
+          </button>
           <button
             onClick={() => navigate('/projects')}
             className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition-colors ${
@@ -471,7 +828,7 @@ export function Board() {
                         aria-busy={isTaskBusy}
                         className={`${cardBg} border ${cardBorder} rounded-xl p-4 shadow-sm transition-all duration-200 card-hover stagger-card ${
                           isTaskBusy ? 'opacity-80' : ''
-                        }`}
+                        } ${openedTaskMenuId === task.id ? 'z-[60] relative' : 'relative'}`}
                         style={{ animationDelay: `${columnIndex * 75 + taskIndex * 50}ms` }}
                       >
                         <div className="mb-2 flex items-start justify-between gap-2">
@@ -487,8 +844,9 @@ export function Board() {
                                 {pendingAction === 'delete' ? 'Удаление' : 'Перевод'}
                               </span>
                             )}
-                            <div className="relative">
+                        <div className={`relative ${openedTaskMenuId === task.id ? 'z-[70]' : ''}`}>
                               <button
+                            data-task-menu-button-id={task.id}
                                 onClick={() =>
                                   setOpenedTaskMenuId(openedTaskMenuId === task.id ? null : task.id)
                                 }
@@ -499,7 +857,8 @@ export function Board() {
                               </button>
                               {openedTaskMenuId === task.id && !isTaskBusy && (
                                 <div
-                                  className={`dropdown-enter absolute right-0 top-6 z-20 w-52 overflow-hidden rounded-xl border shadow-xl ${
+                              data-task-menu-id={task.id}
+                              className={`dropdown-enter absolute right-0 top-6 z-[80] w-52 overflow-hidden rounded-xl border shadow-xl ${
                                     isDark
                                       ? 'border-[#313d4f] bg-[#273142]'
                                       : 'border-[#e8e8e8] bg-white'
@@ -626,7 +985,7 @@ export function Board() {
                           </div>
                           <div className="flex min-w-0 items-center gap-1">
                             <UserIcon className="h-3 w-3 shrink-0" />
-                            <span className="truncate">{task.assignee?.fullName ?? 'Не назначен'}</span>
+                            <span className="truncate">{formatTaskAssigneesShort(task)}</span>
                           </div>
                         </div>
                       </article>
@@ -726,7 +1085,7 @@ export function Board() {
                     </div>
                     <div className="flex min-w-0 items-center gap-1 text-[11px]">
                       <UserIcon className="h-3 w-3 shrink-0" />
-                      <span className="truncate">{task.assignee?.fullName ?? 'Не назначен'}</span>
+                      <span className="truncate">{formatTaskAssigneesShort(task)}</span>
                     </div>
                   </button>
                 )
@@ -785,12 +1144,63 @@ export function Board() {
               { value: '5', label: '5' },
             ]}
           />
-          <SelectField
-            label="Исполнитель"
-            value={taskFormAssigneeId}
-            onChange={setTaskFormAssigneeId}
-            options={taskAssigneeOptions}
-          />
+          <div>
+            <label className={`block text-sm font-semibold mb-1.5 ${textSecondary}`}>
+              Исполнители
+            </label>
+            <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+              <button
+                type="button"
+                onClick={() => setTaskFormAssigneeIds([])}
+                className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold transition-colors border ${
+                  taskFormAssigneeIds.length === 0
+                    ? isDark
+                      ? 'border-[#4880ff] bg-[#4880ff]/15 text-[#4880ff]'
+                      : 'border-[#4880ff] bg-blue-50 text-[#4880ff]'
+                    : isDark
+                      ? 'border-[#313d4f] bg-[#1c2534] text-[#94a3b8] hover:bg-[#273142]'
+                      : 'border-gray-200 bg-white text-[#737373] hover:bg-gray-50'
+                }`}
+              >
+                Не назначено
+              </button>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {projectMembers.map((member) => {
+                  const checked = taskFormAssigneeIds.includes(member.userId)
+                  return (
+                    <label
+                      key={member.userId}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs cursor-pointer select-none transition-colors ${
+                        isDark
+                          ? checked
+                            ? 'border-[#4880ff] bg-[#4880ff]/10 text-[#f4f3f2]'
+                            : 'border-[#313d4f] bg-[#1c2534] text-[#94a3b8] hover:bg-[#273142]'
+                          : checked
+                            ? 'border-[#4880ff] bg-blue-50 text-[#202224]'
+                            : 'border-gray-200 bg-white text-[#737373] hover:bg-gray-50'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          setTaskFormAssigneeIds((current) =>
+                            current.includes(member.userId)
+                              ? current.filter((id) => id !== member.userId)
+                              : [...current, member.userId],
+                          )
+                        }}
+                      />
+                      <span className="truncate">
+                        {member.user.fullName}
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
           <SelectField
             label="Статус"
             value={taskFormStatus}
@@ -845,7 +1255,7 @@ export function Board() {
               </div>
               <div className={`rounded-xl p-4 ${isDark ? 'bg-[#1c2534]' : 'bg-gray-50'}`}>
                 <p className={`text-xs uppercase tracking-wider ${textSecondary}`}>Исполнитель</p>
-                <p className={`mt-1 text-sm font-semibold ${textPrimary}`}>{selectedTaskForDetails.assignee?.fullName ?? 'Не назначен'}</p>
+                <p className={`mt-1 text-sm font-semibold ${textPrimary}`}>{formatTaskAssigneesShort(selectedTaskForDetails)}</p>
               </div>
               <div className={`rounded-xl p-4 ${isDark ? 'bg-[#1c2534]' : 'bg-gray-50'}`}>
                 <p className={`text-xs uppercase tracking-wider ${textSecondary}`}>Сложность</p>
