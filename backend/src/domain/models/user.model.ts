@@ -6,8 +6,10 @@ export interface User {
   password: string;
   fullName: string;
   profession: string;
-  accountStatus: 'active' | 'blocked';
+  accountStatus: 'active' | 'blocked' | 'inactive';
   accountRole: AccountRole;
+  aiHintsEnabled: boolean;
+  lastPasswordChangedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

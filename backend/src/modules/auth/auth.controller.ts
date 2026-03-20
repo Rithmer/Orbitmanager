@@ -15,7 +15,7 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, RefreshDto } from './dto';
+import { RegisterDto, LoginDto, RefreshDto, ChangePasswordDto } from './dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 
@@ -71,5 +71,24 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Не авторизован' })
   getMe(@CurrentUser('id') userId: number) {
     return this.authService.getMe(userId);
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Изменить пароль текущего пользователя' })
+  @ApiResponse({ status: 204, description: 'Пароль успешно изменён' })
+  @ApiResponse({ status: 400, description: 'Некорректный новый пароль' })
+  @ApiResponse({ status: 401, description: 'Текущий пароль неверен' })
+  @ApiResponse({
+    status: 429,
+    description: 'Смена пароля доступна не чаще одного раза за 24 часа',
+  })
+  changePassword(
+    @CurrentUser('id') userId: number,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(userId, dto);
   }
 }

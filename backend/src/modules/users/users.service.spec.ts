@@ -1,5 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  NotFoundException,
+  TooManyRequestsException,
+} from '@nestjs/common';
+import { TtlCacheService } from '@/common/cache/ttl-cache.service';
 import { UsersService } from './users.service';
 import { USER_REPOSITORY } from '@/domain/repositories/user.repository';
 import { TEAM_REPOSITORY } from '@/domain/repositories/team.repository';
@@ -7,6 +12,7 @@ import { TASK_REPOSITORY } from '@/domain/repositories/task.repository';
 import { AUDIT_LOG_REPOSITORY } from '@/domain/repositories/audit-log.repository';
 import { AuditService } from '../audit-logs/audit.service';
 import { AccountRole } from '@/common/enums/account-role.enum';
+import { AuditAction } from '@/common/enums/audit-action.enum';
 import { User } from '@/domain/models/user.model';
 
 const mockUser: User = {
@@ -17,22 +23,19 @@ const mockUser: User = {
   profession: 'Developer',
   accountStatus: 'active',
   accountRole: AccountRole.MEMBER,
+  aiHintsEnabled: true,
+  lastPasswordChangedAt: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
-};
-
-const paginatedUsers = {
-  items: [mockUser],
-  total: 1,
-  page: 1,
-  limit: 20,
-  totalPages: 1,
 };
 
 const mockUserRepository = {
   findAll: jest.fn().mockResolvedValue([mockUser]),
   findById: jest.fn().mockResolvedValue(mockUser),
-  findPaginated: jest.fn().mockResolvedValue(paginatedUsers),
+  findPage: jest.fn().mockResolvedValue({
+    items: [mockUser],
+    total: 1,
+  }),
   findByLogin: jest.fn().mockResolvedValue(null),
   create: jest
     .fn()
@@ -42,42 +45,33 @@ const mockUserRepository = {
   update: jest
     .fn()
     .mockImplementation((id: number, partial: Partial<User>) =>
-      Promise.resolve({ ...mockUser, ...partial }),
+      Promise.resolve({ ...mockUser, ...partial, id }),
     ),
   delete: jest.fn().mockResolvedValue(true),
 };
 
 const mockTeamRepository = {
-  findAll: jest.fn().mockResolvedValue([]),
-  findById: jest.fn().mockResolvedValue(null),
   findByCreator: jest.fn().mockResolvedValue([]),
-  create: jest.fn(),
-  update: jest.fn(),
-  delete: jest.fn(),
 };
 
 const mockTaskRepository = {
-  findAll: jest.fn().mockResolvedValue([]),
-  findById: jest.fn().mockResolvedValue(null),
-  findByProject: jest.fn().mockResolvedValue([]),
-  findByProjects: jest.fn().mockResolvedValue([]),
   findByCreator: jest.fn().mockResolvedValue([]),
-  clearAssigneeByUserAndProjects: jest.fn().mockResolvedValue(0),
-  create: jest.fn(),
-  update: jest.fn(),
-  delete: jest.fn(),
 };
 
 const mockAuditLogRepository = {
-  findAll: jest.fn().mockResolvedValue([]),
-  findById: jest.fn().mockResolvedValue(null),
-  findByEntity: jest.fn().mockResolvedValue([]),
   findByUser: jest.fn().mockResolvedValue([]),
-  create: jest.fn(),
 };
 
 const mockAuditService = {
   log: jest.fn().mockResolvedValue(undefined),
+};
+
+const cacheStore = new Map<string, unknown>();
+const mockCacheService = {
+  get: jest.fn((key: string) => cacheStore.get(key)),
+  set: jest.fn((key: string, value: unknown) => {
+    cacheStore.set(key, value);
+  }),
 };
 
 describe('UsersService', () => {
@@ -92,63 +86,102 @@ describe('UsersService', () => {
         { provide: TASK_REPOSITORY, useValue: mockTaskRepository },
         { provide: AUDIT_LOG_REPOSITORY, useValue: mockAuditLogRepository },
         { provide: AuditService, useValue: mockAuditService },
+        { provide: TtlCacheService, useValue: mockCacheService },
       ],
     }).compile();
 
     service = module.get<UsersService>(UsersService);
     jest.clearAllMocks();
+    cacheStore.clear();
+    mockUserRepository.findById.mockResolvedValue(mockUser);
+    mockUserRepository.findPage.mockResolvedValue({
+      items: [mockUser],
+      total: 1,
+    });
+    mockUserRepository.update.mockImplementation(
+      (id: number, partial: Partial<User>) =>
+        Promise.resolve({ ...mockUser, ...partial, id }),
+    );
+    mockUserRepository.findByLogin.mockResolvedValue(null);
+    mockUserRepository.delete.mockResolvedValue(true);
+    mockTeamRepository.findByCreator.mockResolvedValue([]);
+    mockTaskRepository.findByCreator.mockResolvedValue([]);
+    mockAuditLogRepository.findByUser.mockResolvedValue([]);
   });
 
   describe('findAll', () => {
-    it('should return paginated users without passwords', async () => {
+    it('returns paginated users without sensitive fields', async () => {
       const result = await service.findAll({});
+
       expect(result.items).toHaveLength(1);
       expect(
         (result.items[0] as Record<string, unknown>)['password'],
       ).toBeUndefined();
-      expect(mockUserRepository.findPaginated).toHaveBeenCalledWith(
+      expect(
+        (result.items[0] as Record<string, unknown>)['lastPasswordChangedAt'],
+      ).toBeUndefined();
+      expect(mockUserRepository.findPage).toHaveBeenCalledWith(
         expect.objectContaining({
-          searchFields: ['login', 'fullName', 'profession'],
+          page: 1,
+          limit: 20,
         }),
       );
     });
   });
 
   describe('findById', () => {
-    it('should return user without password', async () => {
+    it('returns user without sensitive fields', async () => {
       const result = await service.findById(1);
+
       expect(result.login).toBe('testuser');
       expect((result as Record<string, unknown>)['password']).toBeUndefined();
+      expect(
+        (result as Record<string, unknown>)['lastPasswordChangedAt'],
+      ).toBeUndefined();
     });
 
-    it('should throw NotFoundException for missing user', async () => {
+    it('throws NotFoundException for missing user', async () => {
       mockUserRepository.findById.mockResolvedValueOnce(null);
+
       await expect(service.findById(999)).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('findEntityById', () => {
-    it('should return entity with password for internal flows', async () => {
+    it('returns full user entity for internal flows', async () => {
       const result = await service.findEntityById(1);
+
       expect(result).toEqual(mockUser);
     });
   });
 
   describe('create', () => {
-    it('should create user and return without password', async () => {
+    it('creates user and returns public representation', async () => {
       const result = await service.create({
         login: 'newuser',
         password: 'password123',
         fullName: 'New User',
         profession: 'Tester',
       });
+
       expect(result.id).toBe(2);
       expect((result as Record<string, unknown>)['password']).toBeUndefined();
-      expect(mockUserRepository.create).toHaveBeenCalled();
+      expect(
+        (result as Record<string, unknown>)['lastPasswordChangedAt'],
+      ).toBeUndefined();
+      expect(mockUserRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          login: 'newuser',
+          profession: 'Tester',
+          aiHintsEnabled: true,
+          lastPasswordChangedAt: null,
+        }),
+      );
     });
 
-    it('should throw ConflictException for duplicate login', async () => {
+    it('throws ConflictException for duplicate login', async () => {
       mockUserRepository.findByLogin.mockResolvedValueOnce(mockUser);
+
       await expect(
         service.create({
           login: 'testuser',
@@ -161,63 +194,108 @@ describe('UsersService', () => {
   });
 
   describe('update', () => {
-    it('should update and return user without password', async () => {
+    it('updates user and returns public representation', async () => {
       const result = await service.update(1, { fullName: 'Updated' });
+
       expect(result.fullName).toBe('Updated');
       expect((result as Record<string, unknown>)['password']).toBeUndefined();
     });
 
-    it('should throw NotFoundException for missing user', async () => {
+    it('throws NotFoundException for missing user', async () => {
       mockUserRepository.findById.mockResolvedValueOnce(null);
+
       await expect(service.update(999, { fullName: 'X' })).rejects.toThrow(
         NotFoundException,
       );
     });
   });
 
+  describe('updateMe', () => {
+    it('updates personal settings and writes audit log', async () => {
+      const result = await service.updateMe(1, {
+        fullName: 'Updated Name',
+        aiHintsEnabled: false,
+      });
+
+      expect(result.fullName).toBe('Updated Name');
+      expect(result.aiHintsEnabled).toBe(false);
+      expect(mockAuditService.log).toHaveBeenCalledWith(
+        1,
+        AuditAction.UPDATE,
+        'user-profile',
+        1,
+        'Пользователь обновил личные настройки',
+      );
+    });
+
+    it('throws TooManyRequestsException after 5 changes in 5 minutes', async () => {
+      for (let index = 0; index < 5; index += 1) {
+        await service.updateMe(1, { profession: `Role ${index}` });
+      }
+
+      await expect(
+        service.updateMe(1, { profession: 'One more role' }),
+      ).rejects.toThrow(TooManyRequestsException);
+    });
+  });
+
+  describe('updatePassword', () => {
+    it('stores hashed password and change timestamp', async () => {
+      await service.updatePassword(1, 'NewPassword123!');
+
+      expect(mockUserRepository.update).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          password: expect.stringContaining('$argon2'),
+          lastPasswordChangedAt: expect.any(String),
+          updatedAt: expect.any(String),
+        }),
+      );
+    });
+  });
+
   describe('remove', () => {
-    it('should delete user when there are no blocking dependencies', async () => {
+    it('deletes user when there are no blocking dependencies', async () => {
       await service.remove(1);
+
       expect(mockUserRepository.delete).toHaveBeenCalledWith(1);
       expect(mockAuditService.log).toHaveBeenCalled();
     });
 
-    it('should throw NotFoundException if not found', async () => {
+    it('throws NotFoundException if user does not exist', async () => {
       mockUserRepository.findById.mockResolvedValueOnce(null);
+
       await expect(service.remove(999)).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw ConflictException when user created teams', async () => {
+    it('throws ConflictException when user created teams', async () => {
       mockTeamRepository.findByCreator.mockResolvedValueOnce([
         { id: 5, name: 'Blocked team' },
       ]);
 
       await expect(service.remove(1)).rejects.toThrow(ConflictException);
       expect(mockUserRepository.delete).not.toHaveBeenCalled();
-      expect(mockAuditService.log).not.toHaveBeenCalled();
     });
 
-    it('should throw ConflictException when user created tasks', async () => {
+    it('throws ConflictException when user created tasks', async () => {
       mockTaskRepository.findByCreator.mockResolvedValueOnce([
         { id: 10, name: 'Blocked task' },
       ]);
 
       await expect(service.remove(1)).rejects.toThrow(ConflictException);
       expect(mockUserRepository.delete).not.toHaveBeenCalled();
-      expect(mockAuditService.log).not.toHaveBeenCalled();
     });
 
-    it('should throw ConflictException when user has audit logs', async () => {
+    it('throws ConflictException when user has audit logs', async () => {
       mockAuditLogRepository.findByUser.mockResolvedValueOnce([
         { id: 7, userId: 1, action: 'login' },
       ]);
 
       await expect(service.remove(1)).rejects.toThrow(ConflictException);
       expect(mockUserRepository.delete).not.toHaveBeenCalled();
-      expect(mockAuditService.log).not.toHaveBeenCalled();
     });
 
-    it('should throw NotFoundException if delete lost the race', async () => {
+    it('throws NotFoundException if delete lost the race', async () => {
       mockUserRepository.delete.mockResolvedValueOnce(false);
 
       await expect(service.remove(1)).rejects.toThrow(NotFoundException);

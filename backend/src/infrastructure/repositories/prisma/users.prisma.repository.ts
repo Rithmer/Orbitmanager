@@ -72,6 +72,10 @@ export class UsersPrismaRepository implements IUserRepository {
         profession: user.profession,
         accountStatus: user.accountStatus,
         accountRole: user.accountRole,
+        aiHintsEnabled: user.aiHintsEnabled,
+        lastPasswordChangedAt: user.lastPasswordChangedAt
+          ? new Date(user.lastPasswordChangedAt)
+          : null,
       },
     });
     return this.toDomain(row);
@@ -118,6 +122,8 @@ export class UsersPrismaRepository implements IUserRepository {
       profession: row.profession,
       accountStatus: row.accountStatus as User['accountStatus'],
       accountRole: row.accountRole as User['accountRole'],
+      aiHintsEnabled: row.aiHintsEnabled,
+      lastPasswordChangedAt: row.lastPasswordChangedAt?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };

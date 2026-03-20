@@ -1,11 +1,12 @@
 import {
-  IsString,
-  IsNotEmpty,
-  MinLength,
-  MaxLength,
   IsEnum,
+  IsIn,
+  IsNotEmpty,
   IsOptional,
+  IsString,
   Matches,
+  MaxLength,
+  MinLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AccountRole } from '@/common/enums/account-role.enum';
@@ -13,20 +14,22 @@ import { AccountRole } from '@/common/enums/account-role.enum';
 export class CreateUserDto {
   @ApiProperty({
     example: 'john_doe',
-    description: 'Уникальный логин (3-50 символов, без спецсимволов)',
+    description:
+      'РЈРЅРёРєР°Р»СЊРЅС‹Р№ Р»РѕРіРёРЅ (3-50 СЃРёРјРІРѕР»РѕРІ, Р±РµР· СЃРїРµС†СЃРёРјРІРѕР»РѕРІ)',
   })
   @IsString()
   @IsNotEmpty()
   @MinLength(3)
   @MaxLength(50)
   @Matches(/^[a-zA-Z0-9_]+$/, {
-    message: 'Логин может содержать только буквы, цифры и символ подчёркивания',
+    message:
+      'Р›РѕРіРёРЅ РјРѕР¶РµС‚ СЃРѕРґРµСЂР¶Р°С‚СЊ С‚РѕР»СЊРєРѕ Р±СѓРєРІС‹, С†РёС„СЂС‹ Рё СЃРёРјРІРѕР» РїРѕРґС‡С‘СЂРєРёРІР°РЅРёСЏ',
   })
   login!: string;
 
   @ApiProperty({
     example: 'secureP@ss1',
-    description: 'Пароль (мин. 8 символов)',
+    description: 'РџР°СЂРѕР»СЊ (РјРёРЅ. 8 СЃРёРјРІРѕР»РѕРІ)',
   })
   @IsString()
   @IsNotEmpty()
@@ -34,20 +37,34 @@ export class CreateUserDto {
   @MaxLength(100)
   password!: string;
 
-  @ApiProperty({ example: 'Иванов Иван', description: 'Полное имя' })
+  @ApiProperty({
+    example: 'РРІР°РЅРѕРІ РРІР°РЅ',
+    description: 'РџРѕР»РЅРѕРµ РёРјСЏ',
+  })
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
   fullName!: string;
 
-  @ApiProperty({ example: 'Backend Developer', description: 'Профессия' })
+  @ApiPropertyOptional({
+    example: 'Backend Developer',
+    description: 'РџСЂРѕС„РµСЃСЃРёСЏ',
+  })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @MaxLength(100)
-  profession!: string;
+  profession?: string;
 
   @ApiPropertyOptional({ enum: AccountRole, default: AccountRole.MEMBER })
   @IsEnum(AccountRole)
   @IsOptional()
   accountRole?: AccountRole;
+
+  @ApiPropertyOptional({
+    enum: ['active', 'blocked', 'inactive'],
+    default: 'active',
+  })
+  @IsIn(['active', 'blocked', 'inactive'])
+  @IsOptional()
+  accountStatus?: 'active' | 'blocked' | 'inactive';
 }

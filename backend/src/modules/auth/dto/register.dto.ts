@@ -1,29 +1,32 @@
 import {
-  IsString,
   IsNotEmpty,
-  MinLength,
-  MaxLength,
+  IsOptional,
+  IsString,
   Matches,
+  MaxLength,
+  MinLength,
 } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RegisterDto {
   @ApiProperty({
     example: 'john_doe',
-    description: 'Логин (3-50 символов, без спецсимволов)',
+    description:
+      'Р›РѕРіРёРЅ (3-50 СЃРёРјРІРѕР»РѕРІ, Р±РµР· СЃРїРµС†СЃРёРјРІРѕР»РѕРІ)',
   })
   @IsString()
   @IsNotEmpty()
   @MinLength(3)
   @MaxLength(50)
   @Matches(/^[a-zA-Z0-9_]+$/, {
-    message: 'Логин может содержать только буквы, цифры и символ подчёркивания',
+    message:
+      'Р›РѕРіРёРЅ РјРѕР¶РµС‚ СЃРѕРґРµСЂР¶Р°С‚СЊ С‚РѕР»СЊРєРѕ Р±СѓРєРІС‹, С†РёС„СЂС‹ Рё СЃРёРјРІРѕР» РїРѕРґС‡С‘СЂРєРёРІР°РЅРёСЏ',
   })
   login!: string;
 
   @ApiProperty({
     example: 'secureP@ss1',
-    description: 'Пароль (мин. 8 символов)',
+    description: 'РџР°СЂРѕР»СЊ (РјРёРЅ. 8 СЃРёРјРІРѕР»РѕРІ)',
   })
   @IsString()
   @IsNotEmpty()
@@ -31,15 +34,15 @@ export class RegisterDto {
   @MaxLength(100)
   password!: string;
 
-  @ApiProperty({ example: 'Иванов Иван' })
+  @ApiProperty({ example: 'РРІР°РЅРѕРІ РРІР°РЅ' })
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
   fullName!: string;
 
-  @ApiProperty({ example: 'Backend Developer' })
+  @ApiPropertyOptional({ example: 'Backend Developer' })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @MaxLength(100)
-  profession!: string;
+  profession?: string;
 }
