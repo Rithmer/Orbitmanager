@@ -15,7 +15,6 @@ import { TeamRole } from '../enums/team-role.enum';
 import { TEAM_ROLES_KEY } from '../decorators/team-roles.decorator';
 import type { ITeamMemberRepository } from '@/domain/repositories/team-member.repository';
 import { TEAM_MEMBER_REPOSITORY } from '@/domain/repositories/team-member.repository';
-import { AccountRole } from '../enums/account-role.enum';
 
 @Injectable()
 export class TeamRolesGuard implements CanActivate {
@@ -40,10 +39,6 @@ export class TeamRolesGuard implements CanActivate {
 
     if (!user) {
       throw new ForbiddenException('Доступ запрещён');
-    }
-
-    if (user.accountRole === AccountRole.ADMIN) {
-      return true;
     }
 
     const teamId = getRouteParamAsNumber(request, 'teamId', 'id');
