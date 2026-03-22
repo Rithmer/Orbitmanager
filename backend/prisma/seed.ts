@@ -10,8 +10,6 @@ const pool = new pg.Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-// ──────────────────── helpers ────────────────────
-
 function days(n: number): number {
   return n * 24 * 60 * 60 * 1000;
 }
@@ -31,8 +29,6 @@ function futureDate(minDays: number, maxDays: number): Date {
 function pastDate(minDays: number, maxDays: number): Date {
   return new Date(Date.now() - days(randomBetween(minDays, maxDays)));
 }
-
-// ──────────────────── data ────────────────────
 
 const USERS_DATA = [
   { login: 'admin', fullName: 'Администратор Системы', profession: 'System Administrator', accountRole: 'admin' },
@@ -414,8 +410,6 @@ const TEAMS: TeamDef[] = [
 
 const EVENT_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
 
-// ──────────────────── main ────────────────────
-
 async function main(): Promise<void> {
   console.log('Cleaning database...');
   await prisma.calendarEvent.deleteMany();
@@ -427,7 +421,6 @@ async function main(): Promise<void> {
   await prisma.team.deleteMany();
   await prisma.user.deleteMany();
 
-  // Reset sequences
   await prisma.$executeRawUnsafe(`ALTER SEQUENCE users_id_seq RESTART WITH 1`);
   await prisma.$executeRawUnsafe(`ALTER SEQUENCE teams_id_seq RESTART WITH 1`);
   await prisma.$executeRawUnsafe(`ALTER SEQUENCE team_members_id_seq RESTART WITH 1`);
@@ -437,7 +430,6 @@ async function main(): Promise<void> {
   await prisma.$executeRawUnsafe(`ALTER SEQUENCE audit_logs_id_seq RESTART WITH 1`);
   await prisma.$executeRawUnsafe(`ALTER SEQUENCE calendar_events_id_seq RESTART WITH 1`);
 
-  // ── Users ──
   console.log('Creating users...');
   const password = await argon2.hash('Password123!');
   const adminPassword = await argon2.hash('Admin123!');
@@ -458,7 +450,6 @@ async function main(): Promise<void> {
   }
   console.log(`  Created ${userIds.length} users`);
 
-  // ── Teams, Members, Projects, Tasks ──
   let totalTeams = 0;
   let totalMembers = 0;
   let totalProjects = 0;
@@ -478,13 +469,11 @@ async function main(): Promise<void> {
     });
     totalTeams++;
 
-    // Owner as team member
     await prisma.teamMember.create({
       data: { userId: ownerId, teamId: team.id, teamRole: 'owner' },
     });
     totalMembers++;
 
-    // Other members
     for (const m of teamDef.members) {
       await prisma.teamMember.create({
         data: {
@@ -496,7 +485,6 @@ async function main(): Promise<void> {
       totalMembers++;
     }
 
-    // Projects
     for (const projDef of teamDef.projects) {
       const project = await prisma.project.create({
         data: {
@@ -508,7 +496,6 @@ async function main(): Promise<void> {
       });
       totalProjects++;
 
-      // Project members
       for (const pm of projDef.members) {
         await prisma.projectMember.create({
           data: {
@@ -519,7 +506,6 @@ async function main(): Promise<void> {
         });
       }
 
-      // Tasks
       for (const taskDef of projDef.tasks) {
         const deadline =
           taskDef.deadlineDaysFromNow >= 0
@@ -553,7 +539,6 @@ async function main(): Promise<void> {
         });
         totalTasks++;
 
-        // Audit log for task creation
         await prisma.auditLog.create({
           data: {
             userId: creatorId,
@@ -565,7 +550,6 @@ async function main(): Promise<void> {
           },
         });
 
-        // Status change audit if not 'new'
         if (taskDef.status !== 'new') {
           const transitions: Record<string, string[]> = {
             in_progress: ['new', 'in_progress'],
@@ -593,7 +577,6 @@ async function main(): Promise<void> {
           }
         }
 
-        // Calendar event for tasks with deadlines (50% chance)
         if (assigneeUserId && Math.random() > 0.5) {
           const eventStart = new Date(deadline.getTime() - days(1));
           await prisma.calendarEvent.create({
@@ -615,7 +598,6 @@ async function main(): Promise<void> {
     }
   }
 
-  // ── Standalone calendar events (meetings, standups, etc.) ──
   console.log('Creating standalone calendar events...');
 
   const meetingEvents = [
@@ -652,7 +634,6 @@ async function main(): Promise<void> {
     }
   }
 
-  // Personal events for various users
   const personalEvents = [
     'Отпуск', 'Больничный', 'Обучение', 'Конференция', 'Хакатон',
     'Собеседование кандидата', 'Подготовка отчёта', 'Обновление документации',
@@ -695,7 +676,6 @@ async function main(): Promise<void> {
     totalEvents++;
   }
 
-  // Login audit for all users
   for (let i = 0; i < userIds.length - 1; i++) {
     await prisma.auditLog.create({
       data: {
