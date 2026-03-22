@@ -41,3 +41,13 @@ export function getOverdueLabel(task: ProjectBoardTask): boolean {
 export function getColumnTasks(tasks: ProjectBoardTask[], status: string) {
   return tasks.filter((task) => task.status === status)
 }
+
+export const KANBAN_COLUMN_PREVIEW_TASKS = 3
+
+export const BOARD_PROJECT_CARD_COLORS = [
+  'bg-[#4880ff]',
+  'bg-[#10b981]',
+  'bg-[#8b5cf6]',
+  'bg-[#f59e0b]',
+  'bg-[#ef4444]',
+] as const
