@@ -13,7 +13,7 @@ import {
   Tag,
 } from 'lucide-react'
 import { useTheme } from '../context/useTheme'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 import { tasksApi } from '../api/tasks'
 import { calendarApi } from '../api/calendar'
 import { projectsApi } from '../api/projects'
@@ -113,6 +113,7 @@ export function Calendar() {
   const [formDuration, setFormDuration] = useState('60')
   const [formColor, setFormColor] = useState('#3b82f6')
   const [formProjectId, setFormProjectId] = useState('')
+  const [formAllDay, setFormAllDay] = useState(false)
   const [formLoading, setFormLoading] = useState(false)
   const [formError, setFormError] = useState('')
 
@@ -174,13 +175,18 @@ export function Calendar() {
     return projects.find((p) => p.id === projectId)?.name || ''
   }
 
+  const toLocalDateStr = (isoString: string): string => {
+    const d = new Date(isoString)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+
   const getItemsForDate = (year: number, month: number, day: number): CalItem[] => {
     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
     const items: CalItem[] = []
 
     if (filterType === 'all' || filterType === 'tasks') {
       tasks
-        .filter((t) => t.deadline && t.deadline.startsWith(dateStr))
+        .filter((t) => t.deadline && toLocalDateStr(t.deadline) === dateStr)
         .forEach((t) => {
           const sc = STATUS_COLORS[t.status] || STATUS_COLORS[TaskStatus.NEW]
           items.push({
@@ -200,7 +206,7 @@ export function Calendar() {
 
     if (filterType === 'all' || filterType === 'events') {
       events
-        .filter((e) => e.startDate.startsWith(dateStr))
+        .filter((e) => toLocalDateStr(e.startDate) === dateStr)
         .forEach((e) => {
           items.push({
             id: `event-${e.id}`,
@@ -223,11 +229,13 @@ export function Calendar() {
   const firstDayOfMonth = getFirstDayOfMonth(currentYear, currentMonth)
 
   const prevMonth = () => {
+    setSelectedDay(null)
     if (currentMonth === 1) { setCurrentMonth(12); setCurrentYear(currentYear - 1) }
     else setCurrentMonth(currentMonth - 1)
   }
 
   const nextMonth = () => {
+    setSelectedDay(null)
     if (currentMonth === 12) { setCurrentMonth(1); setCurrentYear(currentYear + 1) }
     else setCurrentMonth(currentMonth + 1)
   }
@@ -260,6 +268,7 @@ export function Calendar() {
     setFormDuration('60')
     setFormColor('#3b82f6')
     setFormProjectId('')
+    setFormAllDay(false)
     setFormError('')
     setShowCreateModal(true)
   }
@@ -277,6 +286,7 @@ export function Calendar() {
         endDate,
         color: formColor,
         projectId: formProjectId ? Number(formProjectId) : undefined,
+        allDay: formAllDay,
       })
       setShowCreateModal(false)
       await loadEvents()
@@ -294,12 +304,13 @@ export function Calendar() {
     const start = new Date(ev.startDate)
     setFormTitle(ev.title)
     setFormDesc(ev.description || '')
-    setFormDate(ev.startDate.split('T')[0])
+    setFormDate(`${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`)
     setFormTime(start.toTimeString().slice(0, 5))
     const diffMin = Math.round((new Date(ev.endDate).getTime() - start.getTime()) / 60000)
     setFormDuration(String(diffMin))
     setFormColor(ev.color)
     setFormProjectId(ev.projectId ? String(ev.projectId) : '')
+    setFormAllDay(ev.allDay)
     setFormError('')
     setShowEditModal(true)
   }
@@ -318,6 +329,7 @@ export function Calendar() {
         endDate,
         color: formColor,
         projectId: formProjectId ? Number(formProjectId) : null,
+        allDay: formAllDay,
       })
       setShowEditModal(false)
       setEditingEvent(null)
@@ -431,7 +443,6 @@ export function Calendar() {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="flex items-center gap-2 mb-4 flex-wrap page-load-stagger">
         <Filter className={`w-4 h-4 ${textSecondary}`} />
         {filterBtns.map((f) => (
@@ -528,7 +539,6 @@ export function Calendar() {
         </div>
       </div>
 
-      {/* Day Detail Modal */}
       {selectedDay !== null && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 modal-overlay-enter" onClick={() => setSelectedDay(null)}>
           <div className={`${modalBg} rounded-2xl shadow-2xl w-full max-w-md overflow-hidden modal-content-enter`} onClick={(e) => e.stopPropagation()}>
@@ -639,7 +649,6 @@ export function Calendar() {
         document.body,
       )}
 
-      {/* Create Event Modal */}
       <Modal open={showCreateModal} onClose={() => setShowCreateModal(false)} title="Новое событие">
         <ErrorMessage message={formError} />
         <form onSubmit={(e) => { e.preventDefault(); handleCreate() }} className="space-y-4">
@@ -677,6 +686,14 @@ export function Calendar() {
               ))}
             </div>
           </div>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={formAllDay}
+              onChange={(e) => setFormAllDay(e.target.checked)}
+            />
+            <span>Весь день</span>
+          </label>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => setShowCreateModal(false)} className={`px-4 py-2 rounded-lg text-sm font-semibold ${textSecondary}`}>Отмена</button>
             <SubmitButton loading={formLoading}>Создать</SubmitButton>
@@ -684,7 +701,6 @@ export function Calendar() {
         </form>
       </Modal>
 
-      {/* Edit Event Modal */}
       <Modal open={showEditModal} onClose={() => { setShowEditModal(false); setEditingEvent(null) }} title="Редактировать событие">
         <ErrorMessage message={formError} />
         <form onSubmit={(e) => { e.preventDefault(); handleEdit() }} className="space-y-4">
@@ -722,6 +738,14 @@ export function Calendar() {
               ))}
             </div>
           </div>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={formAllDay}
+              onChange={(e) => setFormAllDay(e.target.checked)}
+            />
+            <span>Весь день</span>
+          </label>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => { setShowEditModal(false); setEditingEvent(null) }} className={`px-4 py-2 rounded-lg text-sm font-semibold ${textSecondary}`}>Отмена</button>
             <SubmitButton loading={formLoading}>Сохранить</SubmitButton>

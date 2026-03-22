@@ -20,8 +20,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
-import { CreateUserDto, UpdateUserDto } from './dto';
-import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
+import { CreateUserDto, UpdateUserDto, UpdateProfileDto } from './dto';
 import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
@@ -30,7 +29,7 @@ import { parseOptionalInt } from '@/common/helpers/query.helper';
 
 @ApiTags('Users')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, AccountRolesGuard)
+@UseGuards(AccountRolesGuard)
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
@@ -74,6 +73,17 @@ export class UsersController {
   @ApiResponse({ status: 409, description: 'Логин уже занят' })
   create(@CurrentUser('id') callerId: number, @Body() dto: CreateUserDto) {
     return this.usersService.create(dto, callerId);
+  }
+
+  @Patch('me')
+  @Roles(AccountRole.MEMBER, AccountRole.ADMIN)
+  @ApiOperation({ summary: 'Обновить свой профиль' })
+  @ApiResponse({ status: 200, description: 'Профиль обновлён' })
+  updateMe(
+    @CurrentUser('id') userId: number,
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return this.usersService.update(userId, dto, userId);
   }
 
   @Patch(':id')

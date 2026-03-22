@@ -25,6 +25,7 @@ export interface ProjectBoardTask {
   difficulty: number
   // Multi-assignees (new contract)
   assigneeIds?: number[] | null
+  assignees?: ProjectBoardUserSummary[]
   // Legacy single-assignee (old contract)
   assigneeId?: number | null
   createdById: number

@@ -21,7 +21,6 @@ import {
 } from '@nestjs/swagger';
 import { ProjectsService } from './projects.service';
 import { AddProjectMemberDto, UpdateProjectMemberDto } from './dto';
-import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
@@ -30,7 +29,7 @@ import { ReadModelResponseFactory } from '@/common/read-models/read-model-respon
 
 @ApiTags('Project Members')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, AccountRolesGuard)
+@UseGuards(AccountRolesGuard)
 @Controller()
 export class ProjectMembersController {
   constructor(

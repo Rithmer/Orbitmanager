@@ -43,16 +43,18 @@ type ProjectBoardRecord = {
     deadline: Date;
     status: string;
     difficulty: number;
-    assigneeId: number | null;
     createdById: number;
     createdAt: Date;
     updatedAt: Date;
-    assignee: {
-      id: number;
-      login: string;
-      fullName: string;
-      profession: string;
-    } | null;
+    assignees: Array<{
+      userId: number;
+      user: {
+        id: number;
+        login: string;
+        fullName: string;
+        profession: string;
+      };
+    }>;
   }>;
 };
 
@@ -107,16 +109,20 @@ export class ProjectBoardService {
             deadline: true,
             status: true,
             difficulty: true,
-            assigneeId: true,
             createdById: true,
             createdAt: true,
             updatedAt: true,
-            assignee: {
+            assignees: {
               select: {
-                id: true,
-                login: true,
-                fullName: true,
-                profession: true,
+                userId: true,
+                user: {
+                  select: {
+                    id: true,
+                    login: true,
+                    fullName: true,
+                    profession: true,
+                  },
+                },
               },
             },
           },
@@ -153,7 +159,7 @@ export class ProjectBoardService {
               deadline: task.deadline,
               status: task.status as TaskStatus,
               difficulty: task.difficulty,
-              assigneeId: task.assigneeId,
+              assigneeIds: task.assigneeIds,
               createdById: task.createdById,
               createdAt: task.createdAt,
               updatedAt: task.updatedAt,
@@ -254,6 +260,8 @@ export class ProjectBoardService {
   }
 
   private toTaskDto(task: ProjectBoardRecord['tasks'][number]): ProjectBoardTaskDto {
+    const assigneeIds = task.assignees.map((a) => a.userId);
+    const assignees = task.assignees.map((a) => this.toUserSummary(a.user));
     return {
       id: task.id,
       projectId: task.projectId,
@@ -262,11 +270,12 @@ export class ProjectBoardService {
       deadline: task.deadline.toISOString(),
       status: task.status as TaskStatus,
       difficulty: task.difficulty,
-      assigneeId: task.assigneeId,
+      assigneeIds,
+      assignees,
+      assigneeId: assigneeIds[0] ?? null,
       createdById: task.createdById,
       createdAt: task.createdAt.toISOString(),
       updatedAt: task.updatedAt.toISOString(),
-      assignee: task.assignee ? this.toUserSummary(task.assignee) : null,
     };
   }
 
@@ -292,31 +301,35 @@ function buildAssigneeLoadByTaskId(
 
   for (const task of tasks) {
     if (
-      task.assigneeId === null ||
+      task.assigneeIds.length === 0 ||
       task.status === TaskStatus.DONE ||
       task.status === TaskStatus.CANCELLED
     ) {
       continue;
     }
 
-    activeCountsByAssignee.set(
-      task.assigneeId,
-      (activeCountsByAssignee.get(task.assigneeId) ?? 0) + 1,
-    );
+    for (const assigneeId of task.assigneeIds) {
+      activeCountsByAssignee.set(
+        assigneeId,
+        (activeCountsByAssignee.get(assigneeId) ?? 0) + 1,
+      );
+    }
   }
 
   const assigneeLoadByTaskId = new Map<number, number>();
 
   for (const task of tasks) {
-    if (task.assigneeId === null) {
+    if (task.assigneeIds.length === 0) {
       assigneeLoadByTaskId.set(task.id, 0);
       continue;
     }
 
-    assigneeLoadByTaskId.set(
-      task.id,
-      Math.max(0, (activeCountsByAssignee.get(task.assigneeId) ?? 0) - 1),
+    const maxLoad = Math.max(
+      ...task.assigneeIds.map((id) =>
+        Math.max(0, (activeCountsByAssignee.get(id) ?? 0) - 1),
+      ),
     );
+    assigneeLoadByTaskId.set(task.id, maxLoad);
   }
 
   return assigneeLoadByTaskId;

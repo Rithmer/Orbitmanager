@@ -4,6 +4,7 @@ import {
   MaxLength,
   IsOptional,
   IsInt,
+  IsArray,
   Min,
   Max,
   IsDateString,
@@ -46,10 +47,12 @@ export class CreateTaskDto {
   difficulty!: number;
 
   @ApiPropertyOptional({
-    example: 2,
-    description: 'ID исполнителя (участник проекта)',
+    example: [2, 3],
+    description: 'ID исполнителей (участники проекта)',
+    type: [Number],
   })
-  @IsInt()
+  @IsArray()
+  @IsInt({ each: true })
   @IsOptional()
-  assigneeId?: number;
+  assigneeIds?: number[];
 }

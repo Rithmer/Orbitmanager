@@ -11,6 +11,7 @@ import {
   getAuthenticatedUser,
   getRouteParamAsNumber,
 } from '@/common/http/authenticated-request';
+import { AccountRole } from '../enums/account-role.enum';
 import { ProjectRole } from '../enums/project-role.enum';
 import { TeamRole } from '../enums/team-role.enum';
 import { PROJECT_ROLES_KEY } from '../decorators/project-roles.decorator';
@@ -48,6 +49,10 @@ export class ProjectRolesGuard implements CanActivate {
 
     if (!user) {
       throw new ForbiddenException('Доступ запрещён');
+    }
+
+    if (user.accountRole === AccountRole.ADMIN) {
+      return true;
     }
 
     const projectId = getRouteParamAsNumber(request, 'projectId', 'id');

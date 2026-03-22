@@ -3,6 +3,7 @@ import type { RiskLevel, TaskStatus } from '../../types'
 export interface DashboardSummaryOverview {
   doneTasks: number
   inProgressTasks: number
+  reviewTasks: number
   overdueTasks: number
   totalTasks: number
   progressPercent: number

@@ -1,9 +1,4 @@
-import {
-  Controller,
-  Get,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -11,7 +6,6 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { parseOptionalInt } from '@/common/helpers/query.helper';
@@ -20,7 +14,6 @@ import type { ProjectsListViewResponseDto } from './projects-list-view.types';
 
 @ApiTags('Projects List View')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
 @Controller('projects/list-view')
 export class ProjectsListViewController {
   constructor(private readonly projectsListViewService: ProjectsListViewService) {}

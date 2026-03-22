@@ -28,7 +28,6 @@ export class LoggingInterceptor implements NestInterceptor {
         );
       }),
       catchError((err: unknown) => {
-        // Логируем ошибочные ответы (4xx, 5xx), которые tap() не перехватывает
         const status = (err as { status?: number }).status ?? 500;
         const duration = Date.now() - startTime;
         if (status >= 500) {

@@ -19,6 +19,8 @@ const mockUser: User = {
   profession: 'Developer',
   accountStatus: 'active',
   accountRole: AccountRole.MEMBER,
+  avatarUrl: null,
+  discriminator: '0001',
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };

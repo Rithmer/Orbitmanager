@@ -108,7 +108,7 @@ export class TasksService {
         .filter((task) => (projectId !== undefined ? task.projectId === projectId : true))
         .filter((task) => (status ? task.status === status : true))
         .filter((task) => (difficulty !== undefined ? task.difficulty === difficulty : true))
-        .filter((task) => (assigneeId !== undefined ? task.assigneeId === assigneeId : true))
+        .filter((task) => (assigneeId !== undefined ? task.assigneeIds.includes(assigneeId) : true))
         .filter((task) => {
           if (!params.search) {
             return true;
@@ -168,15 +168,16 @@ export class TasksService {
       throw new BadRequestException('Дедлайн должен быть в будущем');
     }
 
-    if (dto.assigneeId !== undefined && dto.assigneeId !== null) {
+    const assigneeIds = dto.assigneeIds ?? [];
+    for (const assigneeId of assigneeIds) {
       const assigneeMembership =
         await this.projectMemberRepository.findByUserAndProject(
-          dto.assigneeId,
+          assigneeId,
           dto.projectId,
         );
       if (!assigneeMembership) {
         throw new BadRequestException(
-          `Пользователь #${dto.assigneeId} не является участником проекта #${dto.projectId}`,
+          `Пользователь #${assigneeId} не является участником проекта #${dto.projectId}`,
         );
       }
     }
@@ -189,7 +190,7 @@ export class TasksService {
       deadline: dto.deadline,
       status: TaskStatus.NEW,
       difficulty: dto.difficulty,
-      assigneeId: dto.assigneeId ?? null,
+      assigneeIds,
       createdById: userId,
       createdAt: now,
       updatedAt: now,
@@ -230,16 +231,18 @@ export class TasksService {
       );
     }
 
-    if (dto.assigneeId !== undefined && dto.assigneeId !== null) {
-      const assigneeMembership =
-        await this.projectMemberRepository.findByUserAndProject(
-          dto.assigneeId,
-          task.projectId,
-        );
-      if (!assigneeMembership) {
-        throw new BadRequestException(
-          `Пользователь #${dto.assigneeId} не является участником проекта #${task.projectId}`,
-        );
+    if (dto.assigneeIds && dto.assigneeIds.length > 0) {
+      for (const assigneeId of dto.assigneeIds) {
+        const assigneeMembership =
+          await this.projectMemberRepository.findByUserAndProject(
+            assigneeId,
+            task.projectId,
+          );
+        if (!assigneeMembership) {
+          throw new BadRequestException(
+            `Пользователь #${assigneeId} не является участником проекта #${task.projectId}`,
+          );
+        }
       }
     }
 
@@ -321,6 +324,10 @@ export class TasksService {
       );
 
     if (canManageTask) {
+      return;
+    }
+
+    if (task.assigneeIds.includes(userId)) {
       return;
     }
 

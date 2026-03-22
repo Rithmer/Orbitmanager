@@ -21,7 +21,6 @@ import {
 } from '@nestjs/swagger';
 import { TeamsService } from './teams.service';
 import { AddTeamMemberDto, UpdateTeamMemberDto } from './dto';
-import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { TeamRolesGuard } from '@/common/guards/team-roles.guard';
 import { TeamRoles } from '@/common/decorators/team-roles.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
@@ -31,7 +30,6 @@ import { ReadModelResponseFactory } from '@/common/read-models/read-model-respon
 
 @ApiTags('Team Members')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
 @Controller()
 export class TeamMembersController {
   constructor(

@@ -2,7 +2,6 @@ import path from 'node:path';
 import { readFileSync, existsSync } from 'node:fs';
 import { defineConfig } from 'prisma/config';
 
-// Load .env for Prisma CLI (which doesn't auto-load .env with config files)
 for (const base of [process.cwd(), path.join(__dirname, '..')]) {
   const envFile = path.join(base, '.env');
   if (existsSync(envFile)) {

@@ -40,14 +40,20 @@ export class CreateUserDto {
   @MaxLength(100)
   fullName!: string;
 
-  @ApiProperty({ example: 'Backend Developer', description: 'Профессия' })
+  @ApiPropertyOptional({ example: 'Backend Developer', description: 'Профессия' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(100)
-  profession!: string;
+  profession?: string;
 
   @ApiPropertyOptional({ enum: AccountRole, default: AccountRole.MEMBER })
   @IsEnum(AccountRole)
   @IsOptional()
   accountRole?: AccountRole;
+
+  @ApiPropertyOptional({ example: 'https://cdn.example.com/avatars/1.png', description: 'URL аватара или Base64' })
+  @IsString()
+  @IsOptional()
+  @MaxLength(5000000)
+  avatarUrl?: string | null;
 }

@@ -14,7 +14,13 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../context/useTheme'
 import { useAuth } from '../context/useAuth'
+import { useAnalyticsSectionAccess } from '../hooks/useAnalyticsSectionAccess'
+import { useProjectsSectionAccess } from '../hooks/useProjectsSectionAccess'
 import { AccountRole, ACCOUNT_ROLE_LABELS } from '../types'
+import {
+  readLastBoardProjectId,
+  LAST_BOARD_PROJECT_CHANGED_EVENT,
+} from '../utils/lastBoardProjectStorage'
 
 export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -24,6 +30,18 @@ export function Layout() {
   const { isDark } = useTheme()
   const { user, isAdmin } = useAuth()
   const location = useLocation()
+  const { allowed: canSeeProjectsNav, isLoading: projectsNavLoading } = useProjectsSectionAccess()
+  const { allowed: canSeeAnalyticsNav, isLoading: analyticsNavLoading } = useAnalyticsSectionAccess()
+
+  const [boardNavPath, setBoardNavPath] = useState(
+    () => `/board/${readLastBoardProjectId() ?? 0}`,
+  )
+
+  useEffect(() => {
+    const syncBoardNav = () => setBoardNavPath(`/board/${readLastBoardProjectId() ?? 0}`)
+    window.addEventListener(LAST_BOARD_PROJECT_CHANGED_EVENT, syncBoardNav)
+    return () => window.removeEventListener(LAST_BOARD_PROJECT_CHANGED_EVENT, syncBoardNav)
+  }, [])
 
   const toggleSidebar = () => {
     const next = !sidebarOpen
@@ -57,11 +75,15 @@ export function Layout() {
 
   const navItems = [
     { path: '/', label: 'Главная', icon: LayoutGrid, end: true },
-    { path: '/projects', label: 'Проекты', icon: FolderOpen, end: false },
-    { path: '/board/0', label: 'Задачи', icon: ClipboardList, end: false },
+    ...(isAdmin || (!projectsNavLoading && canSeeProjectsNav)
+      ? [{ path: '/projects', label: 'Проекты', icon: FolderOpen, end: false }]
+      : []),
+    { path: boardNavPath, label: 'Задачи', icon: ClipboardList, end: false },
     { path: '/teams', label: 'Команды', icon: Users, end: false },
     { path: '/calendar', label: 'Календарь', icon: CalendarDays, end: false },
-    { path: '/reports', label: 'Аналитика', icon: PieChart, end: false },
+    ...(isAdmin || (!analyticsNavLoading && canSeeAnalyticsNav)
+      ? [{ path: '/reports', label: 'Аналитика', icon: PieChart, end: false }]
+      : []),
     { path: '/settings', label: 'Настройки', icon: Settings2, end: false },
     ...(isAdmin
       ? [{ path: '/admin', label: 'Админ-панель', icon: ShieldCheck, end: false }]
@@ -209,7 +231,6 @@ export function Layout() {
 
   return (
     <div className={`flex h-screen overflow-hidden ${mainBg}`}>
-      {/* Desktop Sidebar */}
       <aside
         className={`
           ${sidebarBg} border-r ${sidebarBorderColor}
@@ -221,7 +242,6 @@ export function Layout() {
         {sidebarContent(false)}
       </aside>
 
-      {/* Mobile Sidebar Overlay */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden" onClick={() => setMobileOpen(false)}>
           <div className="absolute inset-0 bg-black/50 sidebar-overlay-enter" />

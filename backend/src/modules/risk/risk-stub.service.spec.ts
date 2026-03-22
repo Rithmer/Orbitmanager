@@ -64,8 +64,6 @@ describe('RiskStubService', () => {
     service = module.get<RiskStubService>(RiskStubService);
   });
 
-  // ────────────── assessTask ──────────────
-
   describe('assessTask', () => {
     it('should return high risk when deadline has passed', async () => {
       const input: TaskRiskInput = {
@@ -175,7 +173,6 @@ describe('RiskStubService', () => {
       };
 
       const result = await service.assessTask(input);
-      // 0.1 + 1 * 0.05 = 0.15
       expect(result.delayProbability).toBe(0.15);
       expect(result.riskLevel).toBe('low');
     });
@@ -239,8 +236,6 @@ describe('RiskStubService', () => {
     });
   });
 
-  // ────────────── assessProject ──────────────
-
   describe('assessProject', () => {
     it('should throw NotFoundException for non-existent project', async () => {
       mockProjectRepository.findById.mockResolvedValue(null);
@@ -286,7 +281,7 @@ describe('RiskStubService', () => {
           createdAt: new Date(
             now.getTime() - 15 * 24 * 60 * 60 * 1000,
           ).toISOString(),
-          assigneeId: 1,
+          assigneeIds: [1],
         },
         {
           id: 2,
@@ -296,7 +291,7 @@ describe('RiskStubService', () => {
           difficulty: 1,
           deadline: futureDate,
           createdAt: isoNow,
-          assigneeId: 2,
+          assigneeIds: [2],
         },
       ];
 
@@ -330,7 +325,7 @@ describe('RiskStubService', () => {
           createdAt: new Date(
             now.getTime() - 5 * 24 * 60 * 60 * 1000,
           ).toISOString(),
-          assigneeId: 1,
+          assigneeIds: [1],
         },
         {
           id: 2,
@@ -342,7 +337,7 @@ describe('RiskStubService', () => {
           createdAt: new Date(
             now.getTime() - 10 * 24 * 60 * 60 * 1000,
           ).toISOString(),
-          assigneeId: 2,
+          assigneeIds: [2],
         },
       ];
 
@@ -359,8 +354,6 @@ describe('RiskStubService', () => {
       }
     });
   });
-
-  // ────────────── assessProjectsBatch ──────────────
 
   describe('assessProjectsBatch', () => {
     it('should return empty object for empty projectIds', async () => {
@@ -395,7 +388,7 @@ describe('RiskStubService', () => {
           createdAt: new Date(
             now.getTime() - 15 * 24 * 60 * 60 * 1000,
           ).toISOString(),
-          assigneeId: 1,
+          assigneeIds: [1],
         },
         {
           id: 2,
@@ -405,7 +398,7 @@ describe('RiskStubService', () => {
           difficulty: 1,
           deadline: futureDate,
           createdAt: isoNow,
-          assigneeId: 2,
+          assigneeIds: [2],
         },
       ];
       mockTaskRepository.findByProjects.mockResolvedValueOnce(tasks);

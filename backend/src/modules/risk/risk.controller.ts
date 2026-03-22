@@ -18,7 +18,6 @@ import {
 } from '@nestjs/swagger';
 import { ProjectAccessService } from '@/common/access/project-access.service';
 import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
-import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
@@ -41,7 +40,7 @@ import { buildTaskRiskInput } from './helpers/build-task-risk-input';
 
 @ApiTags('Risk Assessment')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, AccountRolesGuard)
+@UseGuards(AccountRolesGuard)
 @Controller()
 export class RiskController {
   constructor(
@@ -95,15 +94,20 @@ export class RiskController {
       (log) => log.action === AuditAction.STATUS_CHANGE,
     ).length;
 
-    const assigneeLoad = task.assigneeId
-      ? allTasks.filter(
-          (candidate) =>
-            candidate.assigneeId === task.assigneeId &&
-            candidate.status !== TaskStatus.DONE &&
-            candidate.status !== TaskStatus.CANCELLED &&
-            candidate.id !== task.id,
-        ).length
-      : 0;
+    const assigneeLoad =
+      task.assigneeIds.length > 0
+        ? Math.max(
+            ...task.assigneeIds.map((uid) =>
+              allTasks.filter(
+                (candidate) =>
+                  candidate.assigneeIds.includes(uid) &&
+                  candidate.status !== TaskStatus.DONE &&
+                  candidate.status !== TaskStatus.CANCELLED &&
+                  candidate.id !== task.id,
+              ).length,
+            ),
+          )
+        : 0;
 
     const input = buildTaskRiskInput(task, statusChangesCount, assigneeLoad);
 
@@ -279,27 +283,28 @@ function buildAssigneeLoadMap(tasks: Task[]): Map<number, number> {
 
   for (const task of tasks) {
     if (
-      task.assigneeId === null ||
       task.status === TaskStatus.DONE ||
       task.status === TaskStatus.CANCELLED
     ) {
       continue;
     }
 
-    activeCountsByAssignee.set(
-      task.assigneeId,
-      (activeCountsByAssignee.get(task.assigneeId) ?? 0) + 1,
-    );
+    for (const uid of task.assigneeIds) {
+      activeCountsByAssignee.set(uid, (activeCountsByAssignee.get(uid) ?? 0) + 1);
+    }
   }
 
   const result = new Map<number, number>();
   for (const task of tasks) {
-    if (task.assigneeId === null) {
+    if (task.assigneeIds.length === 0) {
       result.set(task.id, 0);
       continue;
     }
 
-    result.set(task.id, Math.max(0, (activeCountsByAssignee.get(task.assigneeId) ?? 0) - 1));
+    const maxLoad = Math.max(
+      ...task.assigneeIds.map((uid) => activeCountsByAssignee.get(uid) ?? 0),
+    );
+    result.set(task.id, Math.max(0, maxLoad - 1));
   }
 
   return result;
@@ -332,7 +337,7 @@ async function buildProjectRiskOutput(
       riskScore: 0,
       riskLevel: 'low',
       tasksAtRisk: [],
-      summary: 'Р’ РїСЂРѕРµРєС‚Рµ РЅРµС‚ Р°РєС‚РёРІРЅС‹С… Р·Р°РґР°С‡. Р РёСЃРєРё РѕС‚СЃСѓС‚СЃС‚РІСѓСЋС‚.',
+      summary: 'В проекте нет активных задач. Риски отсутствуют.',
     };
   }
 
@@ -391,11 +396,11 @@ function buildProjectRiskSummary(
   highRiskCount: number,
 ): string {
   if (riskLevel === 'low') {
-    return `РџСЂРѕРµРєС‚ РІ Р·РµР»С‘РЅРѕР№ Р·РѕРЅРµ (${riskScore}/100). РР· ${totalActive} Р°РєС‚РёРІРЅС‹С… Р·Р°РґР°С‡ РЅРµС‚ Р·Р°РґР°С‡ СЃ РІС‹СЃРѕРєРёРј СЂРёСЃРєРѕРј.`;
+    return `Проект в зелёной зоне (${riskScore}/100). Из ${totalActive} активных задач нет задач с высоким риском.`;
   }
   if (riskLevel === 'medium') {
-    return `РџСЂРѕРµРєС‚ РёРјРµРµС‚ СЃСЂРµРґРЅРёР№ СѓСЂРѕРІРµРЅСЊ СЂРёСЃРєР° (${riskScore}/100). ${atRiskCount} РёР· ${totalActive} Р°РєС‚РёРІРЅС‹С… Р·Р°РґР°С‡ С‚СЂРµР±СѓСЋС‚ РІРЅРёРјР°РЅРёСЏ.`;
+    return `Проект имеет средний уровень риска (${riskScore}/100). ${atRiskCount} из ${totalActive} активных задач требуют внимания.`;
   }
 
-  return `РџСЂРѕРµРєС‚ РёРјРµРµС‚ РІС‹СЃРѕРєРёР№ СЂРёСЃРє СЃСЂС‹РІР° СЃСЂРѕРєРѕРІ (${riskScore}/100): ${highRiskCount} Р·Р°РґР°С‡ СЃ РІРµСЂРѕСЏС‚РЅРѕСЃС‚СЊСЋ Р·Р°РґРµСЂР¶РєРё > 60%.`;
+  return `Проект имеет высокий риск срыва сроков (${riskScore}/100): ${highRiskCount} задач с вероятностью задержки > 60%.`;
 }

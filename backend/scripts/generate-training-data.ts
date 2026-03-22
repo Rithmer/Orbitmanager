@@ -1,14 +1,3 @@
-/**
- * Скрипт генерации синтетических данных для обучения ML-модели оценки рисков.
- *
- * Запуск: npx ts-node scripts/generate-training-data.ts
- * Выход:  data/training_data.csv (≥ 1000 записей)
- *
- * Признаки: difficulty, daysUntilDeadline, daysSinceCreation, status,
- *           assigneeCount, assigneeLoad, statusChangesCount
- * Метки:    actualCompletionDays, isDelayed (0/1)
- */
-
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -46,23 +35,17 @@ function generateRecord(): TrainingRecord {
   const assigneeLoad = assigneeCount > 0 ? randomInt(0, 12) : 0;
   const statusChangesCount = randomInt(0, 8);
 
-  // Simulate actual completion time based on risk factors
   let delayFactor = 1.0;
 
-  // High difficulty increases delay
   delayFactor += (difficulty - 3) * 0.15;
 
-  // High assignee load increases delay
   if (assigneeLoad > 5) delayFactor += 0.3;
   if (assigneeLoad > 8) delayFactor += 0.2;
 
-  // No assignee increases delay
   if (assigneeCount === 0) delayFactor += 0.4;
 
-  // Many status changes indicate instability
   if (statusChangesCount > 3) delayFactor += 0.2;
 
-  // Add randomness
   delayFactor *= randomFloat(0.6, 1.5);
 
   const actualCompletionDays = Math.max(1, Math.round(plannedDurationDays * delayFactor));

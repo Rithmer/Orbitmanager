@@ -1,63 +1,55 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { AlertTriangle, ArrowLeft, LoaderCircle, Plus } from 'lucide-react'
+import { useNavigate, useParams, useSearchParams } from 'react-router'
 import {
-  AlertTriangle,
-  ArrowLeft,
-  Calendar,
-  LoaderCircle,
-  Eye,
-  Edit3,
-  MoreHorizontal,
-  Plus,
-  Tag,
-  Trash2,
-  User as UserIcon,
-} from 'lucide-react'
-import { useNavigate, useParams } from 'react-router'
-import { Modal, InputField, SelectField, SubmitButton, ErrorMessage } from '../components/Modal'
-import { PageShell, PageShellHeaderSkeleton, RefreshBadge } from '../components/PageShell'
+  PageShell,
+  PageShellHeaderSkeleton,
+  RefreshBadge,
+} from '../components/PageShell'
 import { useSmoothPageSkeleton } from '../hooks/useSmoothPageSkeleton'
 import { useTheme } from '../context/useTheme'
 import { tasksApi } from '../api/tasks'
-import { teamsApi } from '../api/teams'
 import { formatLocalDateInput, toLocalEndOfDayIso } from '../utils/dateTime'
 import { appQueryKeys } from '../query'
-import { ALLOWED_TASK_TRANSITIONS, PROJECT_ROLE_LABELS, ProjectRole, RISK_LEVEL_LABELS, RiskLevel, TASK_STATUS_LABELS, TaskStatus, TeamRole } from '../types'
+import { ProjectRole, TaskStatus, TeamRole } from '../types'
 import { useAuth } from '../context/useAuth'
-import { useProjectBoardViewQuery, type ProjectBoardTask } from '../features/board'
-import { projectsListViewApi } from '../api/projects-list-view'
-import { PROJECT_BOARD_COLUMNS, getColumnTasks, getOverdueLabel, getRiskBadgeClasses } from '../features/board/board-view.constants'
+import {
+  BoardColumnTasksOverflowModal,
+  BoardKanbanColumns,
+  BoardPickerSkeleton,
+  BoardProjectPicker,
+  BoardRiskModal,
+  BoardTaskDetailsModal,
+  BoardTaskFormModal,
+  BoardTaskListView,
+  useBoardProjectPickerQuery,
+  useBoardTeamMembersQuery,
+  useProjectBoardViewQuery,
+  type ProjectBoardTask,
+} from '../features/board'
+import { buildBoardAssigneeFormatters } from '../features/board/board-task-assignees'
+import { PROJECT_BOARD_COLUMNS, getColumnTasks } from '../features/board/board-view.constants'
 import { ProjectBoardSkeleton } from '../features/board/board-view'
 import type { TaskRiskOutput } from '../types'
+import {
+  clearLastBoardProjectId,
+  persistLastBoardProjectId,
+  readLastBoardProjectId,
+} from '../utils/lastBoardProjectStorage'
 
 type TaskPendingAction = 'status' | 'delete'
-
-const BOARD_PROJECT_SESSION_KEY = 'orbitmanager:boardProjectId'
-
-const BOARD_PROJECT_CARD_COLORS = [
-  'bg-[#4880ff]',
-  'bg-[#10b981]',
-  'bg-[#8b5cf6]',
-  'bg-[#f59e0b]',
-  'bg-[#ef4444]',
-]
-
-function formatDateLabel(value: string) {
-  return new Date(value).toLocaleDateString('ru-RU')
-}
-
-function formatDateTimeLabel(value: string) {
-  return new Date(value).toLocaleString('ru-RU')
-}
 
 export function Board() {
   const { isDark } = useTheme()
   const { user } = useAuth()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [searchParams] = useSearchParams()
   const { projectId: projectIdParam } = useParams()
   const projectId = Number(projectIdParam)
   const hasProjectId = Number.isInteger(projectId) && projectId > 0
+  const forceProjectPicker = searchParams.get('choose') === '1'
 
   const boardQuery = useProjectBoardViewQuery(hasProjectId ? projectId : null)
   const projectBoardView = boardQuery.data
@@ -66,13 +58,8 @@ export function Board() {
 
   // Determine whether the user is team owner to allow task creation.
   // Note: backend allows task creation for team owner even if there's no project_member row.
-  const teamMembersQuery = useQuery({
-    queryKey: ['board', 'team-members', teamIdForBoard],
-    queryFn: ({ signal }) => {
-      if (!teamIdForBoard) return Promise.resolve([])
-      return teamsApi.getMembers(teamIdForBoard, { signal })
-    },
-    enabled: Boolean(user?.id) && Boolean(teamIdForBoard),
+  const teamMembersQuery = useBoardTeamMembersQuery(teamIdForBoard, {
+    enabled: Boolean(user?.id),
   })
 
   const currentUserTeamMember = teamMembersQuery.data?.find((m) => m.userId === user?.id)
@@ -84,6 +71,10 @@ export function Board() {
   const [selectedTaskForEditing, setSelectedTaskForEditing] = useState<ProjectBoardTask | null>(null)
   const [selectedTaskForRisk, setSelectedTaskForRisk] = useState<{ task: ProjectBoardTask; risk: TaskRiskOutput } | null>(null)
   const [openedTaskMenuId, setOpenedTaskMenuId] = useState<number | null>(null)
+  const [kanbanColumnModal, setKanbanColumnModal] = useState<{
+    title: string
+    tasks: ProjectBoardTask[]
+  } | null>(null)
   const [taskFormName, setTaskFormName] = useState('')
   const [taskFormDescription, setTaskFormDescription] = useState('')
   const [taskFormDeadline, setTaskFormDeadline] = useState('')
@@ -93,126 +84,52 @@ export function Board() {
   const [taskFormError, setTaskFormError] = useState('')
   const [pendingTaskActions, setPendingTaskActions] = useState<Record<number, TaskPendingAction>>({})
   const [viewMode, setViewMode] = useState<'board' | 'list'>('board')
+  const [projectPickerSearch, setProjectPickerSearch] = useState('')
 
-  // Persist chosen project for `/board/0` across navigations within the same browser tab.
-  const [sessionSelectedProjectId, setSessionSelectedProjectId] = useState<number | null>(() => {
-    if (hasProjectId) return null
-    if (typeof window === 'undefined') return null
+  const projectPickerQuery = useBoardProjectPickerQuery(hasProjectId)
 
-    const raw = window.sessionStorage.getItem(BOARD_PROJECT_SESSION_KEY)
-    const parsed = raw ? Number(raw) : NaN
-    return Number.isInteger(parsed) && parsed > 0 ? parsed : null
-  })
+  const pickerProjectsAll = useMemo(
+    () => projectPickerQuery.data?.items ?? [],
+    [projectPickerQuery.data?.items],
+  )
 
-  const [isProjectSelectorOpen, setIsProjectSelectorOpen] = useState(() => !hasProjectId)
-  const [pendingProjectId, setPendingProjectId] = useState<number | null>(null)
+  const pickerProjects = useMemo(() => {
+    const q = projectPickerSearch.trim().toLowerCase()
+    if (!q) return pickerProjectsAll
+    return pickerProjectsAll.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        p.teamName.toLowerCase().includes(q) ||
+        (p.description && p.description.toLowerCase().includes(q)),
+    )
+  }, [pickerProjectsAll, projectPickerSearch])
 
-  const projectSelectorProjectsQuery = useQuery({
-    queryKey: ['board', 'project-selector-projects'],
-    queryFn: ({ signal }) =>
-      projectsListViewApi.getListView(
-        { page: 1, limit: 1000 },
-        { signal },
-      ),
-    enabled: !hasProjectId && isProjectSelectorOpen,
-  })
-
-  const allSelectorProjects = projectSelectorProjectsQuery.data?.items ?? []
-
-  const visibleSelectorProjectIds = useMemo(() => new Set(allSelectorProjects.map((p) => p.id)), [allSelectorProjects])
+  useEffect(() => {
+    if (!hasProjectId) return
+    persistLastBoardProjectId(projectId)
+  }, [hasProjectId, projectId])
 
   useEffect(() => {
     if (hasProjectId) return
-    if (!sessionSelectedProjectId) return
-    if (!isProjectSelectorOpen) return
-    if (!projectSelectorProjectsQuery.isSuccess) return
+    if (forceProjectPicker) return
+    if (!projectPickerQuery.isSuccess) return
 
-    // Allow the user to explicitly close the selector before auto-opening the stored project.
-    const projectIdToOpen = pendingProjectId ?? sessionSelectedProjectId
-    if (!projectIdToOpen) return
+    const accessibleIds = new Set(pickerProjectsAll.map((p) => p.id))
+    const lastId = readLastBoardProjectId()
 
-    if (!visibleSelectorProjectIds.has(projectIdToOpen)) {
-      // Stored project is no longer available for this user.
-      try {
-        window.sessionStorage.removeItem(BOARD_PROJECT_SESSION_KEY)
-      } catch {
-        // Ignore storage failures (e.g., blocked storage)
-      }
-      setSessionSelectedProjectId(null)
-      setPendingProjectId(null)
-      return
+    if (lastId && !accessibleIds.has(lastId)) {
+      clearLastBoardProjectId()
     }
 
-    const timeoutId = setTimeout(() => {
-      try {
-        window.sessionStorage.setItem(BOARD_PROJECT_SESSION_KEY, String(projectIdToOpen))
-      } catch {
-        // Ignore storage failures (e.g., blocked storage)
-      }
-
-      setSessionSelectedProjectId(projectIdToOpen)
-      navigate(`/board/${projectIdToOpen}`)
-    }, 500)
-
-    return () => clearTimeout(timeoutId)
+    if (lastId && accessibleIds.has(lastId)) {
+      navigate(`/board/${lastId}`, { replace: true })
+    }
   }, [
+    forceProjectPicker,
     hasProjectId,
-    sessionSelectedProjectId,
-    isProjectSelectorOpen,
-    pendingProjectId,
     navigate,
-    projectSelectorProjectsQuery.isSuccess,
-    visibleSelectorProjectIds,
-  ])
-
-  useEffect(() => {
-    if (hasProjectId) return
-    if (!isProjectSelectorOpen) return
-    if (pendingProjectId !== null) return
-    if (sessionSelectedProjectId) return
-
-    if (!projectSelectorProjectsQuery.isSuccess) return
-
-    const firstProjectId = allSelectorProjects[0]?.id
-    if (firstProjectId) {
-      setPendingProjectId(firstProjectId)
-    }
-  }, [
-    hasProjectId,
-    isProjectSelectorOpen,
-    pendingProjectId,
-    sessionSelectedProjectId,
-    allSelectorProjects,
-    projectSelectorProjectsQuery.isSuccess,
-  ])
-
-  useEffect(() => {
-    if (hasProjectId) return
-    if (!isProjectSelectorOpen) return
-    if (!sessionSelectedProjectId) return
-    if (pendingProjectId !== null) return
-
-    if (!projectSelectorProjectsQuery.isSuccess) return
-
-    if (!visibleSelectorProjectIds.has(sessionSelectedProjectId)) {
-      try {
-        window.sessionStorage.removeItem(BOARD_PROJECT_SESSION_KEY)
-      } catch {
-        // Ignore storage failures (e.g., blocked storage)
-      }
-      setSessionSelectedProjectId(null)
-      setPendingProjectId(null)
-      return
-    }
-
-    setPendingProjectId(sessionSelectedProjectId)
-  }, [
-    hasProjectId,
-    isProjectSelectorOpen,
-    sessionSelectedProjectId,
-    pendingProjectId,
-    projectSelectorProjectsQuery.isSuccess,
-    visibleSelectorProjectIds,
+    pickerProjectsAll,
+    projectPickerQuery.isSuccess,
   ])
 
   useEffect(() => {
@@ -363,6 +280,9 @@ export function Board() {
 
   const isInitialLoading = hasProjectId && boardQuery.isLoading && !projectBoardView
   const showInitialSkeleton = useSmoothPageSkeleton(isInitialLoading)
+  const showPickerSkeleton = useSmoothPageSkeleton(
+    !hasProjectId && projectPickerQuery.isPending && !projectPickerQuery.data,
+  )
 
   if (showInitialSkeleton) {
     return (
@@ -377,163 +297,24 @@ export function Board() {
     )
   }
 
+  if (!hasProjectId && showPickerSkeleton) {
+    return <BoardPickerSkeleton pageBg={pageBg} />
+  }
+
   if (!hasProjectId) {
-    const projects = allSelectorProjects
-
-    const openBoardForProjectId = (projectId: number) => {
-      try {
-        window.sessionStorage.setItem(BOARD_PROJECT_SESSION_KEY, String(projectId))
-      } catch {
-        // Ignore storage failures (e.g., blocked storage)
-      }
-
-      setSessionSelectedProjectId(projectId)
-      setPendingProjectId(projectId)
-      navigate(`/board/${projectId}`)
-    }
-
-    const closeProjectSelector = () => {
-      try {
-        window.sessionStorage.removeItem(BOARD_PROJECT_SESSION_KEY)
-      } catch {
-        // Ignore storage failures (e.g., blocked storage)
-      }
-
-      setSessionSelectedProjectId(null)
-      setPendingProjectId(null)
-      setIsProjectSelectorOpen(false)
-    }
-
     return (
-      <PageShell
-        title="Доска проекта"
-        description="Выберите доступный проект, чтобы открыть задачи."
-        className={pageBg}
-        actions={
-          <button
-            onClick={() => navigate('/projects')}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#4880ff] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#3a6fe0]"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            К проектам
-          </button>
-        }
-      >
-        {isProjectSelectorOpen ? (
-          <div className="rounded-xl border border-dashed border-black/10 bg-white/60 p-8 dark:border-white/10 dark:bg-[#273142]">
-            <p className={`text-lg font-bold ${textPrimary}`}>Выбор проекта</p>
-            <p className={`mt-2 text-sm ${textSecondary}`}>
-              Кликните по плитке ниже: выбранный проект будет сохраняться в `sessionStorage`, пока список не будет закрыт.
-            </p>
-
-            <div className="mt-6">
-              {projectSelectorProjectsQuery.isPending ? (
-                <div className={`text-sm ${textSecondary}`}>Загрузка доступных проектов...</div>
-              ) : projectSelectorProjectsQuery.error instanceof Error ? (
-                <div className={`mt-2 text-sm text-red-500`}>{projectSelectorProjectsQuery.error.message}</div>
-              ) : projects.length === 0 ? (
-                <div
-                  className={`flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-black/10 bg-white/60 py-10 dark:border-white/10 dark:bg-[#273142]`}
-                >
-                  <p className={`text-sm font-semibold ${textSecondary}`}>Нет доступных проектов</p>
-                  <p className={`text-xs ${textSecondary}`}>Вы сможете открыть задачи, когда появится доступ к проекту.</p>
-                </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 page-load-stagger">
-                    {projects.map((project, index) => {
-                      const colorIndex = index % BOARD_PROJECT_CARD_COLORS.length
-                      const isHighRisk = project.riskSummary.riskLevel === RiskLevel.HIGH
-                      const riskBadgeClasses = getRiskBadgeClasses(project.riskSummary.riskLevel)
-                      const isSelected = pendingProjectId === project.id
-
-                      return (
-                        <div
-                          key={project.id}
-                          role="button"
-                          tabIndex={0}
-                          className={`card-hover cursor-pointer rounded-xl border bg-white p-6 transition-all duration-200 dark:bg-[#273142] dark:border-[#313d4f] stagger-row ${
-                            isSelected ? 'border-[#4880ff] shadow-[0_0_0_2px_rgba(72,128,255,0.35)]' : 'border-[#e8e8e8]'
-                          }`}
-                          style={{ animationDelay: `${index * 80}ms` }}
-                          onClick={() => openBoardForProjectId(project.id)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault()
-                              openBoardForProjectId(project.id)
-                            }
-                          }}
-                        >
-                          <div className="mb-3 flex items-start justify-between gap-3">
-                            <div className="flex min-w-0 flex-1 items-center gap-3">
-                              <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${BOARD_PROJECT_CARD_COLORS[colorIndex]} text-base font-bold text-white`}>
-                                {project.name.charAt(0)}
-                              </div>
-                              <div className="min-w-0">
-                                <h3 className={`truncate font-bold ${textPrimary}`}>{project.name}</h3>
-                                <div className="mt-1 flex flex-wrap items-center gap-2">
-                                  <span className={`rounded-full bg-black/5 px-2 py-0.5 text-xs font-semibold text-[#737373] dark:bg-white/5 dark:text-[#94a3b8]`}>
-                                    {project.teamName}
-                                  </span>
-                                  {project.riskSummary.riskLevel !== RiskLevel.LOW ? (
-                                    <span
-                                      className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${riskBadgeClasses.background} ${riskBadgeClasses.text}`}
-                                    >
-                                      <AlertTriangle className="h-3 w-3" />
-                                      {isHighRisk ? 'Высокий риск' : 'Средний риск'}
-                                    </span>
-                                  ) : null}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className={`flex items-center justify-between border-t pt-4`}>
-                            <div className={`flex items-center gap-1.5 text-xs ${textSecondary}`}>
-                              <UserIcon className="h-3.5 w-3.5" />
-                              <span>{project.memberCount} уч.</span>
-                            </div>
-                            <div className={`text-xs font-semibold ${textSecondary}`}>Открыть</div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  <div className="mt-4 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={closeProjectSelector}
-                      className={`rounded-lg border px-4 py-2.5 text-sm font-semibold transition-colors ${
-                        isDark
-                          ? 'border-[#313d4f] text-[#94a3b8] hover:bg-[#273142]'
-                          : 'border-gray-200 text-[#737373] hover:bg-gray-50'
-                      }`}
-                    >
-                      Закрыть список
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-black/10 bg-white/60 p-8 text-center dark:border-white/10 dark:bg-[#273142]">
-            <p className={`text-lg font-bold ${textPrimary}`}>Проект не выбран</p>
-            <p className={`mt-2 text-sm ${textSecondary}`}>Список выбора проекта закрыт в этой вкладке.</p>
-            <button
-              type="button"
-              onClick={() => {
-                setIsProjectSelectorOpen(true)
-                setPendingProjectId(null)
-              }}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-[#737373] transition-colors hover:bg-gray-50 dark:border-[#313d4f] dark:text-[#94a3b8] dark:hover:bg-[#273142]"
-            >
-              Выбрать проект
-            </button>
-          </div>
-        )}
-      </PageShell>
+      <BoardProjectPicker
+        pageBg={pageBg}
+        textPrimary={textPrimary}
+        textSecondary={textSecondary}
+        isDark={isDark}
+        projectPickerSearch={projectPickerSearch}
+        onSearchChange={setProjectPickerSearch}
+        pickerProjects={pickerProjects}
+        pickerProjectsAll={pickerProjectsAll}
+        projectPickerQuery={projectPickerQuery}
+        onOpenProject={(id) => navigate(`/board/${id}`)}
+      />
     )
   }
 
@@ -576,31 +357,9 @@ export function Board() {
   const canEditTasks =
     currentUserMember?.role === ProjectRole.TEAM_LEAD || currentUserTeamMember?.teamRole === TeamRole.OWNER
 
-  const assigneeFullNameById = new Map(projectMembers.map((m) => [m.userId, m.user.fullName] as const))
+  const { formatTaskAssigneesShort, formatTaskAssigneesDetail } =
+    buildBoardAssigneeFormatters(projectMembers)
 
-  const getTaskAssigneeIds = (task: ProjectBoardTask): number[] => {
-    const ids =
-      task.assigneeIds && task.assigneeIds.length >= 0
-        ? task.assigneeIds
-        : typeof task.assigneeId === 'number'
-          ? [task.assigneeId]
-          : task.assignee
-            ? [task.assignee.id]
-            : []
-
-    return ids.filter((id) => typeof id === 'number' && id > 0)
-  }
-
-  const formatTaskAssigneesShort = (task: ProjectBoardTask): string => {
-    const ids = getTaskAssigneeIds(task)
-    if (ids.length === 0) return 'Не назначен'
-
-    const firstName = assigneeFullNameById.get(ids[0])
-    if (!firstName) return 'Не назначен'
-
-    if (ids.length === 1) return firstName
-    return `${firstName} +${ids.length - 1}`
-  }
   const boardColumns = PROJECT_BOARD_COLUMNS.map((column) => {
     const columnTasks = getColumnTasks(boardTasks, column.status)
     return {
@@ -687,13 +446,7 @@ export function Board() {
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => {
-              try {
-                window.sessionStorage.removeItem(BOARD_PROJECT_SESSION_KEY)
-              } catch {
-                // Ignore storage failures (e.g., blocked storage)
-              }
-
-              navigate('/board/0')
+              navigate('/board/0?choose=1')
             }}
             className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition-colors ${
               isDark
@@ -704,31 +457,24 @@ export function Board() {
             <ArrowLeft className="h-4 w-4" />
             Выбор проектов
           </button>
-          <button
-            onClick={() => navigate('/projects')}
-            className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition-colors ${
-              isDark
-                ? 'border-[#313d4f] text-[#f4f3f2] hover:bg-[#273142]'
-                : 'border-gray-200 text-[#202224] hover:bg-gray-50'
-            }`}
-          >
-            <ArrowLeft className="h-4 w-4" />
-            К проектам
-          </button>
           <div
-            className={`relative inline-flex h-10 items-center overflow-hidden rounded-lg border text-xs font-medium shadow-sm ${
+            className={`relative inline-flex h-10 items-stretch overflow-hidden rounded-lg border text-xs font-medium shadow-sm ${
               isDark ? 'border-[#313d4f] bg-[#0b1120]' : 'border-gray-200 bg-white'
             }`}
           >
             <div
-              className={`pointer-events-none absolute inset-y-1 w-[calc(50%-4px)] rounded-md bg-[#4880ff] shadow-sm transition-transform duration-200 ease-out ${
-                viewMode === 'board' ? 'translate-x-1' : 'translate-x-[calc(100%+4px)]'
-              }`}
+              aria-hidden
+              className="pointer-events-none absolute left-1 top-1 bottom-1 z-0 w-[calc(50%-8px)] rounded-md bg-[#4880ff] shadow-sm"
+              style={{
+                transform:
+                  viewMode === 'board' ? 'translate3d(0, 0, 0)' : 'translate3d(calc(100% + 8px), 0, 0)',
+                transition: 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+              }}
             />
             <button
               type="button"
-              onClick={() => setViewMode('board')}
-              className={`relative z-10 flex-1 px-3 py-1 text-center transition-colors ${
+              onClick={() => setViewMode((m) => (m === 'board' ? 'list' : 'board'))}
+              className={`relative z-10 flex min-h-0 flex-1 items-center justify-center px-3 py-1 text-center transition-colors ${
                 viewMode === 'board'
                   ? 'text-white'
                   : isDark
@@ -740,8 +486,8 @@ export function Board() {
             </button>
             <button
               type="button"
-              onClick={() => setViewMode('list')}
-              className={`relative z-10 flex-1 px-3 py-1 text-center transition-colors ${
+              onClick={() => setViewMode((m) => (m === 'board' ? 'list' : 'board'))}
+              className={`relative z-10 flex min-h-0 flex-1 items-center justify-center px-3 py-1 text-center transition-colors ${
                 viewMode === 'list'
                   ? 'text-white'
                   : isDark
@@ -780,321 +526,45 @@ export function Board() {
         <RefreshBadge isRefreshing={isBoardRefreshing} label="Обновление доски" />
       </div>
 
+
       {viewMode === 'board' ? (
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3 grid-slide-in-up page-load-stagger">
-          {boardColumns.map((column, columnIndex) => {
-            const columnTasks = column.tasks
-
-            return (
-              <section
-                key={column.status}
-                className={`${columnBg} rounded-xl p-4 stagger-row`}
-                style={{ animationDelay: `${columnIndex * 75}ms` }}
-              >
-                <div className="mb-4 flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: column.accent }} />
-                  <span className={`text-sm font-bold ${textPrimary}`}>{column.title}</span>
-                  <span
-                    className="rounded-full px-2 py-0.5 text-xs font-semibold"
-                    style={{ backgroundColor: `${column.accent}20`, color: column.accent }}
-                  >
-                    {column.tasks.length}
-                  </span>
-                  {column.isRefreshing && (
-                    <span
-                      className={`ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                        isDark ? 'bg-white/5 text-[#94a3b8]' : 'bg-black/5 text-[#737373]'
-                      }`}
-                    >
-                      <LoaderCircle className="h-3 w-3 animate-spin" />
-                      {columnTasks.some((task) => pendingTaskActions[task.id] !== undefined)
-                        ? 'Сохраняем'
-                        : 'Обновление'}
-                    </span>
-                  )}
-                </div>
-
-                <div className="space-y-3">
-                  {columnTasks.map((task, taskIndex) => {
-                    const risk = projectBoardView.riskByTaskId[task.id]
-                    const overdue = getOverdueLabel(task)
-                    const canTransition = (ALLOWED_TASK_TRANSITIONS[task.status as TaskStatus] ?? []) as TaskStatus[]
-                    const pendingAction = pendingTaskActions[task.id]
-                    const isTaskBusy = pendingAction !== undefined
-
-                    return (
-                      <article
-                        key={task.id}
-                        aria-busy={isTaskBusy}
-                        className={`${cardBg} border ${cardBorder} rounded-xl p-4 shadow-sm transition-all duration-200 card-hover stagger-card ${
-                          isTaskBusy ? 'opacity-80' : ''
-                        } ${openedTaskMenuId === task.id ? 'z-[60] relative' : 'relative'}`}
-                        style={{ animationDelay: `${columnIndex * 75 + taskIndex * 50}ms` }}
-                      >
-                        <div className="mb-2 flex items-start justify-between gap-2">
-                          <h3 className={`text-sm font-semibold leading-snug ${textPrimary}`}>{task.name}</h3>
-                          <div className="flex items-start gap-2">
-                            {isTaskBusy && (
-                              <span
-                                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                                  isDark ? 'bg-[#1c2534] text-[#94a3b8]' : 'bg-gray-100 text-[#737373]'
-                                }`}
-                              >
-                                <LoaderCircle className="h-3 w-3 animate-spin" />
-                                {pendingAction === 'delete' ? 'Удаление' : 'Перевод'}
-                              </span>
-                            )}
-                        <div className={`relative ${openedTaskMenuId === task.id ? 'z-[70]' : ''}`}>
-                              <button
-                            data-task-menu-button-id={task.id}
-                                onClick={() =>
-                                  setOpenedTaskMenuId(openedTaskMenuId === task.id ? null : task.id)
-                                }
-                                disabled={isTaskBusy}
-                                className={`shrink-0 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${textSecondary}`}
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </button>
-                              {openedTaskMenuId === task.id && !isTaskBusy && (
-                                <div
-                              data-task-menu-id={task.id}
-                              className={`dropdown-enter absolute right-0 top-6 z-[80] w-52 overflow-hidden rounded-xl border shadow-xl ${
-                                    isDark
-                                      ? 'border-[#313d4f] bg-[#273142]'
-                                      : 'border-[#e8e8e8] bg-white'
-                                  }`}
-                                >
-                                  <button
-                                    onClick={() => {
-                                      openTaskDetails(task)
-                                      setOpenedTaskMenuId(null)
-                                    }}
-                                    className={`flex w-full items-center gap-2 px-3 py-2 text-xs ${textPrimary} ${
-                                      isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'
-                                    }`}
-                                  >
-                                    <Eye className="h-3.5 w-3.5" />
-                                    Подробности
-                                  </button>
-                                  {canEditTasks && (
-                                    <button
-                                      onClick={() => {
-                                        openTaskEditing(task)
-                                        setOpenedTaskMenuId(null)
-                                      }}
-                                      className={`flex w-full items-center gap-2 px-3 py-2 text-xs ${textPrimary} ${
-                                        isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'
-                                      }`}
-                                    >
-                                      <Edit3 className="h-3.5 w-3.5" />
-                                      Редактировать
-                                    </button>
-                                  )}
-                                  {risk && (
-                                    <button
-                                      onClick={() => {
-                                        openTaskRisk(task)
-                                        setOpenedTaskMenuId(null)
-                                      }}
-                                      className={`flex w-full items-center gap-2 px-3 py-2 text-xs ${textPrimary} ${
-                                        isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'
-                                      }`}
-                                    >
-                                      <AlertTriangle className="h-3.5 w-3.5" />
-                                      Оценка рисков
-                                    </button>
-                                  )}
-                                  {canEditTasks && canTransition.length > 0 && (
-                                    <div className={`border-t ${isDark ? 'border-[#313d4f]' : 'border-gray-100'}`}>
-                                      <p className={`px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider ${textSecondary}`}>
-                                        Перевести в
-                                      </p>
-                                      {canTransition.map((transitionStatus) => (
-                                        <button
-                                          key={transitionStatus}
-                                          onClick={() =>
-                                            changeTaskStatusMutation.mutate({
-                                              taskId: task.id,
-                                              status: transitionStatus,
-                                            })
-                                          }
-                                          disabled={isTaskBusy}
-                                          className={`flex w-full items-center gap-2 px-3 py-2 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${textPrimary} ${
-                                            isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'
-                                          }`}
-                                        >
-                                          {TASK_STATUS_LABELS[transitionStatus]}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  )}
-                                  {canEditTasks && (
-                                    <div className={`border-t ${isDark ? 'border-[#313d4f]' : 'border-gray-100'}`}>
-                                      <button
-                                        onClick={() => deleteTaskMutation.mutate(task.id)}
-                                        disabled={isTaskBusy}
-                                        className={`flex w-full items-center gap-2 px-3 py-2 text-xs text-red-500 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                                          isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'
-                                        }`}
-                                      >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                        Удалить
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {task.description && (
-                          <p className={`mb-3 line-clamp-2 text-xs leading-relaxed ${textSecondary}`}>
-                            {task.description}
-                          </p>
-                        )}
-
-                        <div className="mb-3 flex flex-wrap gap-1.5">
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
-                              isDark ? 'bg-[#4880ff]/15 text-[#4880ff]' : 'bg-blue-50 text-[#4880ff]'
-                            }`}
-                          >
-                            <Tag className="h-2.5 w-2.5" />
-                            {task.difficulty}/5
-                          </span>
-                          {risk && risk.riskLevel !== RiskLevel.LOW && (
-                            <span
-                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${getRiskBadgeClasses(risk.riskLevel).background} ${getRiskBadgeClasses(risk.riskLevel).text}`}
-                            >
-                              <AlertTriangle className="h-2.5 w-2.5" />
-                              {RISK_LEVEL_LABELS[risk.riskLevel]}
-                            </span>
-                          )}
-                          {overdue && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-semibold text-red-500">
-                              Просрочено
-                            </span>
-                          )}
-                        </div>
-
-                        <div className={`mt-2 flex items-center justify-between gap-3 text-xs ${textSecondary}`}>
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3 shrink-0" />
-                            <span>{formatDateLabel(task.deadline)}</span>
-                          </div>
-                          <div className="flex min-w-0 items-center gap-1">
-                            <UserIcon className="h-3 w-3 shrink-0" />
-                            <span className="truncate">{formatTaskAssigneesShort(task)}</span>
-                          </div>
-                        </div>
-                      </article>
-                    )
-                  })}
-                </div>
-              </section>
-            )
-          })}
-        </div>
+        <BoardKanbanColumns
+          columns={boardColumns}
+          projectBoardView={projectBoardView}
+          isDark={isDark}
+          columnBg={columnBg}
+          cardBg={cardBg}
+          cardBorder={cardBorder}
+          textPrimary={textPrimary}
+          textSecondary={textSecondary}
+          openedTaskMenuId={openedTaskMenuId}
+          onToggleTaskMenu={setOpenedTaskMenuId}
+          pendingTaskActions={pendingTaskActions}
+          canEditTasks={canEditTasks}
+          formatTaskAssigneesShort={formatTaskAssigneesShort}
+          onOpenTaskDetails={openTaskDetails}
+          onOpenTaskEditing={openTaskEditing}
+          onOpenTaskRisk={openTaskRisk}
+          onChangeTaskStatus={(taskId, status) =>
+            changeTaskStatusMutation.mutate({ taskId, status })
+          }
+          onDeleteTask={(taskId) => deleteTaskMutation.mutate(taskId)}
+          onOpenColumnModal={(title, tasks) => setKanbanColumnModal({ title, tasks })}
+        />
       ) : (
-        <div
-          className={`mt-2 overflow-hidden rounded-xl border ${cardBorder} ${
-            isDark ? 'bg-[#273142]' : 'bg-white'
-          }`}
-        >
-          <div
-            className={`grid grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.7fr)_minmax(0,0.9fr)] items-center gap-3 border-b px-4 py-3 text-[11px] font-semibold uppercase tracking-wide ${
-              isDark ? 'border-[#313d4f] text-[#94a3b8]' : 'border-gray-100 text-[#737373]'
-            }`}
-          >
-            <span>Задача</span>
-            <span>Статус</span>
-            <span>Дедлайн</span>
-            <span>Сложн.</span>
-            <span>Исполнитель</span>
-          </div>
-          <div className="divide-y divide-gray-100 dark:divide-[#313d4f]">
-            {[...boardTasks]
-              .sort((a, b) => {
-                const order = PROJECT_BOARD_COLUMNS.map((c) => c.status)
-                return order.indexOf(a.status as TaskStatus) - order.indexOf(b.status as TaskStatus)
-              })
-              .map((task) => {
-                const risk = projectBoardView.riskByTaskId[task.id]
-                const overdue = getOverdueLabel(task)
-                const columnMeta = PROJECT_BOARD_COLUMNS.find((c) => c.status === task.status)
-
-                return (
-                  <button
-                    key={task.id}
-                    type="button"
-                    onClick={() => openTaskDetails(task)}
-                    className={`grid w-full grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.7fr)_minmax(0,0.9fr)] items-center gap-3 px-4 py-3 text-left text-xs transition-colors hover:bg-black/5 dark:hover:bg-white/5 ${
-                      isDark ? 'text-[#f4f3f2]' : 'text-[#202224]'
-                    }`}
-                  >
-                    <div className="space-y-1">
-                      <p className="line-clamp-2 font-semibold">{task.name}</p>
-                      {task.description && (
-                        <p className={`line-clamp-1 text-[11px] ${textSecondary}`}>{task.description}</p>
-                      )}
-                      <div className="flex flex-wrap gap-1">
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                            isDark ? 'bg-[#4880ff]/15 text-[#4880ff]' : 'bg-blue-50 text-[#4880ff]'
-                          }`}
-                        >
-                          <Tag className="h-2.5 w-2.5" />
-                          {task.difficulty}/5
-                        </span>
-                        {risk && risk.riskLevel !== RiskLevel.LOW && (
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${getRiskBadgeClasses(risk.riskLevel).background} ${getRiskBadgeClasses(risk.riskLevel).text}`}
-                          >
-                            <AlertTriangle className="h-2.5 w-2.5" />
-                            {RISK_LEVEL_LABELS[risk.riskLevel]}
-                          </span>
-                        )}
-                        {overdue && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold text-red-500">
-                            Просрочено
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center">
-                      {columnMeta && (
-                        <span
-                          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                          style={{
-                            backgroundColor: `${columnMeta.accent}20`,
-                            color: columnMeta.accent,
-                          }}
-                        >
-                          {columnMeta.title}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1 text-[11px]">
-                      <Calendar className="h-3 w-3 shrink-0" />
-                      <span>{formatDateLabel(task.deadline)}</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-[11px]">
-                      <Tag className="h-3 w-3" />
-                      <span>{task.difficulty}/5</span>
-                    </div>
-                    <div className="flex min-w-0 items-center gap-1 text-[11px]">
-                      <UserIcon className="h-3 w-3 shrink-0" />
-                      <span className="truncate">{formatTaskAssigneesShort(task)}</span>
-                    </div>
-                  </button>
-                )
-              })}
-          </div>
-        </div>
+        <BoardTaskListView
+          boardTasks={boardTasks}
+          projectBoardView={projectBoardView}
+          isDark={isDark}
+          cardBorder={cardBorder}
+          textPrimary={textPrimary}
+          textSecondary={textSecondary}
+          formatTaskAssigneesShort={formatTaskAssigneesShort}
+          onOpenTaskDetails={openTaskDetails}
+        />
       )}
 
-      <Modal
+      <BoardTaskFormModal
         open={isTaskFormOpen}
         onClose={() => {
           setIsTaskFormOpen(false)
@@ -1102,255 +572,68 @@ export function Board() {
           resetTaskForm()
         }}
         title={selectedTaskForEditing ? 'Редактировать задачу' : 'Новая задача'}
-        maxWidth="max-w-xl"
-      >
-        <ErrorMessage message={taskFormError} />
-        <form
-          onSubmit={(event) => {
-            event.preventDefault()
-            void submitTaskForm()
-          }}
-          className="space-y-4"
-        >
-          <InputField
-            label="Название"
-            value={taskFormName}
-            onChange={setTaskFormName}
-            required
-            placeholder="Название задачи"
-          />
-          <InputField
-            label="Описание"
-            value={taskFormDescription}
-            onChange={setTaskFormDescription}
-            placeholder="Подробности задачи"
-          />
-          <InputField
-            label="Дедлайн"
-            value={taskFormDeadline}
-            onChange={setTaskFormDeadline}
-            type="date"
-            required
-          />
-          <SelectField
-            label="Сложность"
-            value={taskFormDifficulty}
-            onChange={setTaskFormDifficulty}
-            options={[
-              { value: '1', label: '1' },
-              { value: '2', label: '2' },
-              { value: '3', label: '3' },
-              { value: '4', label: '4' },
-              { value: '5', label: '5' },
-            ]}
-          />
-          <div>
-            <label className={`block text-sm font-semibold mb-1.5 ${textSecondary}`}>
-              Исполнители
-            </label>
-            <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-              <button
-                type="button"
-                onClick={() => setTaskFormAssigneeIds([])}
-                className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold transition-colors border ${
-                  taskFormAssigneeIds.length === 0
-                    ? isDark
-                      ? 'border-[#4880ff] bg-[#4880ff]/15 text-[#4880ff]'
-                      : 'border-[#4880ff] bg-blue-50 text-[#4880ff]'
-                    : isDark
-                      ? 'border-[#313d4f] bg-[#1c2534] text-[#94a3b8] hover:bg-[#273142]'
-                      : 'border-gray-200 bg-white text-[#737373] hover:bg-gray-50'
-                }`}
-              >
-                Не назначено
-              </button>
+        taskFormError={taskFormError}
+        taskFormName={taskFormName}
+        onTaskFormNameChange={setTaskFormName}
+        taskFormDescription={taskFormDescription}
+        onTaskFormDescriptionChange={setTaskFormDescription}
+        taskFormDeadline={taskFormDeadline}
+        onTaskFormDeadlineChange={setTaskFormDeadline}
+        taskFormDifficulty={taskFormDifficulty}
+        onTaskFormDifficultyChange={setTaskFormDifficulty}
+        taskFormAssigneeIds={taskFormAssigneeIds}
+        onSetTaskFormAssigneeIds={setTaskFormAssigneeIds}
+        taskFormStatus={taskFormStatus}
+        onTaskFormStatusChange={setTaskFormStatus}
+        projectMembers={projectMembers}
+        isDark={isDark}
+        textSecondary={textSecondary}
+        onSubmit={() => void submitTaskForm()}
+        createOrUpdatePending={createTaskMutation.isPending || updateTaskMutation.isPending}
+        isEditing={Boolean(selectedTaskForEditing)}
+      />
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {projectMembers.map((member) => {
-                  const checked = taskFormAssigneeIds.includes(member.userId)
-                  return (
-                    <label
-                      key={member.userId}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs cursor-pointer select-none transition-colors ${
-                        isDark
-                          ? checked
-                            ? 'border-[#4880ff] bg-[#4880ff]/10 text-[#f4f3f2]'
-                            : 'border-[#313d4f] bg-[#1c2534] text-[#94a3b8] hover:bg-[#273142]'
-                          : checked
-                            ? 'border-[#4880ff] bg-blue-50 text-[#202224]'
-                            : 'border-gray-200 bg-white text-[#737373] hover:bg-gray-50'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => {
-                          setTaskFormAssigneeIds((current) =>
-                            current.includes(member.userId)
-                              ? current.filter((id) => id !== member.userId)
-                              : [...current, member.userId],
-                          )
-                        }}
-                      />
-                      <span className="truncate">
-                        {member.user.fullName}
-                      </span>
-                    </label>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-          <SelectField
-            label="Статус"
-            value={taskFormStatus}
-            onChange={(value) => setTaskFormStatus(value as TaskStatus)}
-            options={Object.values(TaskStatus).map((status) => ({
-              value: status,
-              label: TASK_STATUS_LABELS[status],
-            }))}
-          />
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => {
-                setIsTaskFormOpen(false)
-                setSelectedTaskForEditing(null)
-                resetTaskForm()
-              }}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold ${textSecondary}`}
-            >
-              Отмена
-            </button>
-            <SubmitButton loading={createTaskMutation.isPending || updateTaskMutation.isPending}>
-              {selectedTaskForEditing ? 'Сохранить' : 'Создать'}
-            </SubmitButton>
-          </div>
-        </form>
-      </Modal>
-
-      <Modal
-        open={isTaskDetailsOpen && selectedTaskForDetails !== null}
+      <BoardTaskDetailsModal
+        open={isTaskDetailsOpen}
+        task={selectedTaskForDetails}
+        textPrimary={textPrimary}
+        textSecondary={textSecondary}
+        isDark={isDark}
+        formatTaskAssigneesDetail={formatTaskAssigneesDetail}
         onClose={() => {
           setIsTaskDetailsOpen(false)
           setSelectedTaskForDetails(null)
         }}
-        title="Подробности задачи"
-        maxWidth="max-w-2xl"
-      >
-        {selectedTaskForDetails ? (
-          <div className="space-y-4">
-            <div>
-              <h3 className={`text-lg font-bold ${textPrimary}`}>{selectedTaskForDetails.name}</h3>
-              <p className={`mt-1 text-sm ${textSecondary}`}>{selectedTaskForDetails.description || 'Описание отсутствует'}</p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className={`rounded-xl p-4 ${isDark ? 'bg-[#1c2534]' : 'bg-gray-50'}`}>
-                <p className={`text-xs uppercase tracking-wider ${textSecondary}`}>Дедлайн</p>
-                <p className={`mt-1 text-sm font-semibold ${textPrimary}`}>{formatDateTimeLabel(selectedTaskForDetails.deadline)}</p>
-              </div>
-              <div className={`rounded-xl p-4 ${isDark ? 'bg-[#1c2534]' : 'bg-gray-50'}`}>
-                <p className={`text-xs uppercase tracking-wider ${textSecondary}`}>Статус</p>
-                <p className={`mt-1 text-sm font-semibold ${textPrimary}`}>{TASK_STATUS_LABELS[selectedTaskForDetails.status as TaskStatus]}</p>
-              </div>
-              <div className={`rounded-xl p-4 ${isDark ? 'bg-[#1c2534]' : 'bg-gray-50'}`}>
-                <p className={`text-xs uppercase tracking-wider ${textSecondary}`}>Исполнитель</p>
-                <p className={`mt-1 text-sm font-semibold ${textPrimary}`}>{formatTaskAssigneesShort(selectedTaskForDetails)}</p>
-              </div>
-              <div className={`rounded-xl p-4 ${isDark ? 'bg-[#1c2534]' : 'bg-gray-50'}`}>
-                <p className={`text-xs uppercase tracking-wider ${textSecondary}`}>Сложность</p>
-                <p className={`mt-1 text-sm font-semibold ${textPrimary}`}>{selectedTaskForDetails.difficulty}/5</p>
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsTaskDetailsOpen(false)
-                  setSelectedTaskForDetails(null)
-                }}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold ${textSecondary}`}
-              >
-                Закрыть
-              </button>
-              {canEditTasks && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    openTaskEditing(selectedTaskForDetails)
-                    setIsTaskDetailsOpen(false)
-                  }}
-                  className="rounded-lg bg-[#4880ff] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#3a6fe0]"
-                >
-                  Редактировать
-                </button>
-              )}
-            </div>
-          </div>
-        ) : null}
-      </Modal>
+        canEditTasks={canEditTasks}
+        onEdit={(task) => {
+          openTaskEditing(task)
+          setIsTaskDetailsOpen(false)
+        }}
+      />
 
-      <Modal
-        open={isRiskModalOpen && selectedTaskForRisk !== null}
+      <BoardColumnTasksOverflowModal
+        modal={kanbanColumnModal}
+        onClose={() => setKanbanColumnModal(null)}
+        textPrimary={textPrimary}
+        textSecondary={textSecondary}
+        isDark={isDark}
+        formatTaskAssigneesShort={formatTaskAssigneesShort}
+        onSelectTask={(task) => {
+          openTaskDetails(task)
+        }}
+      />
+
+      <BoardRiskModal
+        open={isRiskModalOpen}
+        selected={selectedTaskForRisk}
+        textPrimary={textPrimary}
+        textSecondary={textSecondary}
+        isDark={isDark}
         onClose={() => {
           setIsRiskModalOpen(false)
           setSelectedTaskForRisk(null)
         }}
-        title="Оценка рисков"
-        maxWidth="max-w-2xl"
-      >
-        {selectedTaskForRisk ? (
-          <div className="space-y-4">
-            <div>
-              <h3 className={`text-lg font-bold ${textPrimary}`}>{selectedTaskForRisk.task.name}</h3>
-              <p className={`mt-1 text-sm ${textSecondary}`}>{selectedTaskForRisk.task.description || 'Описание отсутствует'}</p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className={`rounded-xl p-4 ${isDark ? 'bg-[#1c2534]' : 'bg-gray-50'}`}>
-                <p className={`text-xs uppercase tracking-wider ${textSecondary}`}>Уровень</p>
-                <p className={`mt-1 text-sm font-semibold ${textPrimary}`}>{RISK_LEVEL_LABELS[selectedTaskForRisk.risk.riskLevel]}</p>
-              </div>
-              <div className={`rounded-xl p-4 ${isDark ? 'bg-[#1c2534]' : 'bg-gray-50'}`}>
-                <p className={`text-xs uppercase tracking-wider ${textSecondary}`}>Вероятность</p>
-                <p className={`mt-1 text-sm font-semibold ${textPrimary}`}>{Math.round(selectedTaskForRisk.risk.delayProbability * 100)}%</p>
-              </div>
-              <div className={`rounded-xl p-4 ${isDark ? 'bg-[#1c2534]' : 'bg-gray-50'}`}>
-                <p className={`text-xs uppercase tracking-wider ${textSecondary}`}>Прогноз</p>
-                <p className={`mt-1 text-sm font-semibold ${textPrimary}`}>{formatDateLabel(selectedTaskForRisk.risk.predictedCompletionDate)}</p>
-              </div>
-            </div>
-            <div className={`rounded-xl p-4 ${isDark ? 'bg-[#1c2534]' : 'bg-gray-50'}`}>
-              <p className={`text-xs uppercase tracking-wider ${textSecondary}`}>Рекомендация</p>
-              <p className={`mt-1 text-sm ${textPrimary}`}>{selectedTaskForRisk.risk.recommendation}</p>
-            </div>
-            {(selectedTaskForRisk.risk.riskFactors?.length ?? 0) > 0 && (
-              <div className={`rounded-xl p-4 ${isDark ? 'bg-[#1c2534]' : 'bg-gray-50'}`}>
-                <p className={`text-xs uppercase tracking-wider ${textSecondary}`}>Факторы риска</p>
-                <ul className={`mt-2 space-y-2 text-sm ${textPrimary}`}>
-                  {(selectedTaskForRisk.risk.riskFactors ?? []).map((factor) => (
-                    <li key={factor} className="flex items-center gap-2">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#4880ff]" />
-                      {factor}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsRiskModalOpen(false)
-                  setSelectedTaskForRisk(null)
-                }}
-                className="rounded-lg bg-[#4880ff] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#3a6fe0]"
-              >
-                Закрыть
-              </button>
-            </div>
-          </div>
-        ) : null}
-      </Modal>
+      />
     </PageShell>
   )
 }

@@ -4,6 +4,7 @@ import { TaskStatus } from '@/common/enums/task-status.enum';
 export interface DashboardSummaryOverviewDto {
   doneTasks: number;
   inProgressTasks: number;
+  reviewTasks: number;
   overdueTasks: number;
   totalTasks: number;
   progressPercent: number;
@@ -19,6 +20,8 @@ export interface DashboardRecentTaskItemDto {
   statusLabel: string;
   deadline: string;
   assigneeName?: string | null;
+  assigneeNames: string[];
+  assigneeCount: number;
   isOverdue: boolean;
 }
 
