@@ -1,6 +1,7 @@
 export interface ReportsSummaryOverview {
   doneTasks: number
   inProgressTasks: number
+  reviewTasks: number
   newTasks: number
   overdueTasks: number
   totalTasks: number
