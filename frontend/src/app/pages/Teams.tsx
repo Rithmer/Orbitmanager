@@ -12,7 +12,7 @@ import {
   Eye,
 } from 'lucide-react'
 import { useTheme } from '../context/useTheme'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 import { teamsApi } from '../api/teams'
 import { usersApi } from '../api/users'
 import { Modal, InputField, SelectField, SubmitButton, ErrorMessage } from '../components/Modal'
@@ -41,7 +41,6 @@ export function Teams() {
 
   const [formName, setFormName] = useState('')
   const [formDesc, setFormDesc] = useState('')
-  const [memberUserId, setMemberUserId] = useState('')
   const [memberRole, setMemberRole] = useState(TeamRole.MEMBER)
   const [addMemberSearch, setAddMemberSearch] = useState('')
   const [addMemberUsers, setAddMemberUsers] = useState<User[]>([])
@@ -215,18 +214,19 @@ export function Teams() {
     }
   }
 
-  const handleAddMember = async () => {
+  const handleAddMemberForUser = async (pickUser: User) => {
     if (!selectedTeamId) return
     setFormLoading(true)
     setFormError('')
     try {
       await teamsApi.addMember(selectedTeamId, {
-        userId: Number(memberUserId),
+        userId: pickUser.id,
         teamRole: memberRole,
       })
       setShowAddMemberModal(false)
-      setMemberUserId('')
       setMemberRole(TeamRole.MEMBER)
+      setAddMemberSearch('')
+      setAddMemberUsers([])
       await loadData()
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Ошибка добавления')
@@ -395,7 +395,6 @@ export function Teams() {
                             <button
                               onClick={() => {
                                 setSelectedTeamId(team.id)
-                                setMemberUserId('')
                                 setMemberRole(TeamRole.MEMBER)
                               setAddMemberSearch('')
                               setAddMemberUsers([])
@@ -530,7 +529,6 @@ export function Teams() {
         )}
       </div>
 
-      {/* Create Team Modal */}
       <Modal open={showCreateModal} onClose={() => setShowCreateModal(false)} title="Новая команда">
         <ErrorMessage message={formError} />
         <form
@@ -551,7 +549,6 @@ export function Teams() {
         </form>
       </Modal>
 
-      {/* Edit Team Modal */}
       <Modal open={showEditModal} onClose={() => setShowEditModal(false)} title="Редактировать команду">
         <ErrorMessage message={formError} />
         <form
@@ -572,57 +569,60 @@ export function Teams() {
         </form>
       </Modal>
 
-      {/* Add Member Modal */}
       <Modal open={showAddMemberModal} onClose={() => setShowAddMemberModal(false)} title="Добавить участника">
         <ErrorMessage message={formError} />
-        <form
-          onSubmit={(e) => {
-            e.preventDefault()
-            handleAddMember()
-          }}
-          className="space-y-4"
-        >
+        <div className="space-y-4">
           <InputField
-            label="Поиск пользователя"
+            label="Найти и добавить"
             value={addMemberSearch}
             onChange={setAddMemberSearch}
-            placeholder="login#discriminator или ФИО"
+            placeholder="Логин, #дискриминатор или ФИО"
             required={false}
-            hint={addMemberUsersLoading ? 'Поиск...' : undefined}
-            disabled={addMemberUsersLoading || formLoading}
-          />
-          <SelectField
-            label="Пользователь"
-            value={memberUserId}
-            onChange={setMemberUserId}
-            required
-            disabled={addMemberUsersLoading || addMemberUsersError !== '' || formLoading}
             hint={
               addMemberUsersError
                 ? addMemberUsersError
                 : addMemberUsersLoading
-                  ? 'Подбираем пользователей...'
-                  : addMemberUsers.length === 0 && addMemberSearch.trim()
-                    ? 'Ничего не найдено'
-                    : 'Введите запрос для поиска'
+                  ? 'Поиск...'
+                  : 'Введите запрос и нажмите на пользователя в списке'
             }
-            options={[
-              {
-                value: '',
-                label: addMemberUsersLoading
-                  ? 'Загрузка...'
-                  : addMemberUsersError
-                    ? 'Источник недоступен'
-                    : addMemberSearch.trim()
-                      ? 'Выберите пользователя...'
-                      : 'Введите запрос',
-              },
-              ...addMemberUsers.map((u) => ({
-                value: String(u.id),
-                label: `${u.login}${u.discriminator ? `#${u.discriminator}` : ''} · ${u.fullName}`,
-              })),
-            ]}
+            disabled={addMemberUsersLoading || formLoading}
           />
+          <div
+            className={`max-h-52 overflow-y-auto rounded-xl border p-1 ${
+              isDark ? 'border-[#313d4f] bg-[#1c2534]' : 'border-gray-200 bg-gray-50'
+            }`}
+          >
+            {addMemberUsersLoading ? (
+              <p className={`px-3 py-4 text-center text-xs ${textSecondary}`}>Загрузка...</p>
+            ) : addMemberUsersError ? (
+              <p className="px-3 py-4 text-center text-xs text-red-500">{addMemberUsersError}</p>
+            ) : !addMemberSearch.trim() ? (
+              <p className={`px-3 py-4 text-center text-xs ${textSecondary}`}>Начните вводить запрос</p>
+            ) : addMemberUsers.length === 0 ? (
+              <p className={`px-3 py-4 text-center text-xs ${textSecondary}`}>Ничего не найдено</p>
+            ) : (
+              <ul className="space-y-0.5">
+                {addMemberUsers.map((u) => (
+                  <li key={u.id}>
+                    <button
+                      type="button"
+                      disabled={formLoading}
+                      onClick={() => void handleAddMemberForUser(u)}
+                      className={`flex w-full flex-col rounded-lg px-3 py-2 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                        isDark ? 'hover:bg-[#273142]' : 'hover:bg-white'
+                      }`}
+                    >
+                      <span className={`font-semibold ${textPrimary}`}>
+                        {u.login}
+                        {u.discriminator ? `#${u.discriminator}` : ''}
+                      </span>
+                      <span className={`text-xs ${textSecondary}`}>{u.fullName}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
           <SelectField
             label="Роль в команде"
             value={memberRole}
@@ -632,15 +632,17 @@ export function Teams() {
               .map(([val, lab]) => ({ value: val, label: lab }))}
           />
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setShowAddMemberModal(false)} className={`px-4 py-2 rounded-lg text-sm font-semibold ${textSecondary}`}>
+            <button
+              type="button"
+              onClick={() => setShowAddMemberModal(false)}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold ${textSecondary}`}
+            >
               Отмена
             </button>
-            <SubmitButton loading={formLoading}>Добавить</SubmitButton>
           </div>
-        </form>
+        </div>
       </Modal>
 
-      {/* Team Members Modal */}
       <Modal
         open={showTeamMembersModal}
         onClose={() => {

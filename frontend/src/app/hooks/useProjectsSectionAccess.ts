@@ -1,0 +1,44 @@
+import { useMemo } from 'react'
+import { useNavMembershipBatch } from './useNavMembershipBatch'
+import { ProjectRole, TeamRole } from '../types'
+
+
+export function useProjectsSectionAccess() {
+  const { uid, isAdmin, enabled, teamsBatchQuery, projectsBatchQuery } =
+    useNavMembershipBatch()
+
+  return useMemo(() => {
+    if (isAdmin) {
+      return { allowed: true, isLoading: false as boolean }
+    }
+
+    if (!uid) {
+      return { allowed: false, isLoading: true as boolean }
+    }
+
+    const loading = enabled && (teamsBatchQuery.isPending || projectsBatchQuery.isPending)
+
+    const teamMembersByTeam = teamsBatchQuery.data ?? {}
+    const isTeamOwner = Object.values(teamMembersByTeam).some((members) =>
+      members.some((m) => m.userId === uid && m.teamRole === TeamRole.OWNER),
+    )
+
+    const projectMembersByProject = projectsBatchQuery.data ?? {}
+    const isProjectTeamLead = Object.values(projectMembersByProject)
+      .flat()
+      .some((m) => m.userId === uid && m.role === ProjectRole.TEAM_LEAD)
+
+    return {
+      allowed: isTeamOwner || isProjectTeamLead,
+      isLoading: loading,
+    }
+  }, [
+    enabled,
+    isAdmin,
+    projectsBatchQuery.data,
+    projectsBatchQuery.isPending,
+    teamsBatchQuery.data,
+    teamsBatchQuery.isPending,
+    uid,
+  ])
+}

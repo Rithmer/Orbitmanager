@@ -122,7 +122,6 @@ export function Settings() {
       </div>
 
       <div className="max-w-3xl space-y-6 page-load-stagger">
-        {/* Profile */}
         <div className={`${cardBg} border ${cardBorder} rounded-xl overflow-hidden card-hover stagger-row`}>
           <div className={`flex items-center gap-3 px-6 py-4 border-b ${dividerColor}`}>
             <div className={`w-8 h-8 ${sectionIconBg} rounded-lg flex items-center justify-center`}>
@@ -245,7 +244,6 @@ export function Settings() {
           </div>
         </div>
 
-        {/* Appearance */}
         <div className={`${cardBg} border ${cardBorder} rounded-xl overflow-hidden card-hover stagger-row`}>
           <div className={`flex items-center gap-3 px-6 py-4 border-b ${dividerColor}`}>
             <div className={`w-8 h-8 ${sectionIconBg} rounded-lg flex items-center justify-center`}>
@@ -288,7 +286,6 @@ export function Settings() {
           </div>
         </div>
 
-        {/* Security */}
         <div className={`${cardBg} border ${cardBorder} rounded-xl overflow-hidden card-hover stagger-row`}>
           <div className={`flex items-center gap-3 px-6 py-4 border-b ${dividerColor}`}>
             <div className={`w-8 h-8 ${sectionIconBg} rounded-lg flex items-center justify-center`}>

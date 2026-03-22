@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router'
-import { AlertCircle, ArrowUpRight, CheckCircle2, Clock, Plus, TrendingUp } from 'lucide-react'
+import { AlertCircle, ArrowUpRight, CheckCircle2, Clock, Plus, TestTube2 } from 'lucide-react'
 import {
   PageRefreshOverlay,
   PageSection,
@@ -9,6 +9,7 @@ import {
   StatCardsSkeleton,
 } from '../components/PageShell'
 import { useSmoothPageSkeleton } from '../hooks/useSmoothPageSkeleton'
+import { useProjectsSectionAccess } from '../hooks/useProjectsSectionAccess'
 import { useTheme } from '../context/useTheme'
 import { useAuth } from '../context/useAuth'
 import { TaskStatus, TASK_STATUS_LABELS } from '../types'
@@ -57,6 +58,7 @@ export function Dashboard() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const summaryQuery = useDashboardSummaryQuery()
+  const { allowed: canUseProjectsSection, isLoading: projectsAccessLoading } = useProjectsSectionAccess()
 
   const summary = summaryQuery.data
   const isInitialLoading = summaryQuery.isPending && !summary
@@ -214,20 +216,20 @@ export function Dashboard() {
       iconColor: 'text-orange-500',
     },
     {
+      label: 'Тестирование',
+      value: String(overview?.reviewTasks ?? 0),
+      change: 'на проверке',
+      icon: TestTube2,
+      iconBg: isDark ? 'bg-purple-500/10' : 'bg-purple-50',
+      iconColor: 'text-purple-500',
+    },
+    {
       label: 'Просрочено',
       value: String(overview?.overdueTasks ?? 0),
       change: (overview?.overdueTasks ?? 0) > 0 ? 'требует внимания' : 'все в порядке',
       icon: AlertCircle,
       iconBg: isDark ? 'bg-red-500/10' : 'bg-red-50',
       iconColor: 'text-red-500',
-    },
-    {
-      label: 'Прогресс',
-      value: `${overview?.progressPercent ?? 0}%`,
-      change: `${overview?.projectCount ?? 0} проектов`,
-      icon: TrendingUp,
-      iconBg: isDark ? 'bg-[#4880ff]/10' : 'bg-blue-50',
-      iconColor: 'text-[#4880ff]',
     },
   ]
 
@@ -242,13 +244,15 @@ export function Dashboard() {
       actions={
         <div className="flex flex-col items-start gap-2 sm:items-end">
           {isRefreshing ? <RefreshBadge isRefreshing label="Сводка обновляется" /> : null}
-          <button
-            onClick={() => navigate('/projects')}
-            className="flex items-center gap-2 bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors duration-150 btn-fizzy"
-          >
-            <Plus className="w-4 h-4" />
-            Создать проект
-          </button>
+          {!projectsAccessLoading && canUseProjectsSection ? (
+            <button
+              onClick={() => navigate('/projects')}
+              className="flex items-center gap-2 bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors duration-150 btn-fizzy"
+            >
+              <Plus className="w-4 h-4" />
+              Создать проект
+            </button>
+          ) : null}
         </div>
       }
     >
@@ -259,11 +263,11 @@ export function Dashboard() {
       ) : null}
 
       <PageRefreshOverlay show={isRefreshing} label="Сводка обновляется" className="mb-6 md:mb-8">
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-5 stagger-row">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 md:gap-5 stagger-row">
           {stats.map((stat, index) => (
             <div
               key={stat.label}
-              className={`${cardBg} border ${cardBorder} rounded-xl p-5 card-hover stagger-card`}
+              className={`${cardBg} border ${cardBorder} rounded-xl p-5 card-hover-shadow stagger-card`}
               style={{ animationDelay: `${index * 70}ms` }}
             >
               <div className="flex items-center gap-4">
@@ -288,7 +292,7 @@ export function Dashboard() {
         <PageSection
           title="Последние задачи"
           description="Показаны самые свежие задачи из доступных проектов."
-          className={`card-hover xl:col-span-2 ${cardBg} border ${cardBorder} fade-in-up`.trim()}
+          className={`card-hover-shadow xl:col-span-2 ${cardBg} border ${cardBorder} fade-in-up`.trim()}
           isRefreshing={isRefreshing}
           refreshLabel="Обновляем последние задачи"
           headerSlot={isRefreshing ? <RefreshBadge isRefreshing label="Обновляем" /> : null}
@@ -340,7 +344,7 @@ export function Dashboard() {
         <PageSection
           title="AI аналитика рисков"
           description="Оценка задач с наибольшей вероятностью задержки."
-          className={`card-hover ${cardBg} border ${cardBorder} fade-in-up`.trim()}
+          className={`card-hover-shadow ${cardBg} border ${cardBorder} fade-in-up`.trim()}
           isRefreshing={isRefreshing}
           refreshLabel="Обновляем аналитику рисков"
           headerSlot={isRefreshing ? <RefreshBadge isRefreshing label="Обновляем" /> : null}

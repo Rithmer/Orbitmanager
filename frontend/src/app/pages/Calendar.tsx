@@ -13,7 +13,7 @@ import {
   Tag,
 } from 'lucide-react'
 import { useTheme } from '../context/useTheme'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 import { tasksApi } from '../api/tasks'
 import { calendarApi } from '../api/calendar'
 import { projectsApi } from '../api/projects'
@@ -443,7 +443,6 @@ export function Calendar() {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="flex items-center gap-2 mb-4 flex-wrap page-load-stagger">
         <Filter className={`w-4 h-4 ${textSecondary}`} />
         {filterBtns.map((f) => (
@@ -540,7 +539,6 @@ export function Calendar() {
         </div>
       </div>
 
-      {/* Day Detail Modal */}
       {selectedDay !== null && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 modal-overlay-enter" onClick={() => setSelectedDay(null)}>
           <div className={`${modalBg} rounded-2xl shadow-2xl w-full max-w-md overflow-hidden modal-content-enter`} onClick={(e) => e.stopPropagation()}>
@@ -651,7 +649,6 @@ export function Calendar() {
         document.body,
       )}
 
-      {/* Create Event Modal */}
       <Modal open={showCreateModal} onClose={() => setShowCreateModal(false)} title="Новое событие">
         <ErrorMessage message={formError} />
         <form onSubmit={(e) => { e.preventDefault(); handleCreate() }} className="space-y-4">
@@ -704,7 +701,6 @@ export function Calendar() {
         </form>
       </Modal>
 
-      {/* Edit Event Modal */}
       <Modal open={showEditModal} onClose={() => { setShowEditModal(false); setEditingEvent(null) }} title="Редактировать событие">
         <ErrorMessage message={formError} />
         <form onSubmit={(e) => { e.preventDefault(); handleEdit() }} className="space-y-4">

@@ -13,7 +13,7 @@ import {
   LoaderCircle,
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useSearchParams } from 'react-router'
+import { Navigate, useNavigate, useSearchParams } from 'react-router'
 import { useTheme } from '../context/useTheme'
 import { projectsApi } from '../api/projects'
 import { ErrorMessage, Modal, InputField, SelectField, SubmitButton } from '../components/Modal'
@@ -25,6 +25,7 @@ import {
   RefreshBadge,
 } from '../components/PageShell'
 import { useSmoothPageSkeleton } from '../hooks/useSmoothPageSkeleton'
+import { useProjectsSectionAccess } from '../hooks/useProjectsSectionAccess'
 import { ProjectRole, PROJECT_ROLE_LABELS, ProjectStatus, PROJECT_STATUS_LABELS, RiskLevel } from '../types'
 import {
   useProjectMemberUsersQuery,
@@ -437,6 +438,11 @@ export function Projects() {
   }
 
   const showInitialSkeleton = useSmoothPageSkeleton(isInitialLoading)
+  const projectsSectionAccess = useProjectsSectionAccess()
+
+  if (!projectsSectionAccess.isLoading && !projectsSectionAccess.allowed) {
+    return <Navigate to="/" replace />
+  }
 
   return (
     <PageShell
