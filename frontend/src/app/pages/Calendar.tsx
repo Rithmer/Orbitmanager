@@ -175,13 +175,18 @@ export function Calendar() {
     return projects.find((p) => p.id === projectId)?.name || ''
   }
 
+  const toLocalDateStr = (isoString: string): string => {
+    const d = new Date(isoString)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+
   const getItemsForDate = (year: number, month: number, day: number): CalItem[] => {
     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
     const items: CalItem[] = []
 
     if (filterType === 'all' || filterType === 'tasks') {
       tasks
-        .filter((t) => t.deadline && t.deadline.startsWith(dateStr))
+        .filter((t) => t.deadline && toLocalDateStr(t.deadline) === dateStr)
         .forEach((t) => {
           const sc = STATUS_COLORS[t.status] || STATUS_COLORS[TaskStatus.NEW]
           items.push({
@@ -201,7 +206,7 @@ export function Calendar() {
 
     if (filterType === 'all' || filterType === 'events') {
       events
-        .filter((e) => e.startDate.startsWith(dateStr))
+        .filter((e) => toLocalDateStr(e.startDate) === dateStr)
         .forEach((e) => {
           items.push({
             id: `event-${e.id}`,
@@ -224,11 +229,13 @@ export function Calendar() {
   const firstDayOfMonth = getFirstDayOfMonth(currentYear, currentMonth)
 
   const prevMonth = () => {
+    setSelectedDay(null)
     if (currentMonth === 1) { setCurrentMonth(12); setCurrentYear(currentYear - 1) }
     else setCurrentMonth(currentMonth - 1)
   }
 
   const nextMonth = () => {
+    setSelectedDay(null)
     if (currentMonth === 12) { setCurrentMonth(1); setCurrentYear(currentYear + 1) }
     else setCurrentMonth(currentMonth + 1)
   }
@@ -261,6 +268,7 @@ export function Calendar() {
     setFormDuration('60')
     setFormColor('#3b82f6')
     setFormProjectId('')
+    setFormAllDay(false)
     setFormError('')
     setShowCreateModal(true)
   }
@@ -296,7 +304,7 @@ export function Calendar() {
     const start = new Date(ev.startDate)
     setFormTitle(ev.title)
     setFormDesc(ev.description || '')
-    setFormDate(ev.startDate.split('T')[0])
+    setFormDate(`${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`)
     setFormTime(start.toTimeString().slice(0, 5))
     const diffMin = Math.round((new Date(ev.endDate).getTime() - start.getTime()) / 60000)
     setFormDuration(String(diffMin))
