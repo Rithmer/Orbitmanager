@@ -9,6 +9,7 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AccountRole } from '@/common/enums/account-role.enum';
+import { StrongPasswordConstraint } from '@/common/validators/strong-password';
 
 export class CreateUserDto {
   @ApiProperty({
@@ -25,13 +26,14 @@ export class CreateUserDto {
   login!: string;
 
   @ApiProperty({
-    example: 'secureP@ss1',
-    description: 'Пароль (мин. 8 символов)',
+    example: 'SecurePass1!',
+    description:
+      'Пароль: мин. 8 символов, строчные и прописные латинские буквы, цифра и спецсимвол',
   })
   @IsString()
   @IsNotEmpty()
-  @MinLength(8)
   @MaxLength(100)
+  @StrongPasswordConstraint()
   password!: string;
 
   @ApiProperty({ example: 'Иванов Иван', description: 'Полное имя' })

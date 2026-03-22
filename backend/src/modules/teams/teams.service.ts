@@ -34,6 +34,7 @@ import {
 import { AuditService } from '@/modules/audit-logs/audit.service';
 import { AuditAction } from '@/common/enums/audit-action.enum';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
+import { auditLogCreateInput } from '@/common/helpers/audit-log-prisma.helper';
 
 @Injectable()
 export class TeamsService {
@@ -345,7 +346,7 @@ export class TeamsService {
       });
 
       await tx.auditLog.create({
-        data: createAuditLogData(
+        data: auditLogCreateInput(
           userId,
           AuditAction.CREATE,
           'team',
@@ -397,7 +398,7 @@ export class TeamsService {
         if (projectMemberships.length > 0) {
           await tx.auditLog.createMany({
             data: projectMemberships.map((membership) =>
-              createAuditLogData(
+              auditLogCreateInput(
                 actorUserId,
                 AuditAction.DELETE,
                 'project_member',
@@ -417,7 +418,7 @@ export class TeamsService {
       });
 
       await tx.auditLog.create({
-        data: createAuditLogData(
+        data: auditLogCreateInput(
           actorUserId,
           AuditAction.DELETE,
           'team_member',
@@ -592,24 +593,3 @@ function mapTeamRecord(team: {
   };
 }
 
-function createAuditLogData(
-  userId: number,
-  action: AuditAction,
-  entityType: string,
-  entityId: number | null,
-  description: string,
-  timestamp: Date,
-  oldValue?: string | null,
-  newValue?: string | null,
-) {
-  return {
-    userId,
-    action,
-    entityType,
-    entityId,
-    description,
-    oldValue: oldValue ?? null,
-    newValue: newValue ?? null,
-    timestamp,
-  };
-}

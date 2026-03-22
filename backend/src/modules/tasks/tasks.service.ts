@@ -1,6 +1,7 @@
 import {
   Injectable,
   Inject,
+  Optional,
   NotFoundException,
   ForbiddenException,
   BadRequestException,
@@ -27,6 +28,8 @@ import { TASK_REPOSITORY } from '@/domain/repositories/task.repository';
 import { AuditService } from '../audit-logs/audit.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service';
+import { auditLogCreateInput } from '@/common/helpers/audit-log-prisma.helper';
 
 @Injectable()
 export class TasksService {
@@ -39,6 +42,7 @@ export class TasksService {
     private readonly projectMemberRepository: IProjectMemberRepository,
     private readonly auditService: AuditService,
     private readonly projectAccessService: ProjectAccessService,
+    @Optional() private readonly prisma?: PrismaService,
   ) {}
 
   async findAll(
@@ -182,6 +186,15 @@ export class TasksService {
       }
     }
 
+    if (this.prisma) {
+      return this.createWithAuditTransaction(
+        dto,
+        userId,
+        assigneeIds,
+        deadlineDate,
+      );
+    }
+
     const now = new Date().toISOString();
     const task = await this.taskRepository.create({
       projectId: dto.projectId,
@@ -205,6 +218,60 @@ export class TasksService {
     );
 
     return task;
+  }
+
+  private async createWithAuditTransaction(
+    dto: CreateTaskDto,
+    userId: number,
+    assigneeIds: number[],
+    deadlineDate: Date,
+  ): Promise<Task> {
+    const timestamp = new Date();
+    const row = await this.prisma!.$transaction(async (tx) => {
+      const created = await tx.task.create({
+        data: {
+          projectId: dto.projectId,
+          name: dto.name,
+          description: dto.description ?? '',
+          deadline: deadlineDate,
+          status: TaskStatus.NEW,
+          difficulty: dto.difficulty,
+          createdById: userId,
+          assignees:
+            assigneeIds.length > 0
+              ? { create: assigneeIds.map((uid) => ({ userId: uid })) }
+              : undefined,
+        },
+        include: { assignees: { select: { userId: true } } },
+      });
+
+      await tx.auditLog.create({
+        data: auditLogCreateInput(
+          userId,
+          AuditAction.CREATE,
+          'task',
+          created.id,
+          `Создана задача "${created.name}"`,
+          timestamp,
+        ),
+      });
+
+      return created;
+    });
+
+    return {
+      id: row.id,
+      projectId: row.projectId,
+      name: row.name,
+      description: row.description,
+      deadline: row.deadline.toISOString(),
+      status: row.status as TaskStatus,
+      difficulty: row.difficulty,
+      assigneeIds: row.assignees.map((a) => a.userId),
+      createdById: row.createdById,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
   }
 
   async update(
