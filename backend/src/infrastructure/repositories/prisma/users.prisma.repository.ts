@@ -78,10 +78,6 @@ export class UsersPrismaRepository implements IUserRepository {
     return this.toDomain(row);
   }
 
-  /**
-   * Оптимизация: убран предварительный findUnique.
-   * Prisma P2025 = запись не найдена → возвращаем null.
-   */
   async update(id: number, partial: Partial<User>): Promise<User | null> {
     const {
       id: _id,

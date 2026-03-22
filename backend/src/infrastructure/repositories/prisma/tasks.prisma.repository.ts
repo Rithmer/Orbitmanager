@@ -154,10 +154,6 @@ export class TasksPrismaRepository implements ITaskRepository {
     return this.toDomain(row);
   }
 
-  /**
-   * Оптимизация: assigneeIds обновляются атомарно через транзакцию.
-   * Prisma P2025 = запись не найдена → возвращаем null.
-   */
   async update(id: number, partial: Partial<Task>): Promise<Task | null> {
     try {
       const scalarData: Record<string, unknown> = {};

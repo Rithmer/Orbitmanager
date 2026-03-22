@@ -106,10 +106,6 @@ export class ProjectsPrismaRepository implements IProjectRepository {
     return this.toDomain(row);
   }
 
-  /**
-   * Оптимизация: убран предварительный findUnique.
-   * Prisma P2025 = запись не найдена → возвращаем null.
-   */
   async update(id: number, partial: Partial<Project>): Promise<Project | null> {
     const {
       id: _id,
