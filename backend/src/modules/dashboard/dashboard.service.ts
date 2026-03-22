@@ -322,6 +322,9 @@ export class DashboardService {
 
   private toRecentTask(row: DashboardTaskRow): DashboardRecentTaskItemDto {
     const status = row.status as TaskStatus;
+    const assigneeNames = row.assignees
+      .map((a) => a.user?.fullName ?? '')
+      .filter(Boolean);
     return {
       id: row.id,
       projectId: row.projectId,
@@ -330,7 +333,9 @@ export class DashboardService {
       status,
       statusLabel: this.getStatusLabel(status),
       deadline: row.deadline.toISOString(),
-      assigneeName: row.assignees[0]?.user?.fullName ?? null,
+      assigneeName: assigneeNames[0] ?? null,
+      assigneeNames,
+      assigneeCount: assigneeNames.length,
       isOverdue:
         row.deadline.getTime() < Date.now() &&
         status !== TaskStatus.DONE &&

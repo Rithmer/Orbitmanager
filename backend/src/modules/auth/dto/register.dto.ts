@@ -1,6 +1,7 @@
 import {
   IsString,
   IsNotEmpty,
+  IsOptional,
   MinLength,
   MaxLength,
   Matches,
@@ -37,9 +38,9 @@ export class RegisterDto {
   @MaxLength(100)
   fullName!: string;
 
-  @ApiProperty({ example: 'Backend Developer' })
+  @ApiProperty({ example: 'Backend Developer', required: false })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(100)
-  profession!: string;
+  profession?: string;
 }

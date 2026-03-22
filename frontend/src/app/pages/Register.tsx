@@ -44,6 +44,14 @@ export function Register() {
       setError('Логин должен быть не менее 3 символов')
       return
     }
+    if (!/^[a-zA-Z0-9_]+$/.test(form.login)) {
+      setError('Логин может содержать только буквы, цифры и символ подчёркивания')
+      return
+    }
+    if (form.login.length > 50) {
+      setError('Логин должен быть не более 50 символов')
+      return
+    }
 
     setLoading(true)
     try {

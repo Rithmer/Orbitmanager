@@ -19,6 +19,8 @@ export interface DashboardRecentTaskItemDto {
   statusLabel: string;
   deadline: string;
   assigneeName?: string | null;
+  assigneeNames: string[];
+  assigneeCount: number;
   isOverdue: boolean;
 }
 

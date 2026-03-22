@@ -113,6 +113,7 @@ export function Calendar() {
   const [formDuration, setFormDuration] = useState('60')
   const [formColor, setFormColor] = useState('#3b82f6')
   const [formProjectId, setFormProjectId] = useState('')
+  const [formAllDay, setFormAllDay] = useState(false)
   const [formLoading, setFormLoading] = useState(false)
   const [formError, setFormError] = useState('')
 
@@ -277,6 +278,7 @@ export function Calendar() {
         endDate,
         color: formColor,
         projectId: formProjectId ? Number(formProjectId) : undefined,
+        allDay: formAllDay,
       })
       setShowCreateModal(false)
       await loadEvents()
@@ -300,6 +302,7 @@ export function Calendar() {
     setFormDuration(String(diffMin))
     setFormColor(ev.color)
     setFormProjectId(ev.projectId ? String(ev.projectId) : '')
+    setFormAllDay(ev.allDay)
     setFormError('')
     setShowEditModal(true)
   }
@@ -318,6 +321,7 @@ export function Calendar() {
         endDate,
         color: formColor,
         projectId: formProjectId ? Number(formProjectId) : null,
+        allDay: formAllDay,
       })
       setShowEditModal(false)
       setEditingEvent(null)
@@ -677,6 +681,14 @@ export function Calendar() {
               ))}
             </div>
           </div>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={formAllDay}
+              onChange={(e) => setFormAllDay(e.target.checked)}
+            />
+            <span>Весь день</span>
+          </label>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => setShowCreateModal(false)} className={`px-4 py-2 rounded-lg text-sm font-semibold ${textSecondary}`}>Отмена</button>
             <SubmitButton loading={formLoading}>Создать</SubmitButton>
@@ -722,6 +734,14 @@ export function Calendar() {
               ))}
             </div>
           </div>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={formAllDay}
+              onChange={(e) => setFormAllDay(e.target.checked)}
+            />
+            <span>Весь день</span>
+          </label>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => { setShowEditModal(false); setEditingEvent(null) }} className={`px-4 py-2 rounded-lg text-sm font-semibold ${textSecondary}`}>Отмена</button>
             <SubmitButton loading={formLoading}>Сохранить</SubmitButton>

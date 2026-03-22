@@ -61,7 +61,7 @@ export interface User {
   discriminator?: string | null
   fullName: string
   profession?: string
-  accountStatus: 'active' | 'blocked' | 'inactive'
+  accountStatus: 'active' | 'blocked'
   accountRole: AccountRole
   avatarUrl?: string | null
   createdAt: string

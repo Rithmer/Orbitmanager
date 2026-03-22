@@ -83,7 +83,7 @@ export class UsersService {
 
           const search = params.search.toLowerCase();
           return [user.login, user.fullName, user.profession]
-            .some((field) => field.toLowerCase().includes(search));
+            .some((field) => field?.toLowerCase().includes(search));
         }),
       page,
       limit,

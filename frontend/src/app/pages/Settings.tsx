@@ -43,7 +43,7 @@ export function Settings() {
     setError('')
     setSuccess('')
     try {
-      await usersApi.update(user.id, { fullName, profession })
+      await usersApi.updateMe({ fullName, profession })
       await refreshUser()
       setSuccess('Изменения сохранены')
       setTimeout(() => setSuccess(''), 3000)
@@ -100,7 +100,7 @@ export function Settings() {
     setAvatarUploadSuccess('')
 
     try {
-      await usersApi.update(user.id, { avatarUrl: avatarUrlPreview })
+      await usersApi.updateMe({ avatarUrl: avatarUrlPreview })
       await refreshUser()
       setAvatarUploadSuccess('Аватар обновлён')
       setTimeout(() => setAvatarUploadSuccess(''), 3000)

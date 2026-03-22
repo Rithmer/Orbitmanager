@@ -5,7 +5,7 @@ export interface User {
   login: string;
   password: string;
   fullName: string;
-  profession: string;
+  profession?: string;
   accountStatus: 'active' | 'blocked';
   accountRole: AccountRole;
   avatarUrl: string | null;
