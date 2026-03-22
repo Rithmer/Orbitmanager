@@ -65,7 +65,7 @@ describe('ProjectAccessService', () => {
     service = module.get<ProjectAccessService>(ProjectAccessService);
   });
 
-  it('returns team projects for owner and assigned projects for observer', async () => {
+  it('returns team projects for owner and assigned projects for member/observer', async () => {
     mockTeamMemberRepository.findByUser.mockResolvedValueOnce([
       { id: 1, userId: 1, teamId: 1, teamRole: TeamRole.OWNER },
       { id: 2, userId: 1, teamId: 2, teamRole: TeamRole.OBSERVER },
@@ -133,6 +133,17 @@ describe('ProjectAccessService', () => {
     await expect(
       service.assertCanManageProject(project, 2, AccountRole.MEMBER),
     ).resolves.not.toThrow();
+  });
+
+  it('returns no projects for team member without project membership', async () => {
+    mockTeamMemberRepository.findByUser.mockResolvedValueOnce([
+      { id: 1, userId: 1, teamId: 1, teamRole: TeamRole.MEMBER },
+    ]);
+    mockProjectMemberRepository.findByUser.mockResolvedValueOnce([]);
+
+    const result = await service.getVisibleProjectIds(1);
+
+    expect(result).toEqual([]);
   });
 
   it('blocks team-level administration for non-owner', async () => {
