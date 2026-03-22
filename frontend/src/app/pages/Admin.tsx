@@ -26,6 +26,7 @@ import {
   useAdminUsersQuery,
 } from '../features/admin/admin-queries'
 import { useSmoothPageSkeleton } from '../hooks/useSmoothPageSkeleton'
+import { PASSWORD_POLICY_HINT, validatePasswordPolicy } from '../utils/passwordPolicy'
 
 type Tab = 'users' | 'audit'
 
@@ -129,8 +130,13 @@ function UsersPanel() {
   }
 
   const handleCreate = async () => {
-    setFormLoading(true)
     setFormError('')
+    const pwdErr = validatePasswordPolicy(formPassword)
+    if (pwdErr) {
+      setFormError(pwdErr)
+      return
+    }
+    setFormLoading(true)
     try {
       await usersApi.create({
         login: formLogin,
@@ -378,7 +384,15 @@ function UsersPanel() {
         >
           <InputField label="ФИО" value={formFullName} onChange={setFormFullName} required placeholder="Иванов Иван" />
           <InputField label="Логин" value={formLogin} onChange={setFormLogin} required placeholder="ivanov" />
-          <InputField label="Пароль" value={formPassword} onChange={setFormPassword} type="password" required placeholder="Минимум 8 символов" />
+          <InputField
+            label="Пароль"
+            value={formPassword}
+            onChange={setFormPassword}
+            type="password"
+            required
+            placeholder="Например, SecurePass1!"
+            hint={PASSWORD_POLICY_HINT}
+          />
           <InputField label="Должность" value={formProfession} onChange={setFormProfession} placeholder="Developer" />
           <SelectField
             label="Роль"
