@@ -324,7 +324,6 @@ function buildAssigneeLoadByTaskId(
       continue;
     }
 
-    // Нагрузка = максимальная нагрузка среди исполнителей задачи (без учёта самой задачи)
     const maxLoad = Math.max(
       ...task.assigneeIds.map((id) =>
         Math.max(0, (activeCountsByAssignee.get(id) ?? 0) - 1),

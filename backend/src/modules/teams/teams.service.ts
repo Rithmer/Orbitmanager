@@ -115,11 +115,9 @@ export class TeamsService {
       });
     } catch (error) {
       if (team) {
-        // Best-effort rollback to avoid orphan teams if owner membership creation fails.
         try {
           await this.teamRepository.delete(team.id);
         } catch {
-          // ignore rollback errors and rethrow the original failure below
         }
       }
 

@@ -64,8 +64,6 @@ describe('RiskStubService', () => {
     service = module.get<RiskStubService>(RiskStubService);
   });
 
-  // ────────────── assessTask ──────────────
-
   describe('assessTask', () => {
     it('should return high risk when deadline has passed', async () => {
       const input: TaskRiskInput = {
@@ -175,7 +173,6 @@ describe('RiskStubService', () => {
       };
 
       const result = await service.assessTask(input);
-      // 0.1 + 1 * 0.05 = 0.15
       expect(result.delayProbability).toBe(0.15);
       expect(result.riskLevel).toBe('low');
     });
@@ -238,8 +235,6 @@ describe('RiskStubService', () => {
       expect(result.recommendation.length).toBeGreaterThan(0);
     });
   });
-
-  // ────────────── assessProject ──────────────
 
   describe('assessProject', () => {
     it('should throw NotFoundException for non-existent project', async () => {
@@ -359,8 +354,6 @@ describe('RiskStubService', () => {
       }
     });
   });
-
-  // ────────────── assessProjectsBatch ──────────────
 
   describe('assessProjectsBatch', () => {
     it('should return empty object for empty projectIds', async () => {

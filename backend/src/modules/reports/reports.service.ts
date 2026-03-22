@@ -73,6 +73,7 @@ export class ReportsService {
       totalTasks,
       doneTasks,
       inProgressTasks,
+      reviewTasks,
       newTasks,
       overdueTasks,
       projectTaskGroups,
@@ -89,6 +90,12 @@ export class ReportsService {
         where: {
           ...where,
           status: TaskStatus.IN_PROGRESS,
+        },
+      }),
+      this.prisma.task.count({
+        where: {
+          ...where,
+          status: TaskStatus.REVIEW,
         },
       }),
       this.prisma.task.count({
@@ -174,6 +181,11 @@ export class ReportsService {
         color: '#f59e0b',
       },
       {
+        label: 'Тестирование',
+        value: reviewTasks,
+        color: '#a855f7',
+      },
+      {
         label: 'Запланировано',
         value: newTasks,
         color: '#4880ff',
@@ -207,6 +219,7 @@ export class ReportsService {
       overview: {
         doneTasks,
         inProgressTasks,
+        reviewTasks,
         newTasks,
         overdueTasks,
         totalTasks,
@@ -269,21 +282,17 @@ export class ReportsService {
         })
       : [];
 
-    const [teamLeadProjectRows, observerProjectRows] = await Promise.all([
-      this.prisma.projectMember.findMany({
-        where: { userId, role: ProjectRole.TEAM_LEAD },
-        select: { projectId: true },
-      }),
-      this.prisma.projectMember.findMany({
-        where: { userId, role: ProjectRole.OBSERVER },
-        select: { projectId: true },
-      }),
-    ]);
+    const leadOrObserverRows = await this.prisma.projectMember.findMany({
+      where: {
+        userId,
+        role: { in: [ProjectRole.TEAM_LEAD, ProjectRole.OBSERVER] },
+      },
+      select: { projectId: true },
+    });
 
     const projectIdsSet = new Set<number>();
     for (const p of ownerProjects) projectIdsSet.add(p.id);
-    for (const row of teamLeadProjectRows) projectIdsSet.add(row.projectId);
-    for (const row of observerProjectRows) projectIdsSet.add(row.projectId);
+    for (const row of leadOrObserverRows) projectIdsSet.add(row.projectId);
 
     return [...projectIdsSet];
   }

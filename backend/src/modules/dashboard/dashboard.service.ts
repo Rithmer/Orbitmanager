@@ -90,6 +90,7 @@ export class DashboardService {
         overview: {
           doneTasks: 0,
           inProgressTasks: 0,
+          reviewTasks: 0,
           overdueTasks: 0,
           totalTasks: 0,
           progressPercent: 0,
@@ -105,6 +106,7 @@ export class DashboardService {
       totalTasks,
       doneTasks,
       inProgressTasks,
+      reviewTasks,
       overdueTasks,
       recentTaskRows,
       activeTaskRows,
@@ -125,6 +127,12 @@ export class DashboardService {
         where: {
           projectId: { in: visibleProjectIds },
           status: TaskStatus.IN_PROGRESS,
+        },
+      }),
+      this.prisma.task.count({
+        where: {
+          projectId: { in: visibleProjectIds },
+          status: TaskStatus.REVIEW,
         },
       }),
       this.prisma.task.count({
@@ -278,6 +286,7 @@ export class DashboardService {
       overview: {
         doneTasks,
         inProgressTasks,
+        reviewTasks,
         overdueTasks,
         totalTasks,
         progressPercent:

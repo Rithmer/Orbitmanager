@@ -163,8 +163,6 @@ describe('TeamsService', () => {
     jest.clearAllMocks();
   });
 
-  // ─── findAll ───
-
   describe('findAll', () => {
     it('should return all teams', async () => {
       const result = await service.findAll({});
@@ -180,8 +178,6 @@ describe('TeamsService', () => {
     });
   });
 
-  // ─── findById ───
-
   describe('findById', () => {
     it('should return team by id', async () => {
       const result = await service.findById(1);
@@ -193,8 +189,6 @@ describe('TeamsService', () => {
       await expect(service.findById(999)).rejects.toThrow(NotFoundException);
     });
   });
-
-  // ─── create ───
 
   describe('create', () => {
     it('should create team and add owner membership', async () => {
@@ -208,8 +202,6 @@ describe('TeamsService', () => {
       );
     });
   });
-
-  // ─── update ───
 
   describe('update', () => {
     it('should update team if caller is owner', async () => {
@@ -276,8 +268,6 @@ describe('TeamsService', () => {
     });
   });
 
-  // ─── remove ───
-
   describe('remove', () => {
     it('should delete team if caller is owner', async () => {
       await expect(
@@ -340,16 +330,14 @@ describe('TeamsService', () => {
     });
   });
 
-  // ─── addMember ───
-
   describe('addMember', () => {
     it('should throw ConflictException if user already a member', async () => {
       mockTeamMemberRepository.findByUserAndTeam.mockResolvedValueOnce(
         mockOwner,
-      ); // caller = owner
+      );
       mockTeamMemberRepository.findByUserAndTeam.mockResolvedValueOnce(
         mockMember,
-      ); // target already member
+      );
       await expect(
         service.addMember(
           1,

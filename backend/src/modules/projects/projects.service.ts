@@ -423,6 +423,30 @@ export class ProjectsService {
         },
       });
 
+      const teamMembers = await tx.teamMember.findMany({
+        where: { teamId: dto.teamId },
+      });
+
+      for (const tm of teamMembers) {
+        let projectRole: ProjectRole;
+        if (tm.teamRole === TeamRole.OWNER) {
+          projectRole = ProjectRole.TEAM_LEAD;
+        } else if (tm.teamRole === TeamRole.OBSERVER) {
+          projectRole = ProjectRole.OBSERVER;
+        } else {
+          projectRole = ProjectRole.DEVELOPER;
+        }
+
+        await tx.projectMember.create({
+          data: {
+            projectId: createdProject.id,
+            userId: tm.userId,
+            role: projectRole,
+            assignedAt: timestamp,
+          },
+        });
+      }
+
       await tx.auditLog.create({
         data: createAuditLogData(
           userId,

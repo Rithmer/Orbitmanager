@@ -1,6 +1,5 @@
 import type { AccountRole } from '@/common/enums/account-role.enum'
 import type { ProjectRole } from '@/common/enums/project-role.enum'
-import type { RiskLevel } from '@/common/enums/risk-level.enum'
 import type { TaskStatus } from '@/common/enums/task-status.enum'
 import type { TaskRiskOutputDto } from '@/modules/risk/dto'
 
