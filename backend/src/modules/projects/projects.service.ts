@@ -34,6 +34,7 @@ import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectMemberDto } from './dto/update-project-member.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
+import { auditLogCreateInput } from '@/common/helpers/audit-log-prisma.helper';
 
 @Injectable()
 export class ProjectsService {
@@ -448,7 +449,7 @@ export class ProjectsService {
       }
 
       await tx.auditLog.create({
-        data: createAuditLogData(
+        data: auditLogCreateInput(
           userId,
           AuditAction.CREATE,
           'project',
@@ -485,7 +486,7 @@ export class ProjectsService {
       });
 
       await tx.auditLog.create({
-        data: createAuditLogData(
+        data: auditLogCreateInput(
           actorUserId,
           AuditAction.DELETE,
           'project_member',
@@ -580,24 +581,3 @@ function mapProjectRecord(project: {
   };
 }
 
-function createAuditLogData(
-  userId: number,
-  action: AuditAction,
-  entityType: string,
-  entityId: number | null,
-  description: string,
-  timestamp: Date,
-  oldValue?: string | null,
-  newValue?: string | null,
-) {
-  return {
-    userId,
-    action,
-    entityType,
-    entityId,
-    description,
-    oldValue: oldValue ?? null,
-    newValue: newValue ?? null,
-    timestamp,
-  };
-}
