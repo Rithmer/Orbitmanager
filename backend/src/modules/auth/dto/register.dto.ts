@@ -7,6 +7,7 @@ import {
   Matches,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { StrongPasswordConstraint } from '@/common/validators/strong-password';
 
 export class RegisterDto {
   @ApiProperty({
@@ -23,13 +24,14 @@ export class RegisterDto {
   login!: string;
 
   @ApiProperty({
-    example: 'secureP@ss1',
-    description: 'Пароль (мин. 8 символов)',
+    example: 'SecurePass1!',
+    description:
+      'Пароль: мин. 8 символов, строчные и прописные латинские буквы, цифра и спецсимвол',
   })
   @IsString()
   @IsNotEmpty()
-  @MinLength(8)
   @MaxLength(100)
+  @StrongPasswordConstraint()
   password!: string;
 
   @ApiProperty({ example: 'Иванов Иван' })
