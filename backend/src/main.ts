@@ -35,7 +35,7 @@ async function bootstrap() {
     winstonTransports.push(
       new winston.transports.File({
         filename: 'logs/app.log',
-        maxsize: 5 * 1024 * 1024, // 5 МБ
+        maxsize: 5 * 1024 * 1024,
         maxFiles: 5,
         format: winston.format.combine(
           winston.format.timestamp(),
@@ -73,9 +73,6 @@ async function bootstrap() {
   );
 
   app.useGlobalFilters(new GlobalExceptionFilter());
-
-  // LoggingInterceptor зарегистрирован через APP_INTERCEPTOR в app.module.ts,
-  // что позволяет использовать DI и корректно направлять логи в Winston
 
   const config = new DocumentBuilder()
     .setTitle('Task Management API')

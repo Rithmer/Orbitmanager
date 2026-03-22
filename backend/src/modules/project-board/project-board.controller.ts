@@ -4,13 +4,12 @@ import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
-import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { ProjectBoardService } from './project-board.service';
 import type { ProjectBoardViewResponseDto } from './project-board.types';
 
 @ApiTags('Project Board View')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, AccountRolesGuard)
+@UseGuards(AccountRolesGuard)
 @Controller('projects')
 export class ProjectBoardController {
   constructor(private readonly projectBoardService: ProjectBoardService) {}

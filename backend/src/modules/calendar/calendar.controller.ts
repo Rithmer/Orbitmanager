@@ -8,7 +8,6 @@ import {
   Body,
   Query,
   ParseIntPipe,
-  UseGuards,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -21,14 +20,12 @@ import {
 } from '@nestjs/swagger';
 import { CalendarService } from './calendar.service';
 import { CreateCalendarEventDto, UpdateCalendarEventDto } from './dto';
-import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { parseOptionalInt } from '@/common/helpers/query.helper';
 
 @ApiTags('Calendar Events')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
 @Controller('calendar-events')
 export class CalendarController {
   constructor(private readonly calendarService: CalendarService) {}

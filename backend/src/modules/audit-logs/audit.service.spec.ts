@@ -79,8 +79,6 @@ describe('AuditService', () => {
     jest.clearAllMocks();
   });
 
-  // ─── log ───
-
   describe('log', () => {
     it('should create an audit record with correct fields', async () => {
       mockAuditLogRepository.create.mockResolvedValueOnce({ id: 99 });
@@ -118,8 +116,6 @@ describe('AuditService', () => {
       );
     });
   });
-
-  // ─── findAll ───
 
   describe('findAll', () => {
     it('returns all logs when no filters applied', async () => {

@@ -7,7 +7,6 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { AuditService } from './audit.service';
-import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
@@ -15,7 +14,7 @@ import { parseOptionalInt } from '@/common/helpers/query.helper';
 
 @ApiTags('Audit Logs')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, AccountRolesGuard)
+@UseGuards(AccountRolesGuard)
 @Controller('audit-logs')
 export class AuditLogsController {
   constructor(private readonly auditService: AuditService) {}

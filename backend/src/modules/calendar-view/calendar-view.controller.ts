@@ -4,14 +4,13 @@ import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
-import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { parseOptionalInt } from '@/common/helpers/query.helper';
 import { CalendarViewService } from './calendar-view.service';
 import type { CalendarMonthViewResponseDto } from './calendar-view.types';
 
 @ApiTags('Calendar Month View')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, AccountRolesGuard)
+@UseGuards(AccountRolesGuard)
 @Controller('calendar')
 export class CalendarViewController {
   constructor(private readonly calendarViewService: CalendarViewService) {}

@@ -21,7 +21,6 @@ import {
 } from '@nestjs/swagger';
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto, UpdateProjectDto } from './dto';
-import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { ProjectRolesGuard } from '@/common/guards/project-roles.guard';
 import { ProjectRoles } from '@/common/decorators/project-roles.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
@@ -32,7 +31,6 @@ import { parseOptionalInt } from '@/common/helpers/query.helper';
 
 @ApiTags('Projects')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
 @Controller('projects')
 export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}

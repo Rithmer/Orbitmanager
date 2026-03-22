@@ -1,9 +1,4 @@
-import {
-  Controller,
-  Get,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -11,7 +6,6 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { parseOptionalInt } from '@/common/helpers/query.helper';
 import { TeamsListViewService } from './teams-list-view.service';
@@ -19,7 +13,6 @@ import type { TeamsListViewResponseDto } from './teams-list-view.types';
 
 @ApiTags('Teams List View')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
 @Controller('teams/list-view')
 export class TeamsListViewController {
   constructor(private readonly teamsListViewService: TeamsListViewService) {}
