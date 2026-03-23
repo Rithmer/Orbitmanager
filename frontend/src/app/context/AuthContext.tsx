@@ -43,18 +43,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     api.loadTokens()
-    if (api.isAuthenticated()) {
-      authApi
-        .me()
-        .then(setUser)
-        .catch((err) => {
+
+    let isMounted = true
+    const bootstrapAuth = async () => {
+      if (api.isAuthenticated()) {
+        try {
+          const me = await authApi.me()
+          if (isMounted) {
+            setUser(me)
+          }
+        } catch (err) {
           if (err instanceof ApiError && err.status === 401) {
             api.clearTokens()
           }
-        })
-        .finally(() => setLoading(false))
-    } else {
-      setLoading(false)
+        }
+      }
+      if (isMounted) {
+        setLoading(false)
+      }
+    }
+
+    void bootstrapAuth()
+    return () => {
+      isMounted = false
     }
   }, [])
 
