@@ -193,12 +193,7 @@ export class ProjectAccessService {
       return [];
     }
 
-    if (this.projectRepository.findIdsByTeams) {
-      return this.projectRepository.findIdsByTeams(teamIds);
-    }
-
-    const projects = await this.projectRepository.findByTeams(teamIds);
-    return projects.map((project) => project.id);
+    return this.projectRepository.findIdsByTeams(teamIds);
   }
 
   /** Проекты команд, где пользователь не владелец: только с явным участием в проекте. */
@@ -219,9 +214,7 @@ export class ProjectAccessService {
     const membershipProjectIds = [
       ...new Set(projectMemberships.map((membership) => membership.projectId)),
     ];
-    const membershipProjects = this.projectRepository.findByIds
-      ? await this.projectRepository.findByIds(membershipProjectIds)
-      : await this.projectRepository.findByTeams(teamIds);
+    const membershipProjects = await this.projectRepository.findByIds(membershipProjectIds);
 
     const teamSet = new Set(teamIds);
     const membershipProjectIdSet = new Set(membershipProjectIds);

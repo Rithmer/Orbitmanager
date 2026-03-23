@@ -14,11 +14,11 @@ import {
 } from '@nestjs/common';
 import {
   ApiTags,
-  ApiBearerAuth,
   ApiOperation,
   ApiResponse,
   ApiQuery,
 } from '@nestjs/swagger';
+import { ApiAuth } from '@/common/decorators/api-auth.decorator';
 import { UsersService } from './users.service';
 import { CreateUserDto, UpdateUserDto, UpdateProfileDto } from './dto';
 import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
@@ -28,7 +28,7 @@ import { AccountRole } from '@/common/enums/account-role.enum';
 import { parseOptionalInt } from '@/common/helpers/query.helper';
 
 @ApiTags('Users')
-@ApiBearerAuth()
+@ApiAuth()
 @UseGuards(AccountRolesGuard)
 @Controller('users')
 export class UsersController {

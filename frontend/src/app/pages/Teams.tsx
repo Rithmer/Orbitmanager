@@ -236,9 +236,10 @@ export function Teams() {
   }
 
   const handleRemoveMember = async (memberId: number) => {
+    if (!membersModalTeamId) return
     if (!confirm('Удалить участника из команды?')) return
     try {
-      await teamsApi.removeMember(memberId)
+      await teamsApi.removeMember(membersModalTeamId, memberId)
       await loadData()
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Ошибка удаления участника')
@@ -246,8 +247,9 @@ export function Teams() {
   }
 
   const handleChangeRole = async (memberId: number, newRole: TeamRole) => {
+    if (!membersModalTeamId) return
     try {
-      await teamsApi.updateMember(memberId, { teamRole: newRole })
+      await teamsApi.updateMember(membersModalTeamId, memberId, { teamRole: newRole })
       await loadData()
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Ошибка смены роли')

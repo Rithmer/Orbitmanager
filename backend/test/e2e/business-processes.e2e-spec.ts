@@ -559,6 +559,136 @@ describe('Business Processes (e2e)', () => {
     });
   });
 
+  describe('BP4: RBAC Access Control', () => {
+    let ownerToken: string;
+    let memberToken: string;
+    let observerToken: string;
+    let memberId: number;
+    let observerMembershipId: number;
+    let teamId: number;
+    let projectId: number;
+
+    beforeAll(async () => {
+      // Register three users for RBAC testing
+      const owner = await registerUser(
+        'rbac_owner',
+        'RbacOwner1!',
+        'RBAC Owner',
+      );
+      ownerToken = owner.accessToken;
+
+      const member = await registerUser(
+        'rbac_member',
+        'RbacMember1!',
+        'RBAC Member',
+      );
+      memberToken = member.accessToken;
+      memberId = member.userId;
+
+      const observer = await registerUser(
+        'rbac_observer',
+        'RbacObserver1!',
+        'RBAC Observer',
+      );
+      observerToken = observer.accessToken;
+      const observerUserId = observer.userId;
+
+      // Owner creates a team
+      const teamRes = await server()
+        .post('/teams')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ name: 'RBAC Test Team' })
+        .expect(201);
+      teamId = teamRes.body.id;
+
+      // Owner adds member to team with MEMBER role
+      await server()
+        .post(`/teams/${teamId}/members`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ userId: memberId, teamRole: 'member' })
+        .expect(201);
+
+      // Owner adds observer to team with OBSERVER role
+      const observerTeamMemberRes = await server()
+        .post(`/teams/${teamId}/members`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ userId: observerUserId, teamRole: 'observer' })
+        .expect(201);
+      observerMembershipId = observerTeamMemberRes.body.id;
+
+      // Owner creates a project in the team
+      const projectRes = await server()
+        .post('/projects')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ teamId, name: 'RBAC Test Project' })
+        .expect(201);
+      projectId = projectRes.body.id;
+
+      // Owner adds member to project with developer role (observer is NOT added)
+      await server()
+        .post(`/projects/${projectId}/members`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ userId: memberId, role: 'developer' })
+        .expect(201);
+    });
+
+    it('observer cannot create a task in a project they are not member of', async () => {
+      const deadline = new Date();
+      deadline.setDate(deadline.getDate() + 7);
+
+      await server()
+        .post('/tasks')
+        .set('Authorization', `Bearer ${observerToken}`)
+        .send({
+          projectId,
+          name: 'Unauthorized task',
+          deadline: deadline.toISOString(),
+          difficulty: 1,
+        })
+        .expect(403);
+    });
+
+    it('team observer without project access cannot view board', async () => {
+      await server()
+        .get(`/projects/${projectId}/board-view`)
+        .set('Authorization', `Bearer ${observerToken}`)
+        .expect(403);
+    });
+
+    it('team member (non-owner) cannot delete project', async () => {
+      await server()
+        .delete(`/projects/${projectId}`)
+        .set('Authorization', `Bearer ${memberToken}`)
+        .expect(403);
+    });
+
+    it('unauthenticated request returns 401 on protected endpoints', async () => {
+      await server().get('/dashboard/summary').expect(401);
+    });
+
+    it('admin can access all projects regardless of membership', async () => {
+      const adminLogin = await loginUser(ADMIN_LOGIN, ADMIN_PASSWORD);
+
+      const res = await server()
+        .get('/projects')
+        .set('Authorization', `Bearer ${adminLogin.accessToken}`)
+        .expect(200);
+
+      const projectIds = (res.body.items as { id: number }[]).map(
+        (p) => p.id,
+      );
+      expect(projectIds).toContain(projectId);
+    });
+
+    it('member cannot change team member roles', async () => {
+      await server()
+        .patch(`/teams/${teamId}/members/${observerMembershipId}`)
+        .set('Authorization', `Bearer ${memberToken}`)
+        .send({ teamRole: 'member' })
+        .expect(403);
+    });
+  });
+
   describe('Remediation regressions', () => {
     it('returns 401 on refresh for blocked user', async () => {
       const blocked = await registerUser(

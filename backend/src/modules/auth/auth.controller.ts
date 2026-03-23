@@ -58,6 +58,15 @@ export class AuthController {
     return this.authService.refresh(dto.refreshToken);
   }
 
+  @Public()
+  @Post('logout')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Выход из системы (отзыв refresh-токена)' })
+  @ApiResponse({ status: 204, description: 'Токен отозван' })
+  logout(@Body() dto: RefreshDto): Promise<void> {
+    return this.authService.logout(dto.refreshToken);
+  }
+
   @Get('me')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Получить профиль текущего пользователя' })

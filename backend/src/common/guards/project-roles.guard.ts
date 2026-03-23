@@ -3,6 +3,7 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
+  NotFoundException,
   Inject,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -62,7 +63,7 @@ export class ProjectRolesGuard implements CanActivate {
 
     const project = await this.projectRepository.findById(projectId);
     if (!project) {
-      throw new ForbiddenException('Проект не найден');
+      throw new NotFoundException('Проект не найден');
     }
 
     const teamMembership = await this.teamMemberRepository.findByUserAndTeam(

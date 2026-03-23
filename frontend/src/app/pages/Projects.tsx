@@ -403,13 +403,17 @@ export function Projects() {
   }
 
   const handleRemoveProjectMember = async (memberId: number) => {
+    if (selectedProjectId === null) {
+      return
+    }
+
     if (!confirm('Убрать участника из проекта?')) {
       return
     }
 
     setPendingRemoveMemberId(memberId)
     try {
-      await projectsApi.removeMember(memberId)
+      await projectsApi.removeMember(selectedProjectId, memberId)
       await invalidateProjectQueries()
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Не удалось удалить участника')

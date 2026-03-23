@@ -6,6 +6,7 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
+import { InMemoryCacheService } from '@/common/cache/in-memory-cache.service';
 import { ProjectAccessService } from '@/common/access/project-access.service';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { AuditAction } from '@/common/enums/audit-action.enum';
@@ -43,6 +44,7 @@ export class TasksService {
     private readonly auditService: AuditService,
     private readonly projectAccessService: ProjectAccessService,
     @Optional() private readonly prisma?: PrismaService,
+    private readonly cache: InMemoryCacheService,
   ) {}
 
   async findAll(
@@ -186,15 +188,18 @@ export class TasksService {
       }
     }
 
-    if (this.prisma) {
-      return this.createWithAuditTransaction(
-        dto,
-        userId,
-        assigneeIds,
-        deadlineDate,
-      );
-    }
+    const task = await (this.prisma
+      ? this.createWithAuditTransaction(dto, userId, assigneeIds, deadlineDate)
+      : this.createViaRepository(dto, userId, assigneeIds));
+    this.invalidateUserCaches(userId);
+    return task;
+  }
 
+  private async createViaRepository(
+    dto: CreateTaskDto,
+    userId: number,
+    assigneeIds: number[],
+  ): Promise<Task> {
     const now = new Date().toISOString();
     const task = await this.taskRepository.create({
       projectId: dto.projectId,
@@ -218,6 +223,11 @@ export class TasksService {
     );
 
     return task;
+  }
+
+  private invalidateUserCaches(userId: number): void {
+    this.cache.invalidateByPrefix(`dashboard:summary:${userId}:`);
+    this.cache.invalidateByPrefix(`reports:summary:${userId}:`);
   }
 
   private async createWithAuditTransaction(
@@ -344,6 +354,7 @@ export class TasksService {
       );
     }
 
+    this.invalidateUserCaches(userId);
     return updated;
   }
 
@@ -374,6 +385,8 @@ export class TasksService {
       id,
       `Удалена задача "${task.name}"`,
     );
+
+    this.invalidateUserCaches(userId);
   }
 
   private async assertCanChangeStatus(

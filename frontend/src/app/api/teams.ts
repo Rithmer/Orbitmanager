@@ -34,11 +34,11 @@ export const teamsApi = {
     return api.post(`/teams/${teamId}/members`, dto)
   },
 
-  updateMember(memberId: number, dto: { teamRole: string }): Promise<TeamMember> {
-    return api.patch(`/team-members/${memberId}`, dto)
+  updateMember(teamId: number, memberId: number, dto: { teamRole: string }): Promise<TeamMember> {
+    return api.patch(`/teams/${teamId}/members/${memberId}`, dto)
   },
 
-  removeMember(memberId: number): Promise<void> {
-    return api.delete(`/team-members/${memberId}`)
+  removeMember(teamId: number, memberId: number): Promise<void> {
+    return api.delete(`/teams/${teamId}/members/${memberId}`)
   },
 }

@@ -14,11 +14,11 @@ import {
 } from '@nestjs/common';
 import {
   ApiTags,
-  ApiBearerAuth,
   ApiQuery,
   ApiOperation,
   ApiResponse,
 } from '@nestjs/swagger';
+import { ApiAuth } from '@/common/decorators/api-auth.decorator';
 import { ProjectsService } from './projects.service';
 import { AddProjectMemberDto, UpdateProjectMemberDto } from './dto';
 import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
@@ -28,7 +28,7 @@ import { AccountRole } from '@/common/enums/account-role.enum';
 import { ReadModelResponseFactory } from '@/common/read-models/read-model-response.factory';
 
 @ApiTags('Project Members')
-@ApiBearerAuth()
+@ApiAuth()
 @UseGuards(AccountRolesGuard)
 @Controller()
 export class ProjectMembersController {
@@ -112,7 +112,7 @@ export class ProjectMembersController {
     return this.projectsService.addMember(projectId, dto, userId, userRole);
   }
 
-  @Patch('project-members/:id')
+  @Patch('projects/:projectId/members/:id')
   @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
   @ApiOperation({
     summary: 'Изменить роль участника проекта (только owner команды)',
@@ -121,6 +121,7 @@ export class ProjectMembersController {
   @ApiResponse({ status: 403, description: 'Нет прав' })
   @ApiResponse({ status: 404, description: 'Участник не найден' })
   updateMember(
+    @Param('projectId', ParseIntPipe) _projectId: number,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateProjectMemberDto,
     @CurrentUser('id') userId: number,
@@ -129,7 +130,7 @@ export class ProjectMembersController {
     return this.projectsService.updateMember(id, dto, userId, userRole);
   }
 
-  @Delete('project-members/:id')
+  @Delete('projects/:projectId/members/:id')
   @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
@@ -139,6 +140,7 @@ export class ProjectMembersController {
   @ApiResponse({ status: 403, description: 'Нет прав' })
   @ApiResponse({ status: 404, description: 'Участник не найден' })
   removeMember(
+    @Param('projectId', ParseIntPipe) _projectId: number,
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('id') userId: number,
     @CurrentUser('accountRole') userRole: AccountRole,

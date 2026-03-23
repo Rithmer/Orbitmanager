@@ -14,13 +14,13 @@ import {
 } from '@nestjs/common';
 import {
   ApiTags,
-  ApiBearerAuth,
   ApiOperation,
   ApiResponse,
   ApiQuery,
 } from '@nestjs/swagger';
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto, UpdateProjectDto } from './dto';
+import { ApiAuth } from '@/common/decorators/api-auth.decorator';
 import { ProjectRolesGuard } from '@/common/guards/project-roles.guard';
 import { ProjectRoles } from '@/common/decorators/project-roles.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
@@ -30,7 +30,7 @@ import { ProjectStatus } from '@/common/enums/project-status.enum';
 import { parseOptionalInt } from '@/common/helpers/query.helper';
 
 @ApiTags('Projects')
-@ApiBearerAuth()
+@ApiAuth()
 @Controller('projects')
 export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}

@@ -11,11 +11,11 @@ import {
 } from '@nestjs/common';
 import {
   ApiTags,
-  ApiBearerAuth,
   ApiQuery,
   ApiOperation,
   ApiResponse,
 } from '@nestjs/swagger';
+import { ApiAuth } from '@/common/decorators/api-auth.decorator';
 import { ProjectAccessService } from '@/common/access/project-access.service';
 import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
@@ -39,7 +39,7 @@ import { ProjectRiskOutputDto, TaskRiskOutputDto } from './dto';
 import { buildTaskRiskInput } from './helpers/build-task-risk-input';
 
 @ApiTags('Risk Assessment')
-@ApiBearerAuth()
+@ApiAuth()
 @UseGuards(AccountRolesGuard)
 @Controller()
 export class RiskController {
@@ -215,7 +215,7 @@ export class RiskController {
         return {};
       }
 
-      if (userRole === AccountRole.ADMIN && this.projectRepository.findByIds) {
+      if (userRole === AccountRole.ADMIN) {
         projects = await this.projectRepository.findByIds(requestedProjectIds);
       } else {
         const visibleProjects = await this.projectAccessService.getVisibleProjects(

@@ -56,6 +56,18 @@ interface DashboardActiveTaskRow {
   assignees: Array<{ userId: number }>;
 }
 
+/**
+ * @architecture CQRS Query Service
+ *
+ * Сервис агрегированного чтения данных. Использует PrismaService напрямую —
+ * намеренное архитектурное решение: запросы включают сложные агрегации
+ * (count, groupBy, многотабличные JOIN), которые не выражаются через
+ * CRUD-репозитории без значительного усложнения их интерфейсов.
+ *
+ * Паттерн: CQRS-light — command-сервисы (TasksService, ProjectsService и др.)
+ * работают через репозитории; query-сервисы (этот класс) обращаются к БД
+ * напрямую для оптимальных read-path запросов.
+ */
 @Injectable()
 export class DashboardService {
   constructor(

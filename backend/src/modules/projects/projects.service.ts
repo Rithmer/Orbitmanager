@@ -6,6 +6,7 @@ import {
   ConflictException,
   BadRequestException,
 } from '@nestjs/common';
+import { InMemoryCacheService } from '@/common/cache/in-memory-cache.service';
 import { ProjectAccessService } from '@/common/access/project-access.service';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { AuditAction } from '@/common/enums/audit-action.enum';
@@ -51,6 +52,7 @@ export class ProjectsService {
     private readonly teamRepository: ITeamRepository,
     private readonly auditService: AuditService,
     private readonly projectAccessService: ProjectAccessService,
+    private readonly cache: InMemoryCacheService,
     @Optional() private readonly prisma?: PrismaService,
   ) {}
 
@@ -151,7 +153,9 @@ export class ProjectsService {
     );
 
     if (this.prisma) {
-      return this.createWithTransaction(dto, userId);
+      const project = await this.createWithTransaction(dto, userId);
+      this.invalidateUserCaches(userId);
+      return project;
     }
 
     const now = new Date().toISOString();
@@ -172,6 +176,7 @@ export class ProjectsService {
       `Создан проект "${project.name}"`,
     );
 
+    this.invalidateUserCaches(userId);
     return project;
   }
 
@@ -205,6 +210,7 @@ export class ProjectsService {
       `Обновлён проект "${updated.name}"`,
     );
 
+    this.invalidateUserCaches(userId);
     return updated;
   }
 
@@ -230,6 +236,8 @@ export class ProjectsService {
       id,
       `Удалён проект "${project.name}"`,
     );
+
+    this.invalidateUserCaches(userId);
   }
 
   async findMembers(
@@ -405,6 +413,11 @@ export class ProjectsService {
     }
 
     return member;
+  }
+
+  private invalidateUserCaches(userId: number): void {
+    this.cache.invalidateByPrefix(`dashboard:summary:${userId}:`);
+    this.cache.invalidateByPrefix(`reports:summary:${userId}:`);
   }
 
   private async createWithTransaction(

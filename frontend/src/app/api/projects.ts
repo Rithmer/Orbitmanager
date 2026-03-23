@@ -45,11 +45,11 @@ export const projectsApi = {
     return api.post(`/projects/${projectId}/members`, dto)
   },
 
-  updateMember(memberId: number, dto: { role: string }): Promise<ProjectMember> {
-    return api.patch(`/project-members/${memberId}`, dto)
+  updateMember(projectId: number, memberId: number, dto: { role: string }): Promise<ProjectMember> {
+    return api.patch(`/projects/${projectId}/members/${memberId}`, dto)
   },
 
-  removeMember(memberId: number): Promise<void> {
-    return api.delete(`/project-members/${memberId}`)
+  removeMember(projectId: number, memberId: number): Promise<void> {
+    return api.delete(`/projects/${projectId}/members/${memberId}`)
   },
 }

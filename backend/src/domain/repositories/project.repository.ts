@@ -14,10 +14,10 @@ export interface IProjectRepository {
   findAll(): Promise<Project[]>;
   findPage?(params: ProjectListQuery): Promise<RepositoryPageResult<Project>>;
   findById(id: number): Promise<Project | null>;
-  findByIds?(ids: number[]): Promise<Project[]>;
+  findByIds(ids: number[]): Promise<Project[]>;
   findByTeam(teamId: number): Promise<Project[]>;
   findByTeams(teamIds: number[]): Promise<Project[]>;
-  findIdsByTeams?(teamIds: number[]): Promise<number[]>;
+  findIdsByTeams(teamIds: number[]): Promise<number[]>;
   create(project: Omit<Project, 'id'>): Promise<Project>;
   update(id: number, partial: Partial<Project>): Promise<Project | null>;
   delete(id: number): Promise<boolean>;

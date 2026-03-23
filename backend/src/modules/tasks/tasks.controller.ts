@@ -13,20 +13,20 @@ import {
 } from '@nestjs/common';
 import {
   ApiTags,
-  ApiBearerAuth,
   ApiOperation,
   ApiResponse,
   ApiQuery,
 } from '@nestjs/swagger';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto, UpdateTaskDto } from './dto';
+import { ApiAuth } from '@/common/decorators/api-auth.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { TaskStatus } from '@/common/enums/task-status.enum';
 import { parseOptionalInt } from '@/common/helpers/query.helper';
 
 @ApiTags('Tasks')
-@ApiBearerAuth()
+@ApiAuth()
 @Controller('tasks')
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
