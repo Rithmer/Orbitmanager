@@ -7,6 +7,26 @@ import { usersApi } from '../api/users'
 import { ErrorMessage } from '../components/Modal'
 import { ACCOUNT_ROLE_LABELS, AccountRole } from '../types'
 
+function validateProfileFields(fullName: string, profession: string): string | null {
+  const normalizedFullName = fullName.trim()
+  const normalizedProfession = profession.trim()
+
+  if (!normalizedFullName) {
+    return 'ФИО обязательно'
+  }
+  if (normalizedFullName.length < 3) {
+    return 'ФИО должно быть не менее 3 символов'
+  }
+  if (normalizedFullName.length > 100) {
+    return 'ФИО должно быть не более 100 символов'
+  }
+  if (normalizedProfession.length > 100) {
+    return 'Должность должна быть не более 100 символов'
+  }
+
+  return null
+}
+
 export function Settings() {
   const { isDark, toggleTheme } = useTheme()
   const { user, logout, refreshUser } = useAuth()
@@ -39,11 +59,17 @@ export function Settings() {
 
   const handleSaveProfile = async () => {
     if (!user) return
+    const validationError = validateProfileFields(fullName, profession)
+    if (validationError) {
+      setError(validationError)
+      setSuccess('')
+      return
+    }
     setSaving(true)
     setError('')
     setSuccess('')
     try {
-      await usersApi.updateMe({ fullName, profession })
+      await usersApi.updateMe({ fullName: fullName.trim(), profession: profession.trim() || undefined })
       await refreshUser()
       setSuccess('Изменения сохранены')
       setTimeout(() => setSuccess(''), 3000)

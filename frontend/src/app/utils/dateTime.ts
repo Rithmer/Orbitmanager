@@ -23,12 +23,12 @@ export function toLocalDateTimeIso(
   const [year, month, day] = dateValue.split('-').map(Number)
   const [hours, minutes] = timeValue.split(':').map(Number)
 
-  return new Date(year, month - 1, day, hours, minutes, 0, 0).toISOString()
+  return new Date(Date.UTC(year, month - 1, day, hours, minutes, 0, 0)).toISOString()
 }
 
 export function toLocalEndOfDayIso(dateValue: string): string {
   const [year, month, day] = dateValue.split('-').map(Number)
-  return new Date(year, month - 1, day, 23, 59, 59, 999).toISOString()
+  return new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999)).toISOString()
 }
 
 export function isSameLocalDate(
@@ -51,7 +51,7 @@ export function getLocalMonthRangeIso(
   month: number,
 ): { from: string; to: string } {
   return {
-    from: new Date(year, month - 1, 1, 0, 0, 0, 0).toISOString(),
-    to: new Date(year, month, 0, 23, 59, 59, 999).toISOString(),
+    from: new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0)).toISOString(),
+    to: new Date(Date.UTC(year, month, 0, 23, 59, 59, 999)).toISOString(),
   }
 }

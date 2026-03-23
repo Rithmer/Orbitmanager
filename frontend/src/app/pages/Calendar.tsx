@@ -75,6 +75,14 @@ const DURATION_OPTIONS = [
   { value: '480', label: '8 часов (весь день)' },
 ]
 
+function getCalendarFallbackErrorMessage(source: 'projects' | 'events'): string {
+  if (source === 'projects') {
+    return 'Список проектов временно недоступен. Доступны задачи и события.'
+  }
+
+  return 'Список событий временно недоступен. Проверьте соединение и попробуйте снова.'
+}
+
 function formatDuration(startDate: string, endDate: string): string {
   const diffMs = new Date(endDate).getTime() - new Date(startDate).getTime()
   const mins = Math.round(diffMs / 60000)
@@ -133,12 +141,14 @@ export function Calendar() {
     try {
       const [tasksRes, projectsRes] = await Promise.all([
         tasksApi.list({ limit: 500 }),
-        projectsApi.list({ limit: 100 }).catch((e) => { console.warn('Failed to load projects:', e); return { items: [] as Project[], total: 0, page: 1, limit: 100, totalPages: 0 } }),
+        projectsApi.list({ limit: 100 }).catch(() => {
+          setError(getCalendarFallbackErrorMessage('projects'))
+          return { items: [] as Project[], total: 0, page: 1, limit: 100, totalPages: 0 }
+        }),
       ])
       setTasks(tasksRes.items)
       setProjects(projectsRes.items)
-    } catch (e) {
-      console.error('Calendar: failed to load static data:', e)
+    } catch {
       setError('Не удалось загрузить данные календаря. Попробуйте обновить страницу.')
     }
   }, [])
@@ -147,13 +157,13 @@ export function Calendar() {
     try {
       const from = new Date(currentYear, currentMonth - 1, 1).toISOString()
       const to = new Date(currentYear, currentMonth, 0, 23, 59, 59).toISOString()
-      const eventsRes = await calendarApi.list({ limit: 500, from, to }).catch((e) => {
-        console.warn('Failed to load calendar events:', e)
+      const eventsRes = await calendarApi.list({ limit: 500, from, to }).catch(() => {
+        setError(getCalendarFallbackErrorMessage('events'))
         return { items: [] as CalendarEvent[], total: 0, page: 1, limit: 500, totalPages: 0 }
       })
       setEvents(eventsRes.items)
-    } catch (e) {
-      console.error('Calendar: failed to load events:', e)
+    } catch {
+      setError('Не удалось загрузить события календаря. Попробуйте обновить страницу.')
     }
   }, [currentYear, currentMonth])
 
