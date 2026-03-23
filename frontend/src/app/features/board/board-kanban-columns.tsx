@@ -25,7 +25,7 @@ import { formatBoardDateLabel } from './board-page-formatters'
 import type { ProjectBoardTask, ProjectBoardView } from './types'
 
 export type BoardColumnVm = {
-  status: string
+  status: TaskStatus
   title: string
   accent: string
   tasks: ProjectBoardTask[]
@@ -122,7 +122,7 @@ export function BoardKanbanColumns({
               {previewTasks.map((task, taskIndex) => {
                 const risk = riskByTaskId[task.id]
                 const overdue = getOverdueLabel(task)
-                const canTransition = (ALLOWED_TASK_TRANSITIONS[task.status as TaskStatus] ?? []) as TaskStatus[]
+                const canTransition = ALLOWED_TASK_TRANSITIONS[task.status] ?? []
                 const pendingAction = pendingTaskActions[task.id]
                 const isTaskBusy = pendingAction !== undefined
 

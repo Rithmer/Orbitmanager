@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, ArrowLeft, LoaderCircle, Plus } from 'lucide-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import {
@@ -9,9 +8,7 @@ import {
 } from '../components/PageShell'
 import { useSmoothPageSkeleton } from '../hooks/useSmoothPageSkeleton'
 import { useTheme } from '../context/useTheme'
-import { tasksApi } from '../api/tasks'
-import { formatLocalDateInput, toLocalEndOfDayIso } from '../utils/dateTime'
-import { appQueryKeys } from '../query'
+import { formatLocalDateInput } from '../utils/dateTime'
 import { ProjectRole, TaskStatus, TeamRole } from '../types'
 import { useAuth } from '../context/useAuth'
 import {
@@ -23,6 +20,7 @@ import {
   BoardTaskDetailsModal,
   BoardTaskFormModal,
   BoardTaskListView,
+  useBoardMutations,
   useBoardProjectPickerQuery,
   useBoardTeamMembersQuery,
   useProjectBoardViewQuery,
@@ -38,13 +36,10 @@ import {
   readLastBoardProjectId,
 } from '../utils/lastBoardProjectStorage'
 
-type TaskPendingAction = 'status' | 'delete'
-
 export function Board() {
   const { isDark } = useTheme()
   const { user } = useAuth()
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
   const [searchParams] = useSearchParams()
   const { projectId: projectIdParam } = useParams()
   const projectId = Number(projectIdParam)
@@ -82,7 +77,6 @@ export function Board() {
   const [taskFormAssigneeIds, setTaskFormAssigneeIds] = useState<number[]>([])
   const [taskFormStatus, setTaskFormStatus] = useState<TaskStatus>(TaskStatus.NEW)
   const [taskFormError, setTaskFormError] = useState('')
-  const [pendingTaskActions, setPendingTaskActions] = useState<Record<number, TaskPendingAction>>({})
   const [viewMode, setViewMode] = useState<'board' | 'list'>('board')
   const [projectPickerSearch, setProjectPickerSearch] = useState('')
 
@@ -163,120 +157,6 @@ export function Board() {
   const columnBg = isDark ? 'bg-[#1e2a3a]' : 'bg-[#f0f4f8]'
   const textPrimary = isDark ? 'text-[#f4f3f2]' : 'text-[#202224]'
   const textSecondary = isDark ? 'text-[#94a3b8]' : 'text-[#737373]'
-
-  const setTaskPendingAction = (taskId: number, action: TaskPendingAction) => {
-    setPendingTaskActions((current) => ({
-      ...current,
-      [taskId]: action,
-    }))
-  }
-
-  const clearTaskPendingAction = (taskId: number) => {
-    setPendingTaskActions((current) => {
-      if (!(taskId in current)) {
-        return current
-      }
-
-      const next = { ...current }
-      delete next[taskId]
-      return next
-    })
-  }
-
-  const invalidateBoardData = async () => {
-    if (!hasProjectId) {
-      return
-    }
-
-    await Promise.all([
-      queryClient.invalidateQueries({
-        queryKey: appQueryKeys.projects.boardView(projectId),
-      }),
-      queryClient.invalidateQueries({
-        queryKey: ['calendar', 'month-view'],
-      }),
-    ])
-  }
-
-  const createTaskMutation = useMutation({
-    mutationFn: async () => {
-      if (!hasProjectId) {
-        throw new Error('Проект не выбран')
-      }
-
-      return tasksApi.create({
-        projectId,
-        name: taskFormName.trim(),
-        description: taskFormDescription.trim() || undefined,
-        deadline: toLocalEndOfDayIso(taskFormDeadline),
-        difficulty: Number(taskFormDifficulty),
-        assigneeIds: taskFormAssigneeIds,
-      })
-    },
-    onSuccess: async () => {
-      setIsTaskFormOpen(false)
-      resetTaskForm()
-      await invalidateBoardData()
-    },
-    onError: (error) => {
-      setTaskFormError(error instanceof Error ? error.message : 'Ошибка создания задачи')
-    },
-  })
-
-  const updateTaskMutation = useMutation({
-    mutationFn: async () => {
-      if (!selectedTaskForEditing) {
-        throw new Error('Задача не выбрана')
-      }
-
-      return tasksApi.update(selectedTaskForEditing.id, {
-        name: taskFormName.trim(),
-        description: taskFormDescription.trim() || undefined,
-        deadline: taskFormDeadline ? toLocalEndOfDayIso(taskFormDeadline) : undefined,
-        difficulty: Number(taskFormDifficulty),
-        status: taskFormStatus,
-        assigneeIds: taskFormAssigneeIds,
-      })
-    },
-    onSuccess: async () => {
-      setIsTaskFormOpen(false)
-      setSelectedTaskForEditing(null)
-      resetTaskForm()
-      await invalidateBoardData()
-    },
-    onError: (error) => {
-      setTaskFormError(error instanceof Error ? error.message : 'Ошибка обновления задачи')
-    },
-  })
-
-  const deleteTaskMutation = useMutation({
-    mutationFn: async (taskId: number) => tasksApi.delete(taskId),
-    onMutate: (taskId) => {
-      setTaskPendingAction(taskId, 'delete')
-    },
-    onSuccess: async () => {
-      setOpenedTaskMenuId(null)
-      await invalidateBoardData()
-    },
-    onSettled: (_data, _error, taskId) => {
-      clearTaskPendingAction(taskId)
-    },
-  })
-
-  const changeTaskStatusMutation = useMutation({
-    mutationFn: async ({ taskId, status }: { taskId: number; status: TaskStatus }) =>
-      tasksApi.update(taskId, { status }),
-    onMutate: ({ taskId }) => {
-      setTaskPendingAction(taskId, 'status')
-    },
-    onSuccess: async () => {
-      setOpenedTaskMenuId(null)
-      await invalidateBoardData()
-    },
-    onSettled: (_data, _error, variables) => {
-      clearTaskPendingAction(variables.taskId)
-    },
-  })
 
   const isInitialLoading = hasProjectId && boardQuery.isLoading && !projectBoardView
   const showInitialSkeleton = useSmoothPageSkeleton(isInitialLoading)
@@ -396,7 +276,7 @@ export function Board() {
             ? [task.assignee.id]
             : [],
     )
-    setTaskFormStatus(task.status as TaskStatus)
+    setTaskFormStatus(task.status)
     setTaskFormError('')
     setIsTaskFormOpen(true)
   }
@@ -419,12 +299,35 @@ export function Board() {
   async function submitTaskForm() {
     setTaskFormError('')
 
-    if (selectedTaskForEditing) {
-      await updateTaskMutation.mutateAsync()
-      return
-    }
+    try {
+      if (selectedTaskForEditing) {
+        await updateTaskMutation.mutateAsync({
+          taskId: selectedTaskForEditing.id,
+          name: taskFormName,
+          description: taskFormDescription,
+          deadline: taskFormDeadline,
+          difficulty: taskFormDifficulty,
+          status: taskFormStatus,
+          assigneeIds: taskFormAssigneeIds,
+        })
+        return
+      }
 
-    await createTaskMutation.mutateAsync()
+      if (!hasProjectId) {
+        throw new Error('Проект не выбран')
+      }
+
+      await createTaskMutation.mutateAsync({
+        projectId,
+        name: taskFormName,
+        description: taskFormDescription,
+        deadline: taskFormDeadline,
+        difficulty: taskFormDifficulty,
+        assigneeIds: taskFormAssigneeIds,
+      })
+    } catch (error) {
+      setTaskFormError(error instanceof Error ? error.message : 'Ошибка сохранения задачи')
+    }
   }
 
   function resetTaskForm() {
@@ -436,6 +339,26 @@ export function Board() {
     setTaskFormStatus(TaskStatus.NEW)
     setTaskFormError('')
   }
+
+  const {
+    pendingTaskActions,
+    createTaskMutation,
+    updateTaskMutation,
+    deleteTaskMutation,
+    changeTaskStatusMutation,
+  } = useBoardMutations({
+    projectId,
+    hasProjectId,
+    onCreateSuccess: () => {
+      setIsTaskFormOpen(false)
+      resetTaskForm()
+    },
+    onUpdateSuccess: () => {
+      setIsTaskFormOpen(false)
+      setSelectedTaskForEditing(null)
+      resetTaskForm()
+    },
+  })
 
   return (
     <PageShell
@@ -545,10 +468,14 @@ export function Board() {
           onOpenTaskDetails={openTaskDetails}
           onOpenTaskEditing={openTaskEditing}
           onOpenTaskRisk={openTaskRisk}
-          onChangeTaskStatus={(taskId, status) =>
+          onChangeTaskStatus={(taskId, status) => {
+            setOpenedTaskMenuId(null)
             changeTaskStatusMutation.mutate({ taskId, status })
-          }
-          onDeleteTask={(taskId) => deleteTaskMutation.mutate(taskId)}
+          }}
+          onDeleteTask={(taskId) => {
+            setOpenedTaskMenuId(null)
+            deleteTaskMutation.mutate(taskId)
+          }}
           onOpenColumnModal={(title, tasks) => setKanbanColumnModal({ title, tasks })}
         />
       ) : (
