@@ -4,6 +4,28 @@ import { Eye, EyeOff } from 'lucide-react'
 import { useTheme } from '../context/useTheme'
 import { useAuth } from '../context/useAuth'
 
+function validateLoginForm(login: string, password: string): string | null {
+  const normalizedLogin = login.trim()
+
+  if (normalizedLogin.length < 3) {
+    return 'Логин должен быть не менее 3 символов'
+  }
+  if (normalizedLogin.length > 50) {
+    return 'Логин должен быть не более 50 символов'
+  }
+  if (!/^[a-zA-Z0-9_]+$/.test(normalizedLogin)) {
+    return 'Логин может содержать только буквы, цифры и символ подчёркивания'
+  }
+  if (password.length === 0) {
+    return 'Введите пароль'
+  }
+  if (password.length > 100) {
+    return 'Пароль должен быть не более 100 символов'
+  }
+
+  return null
+}
+
 export function Login() {
   const { isDark } = useTheme()
   const { login } = useAuth()
@@ -25,9 +47,16 @@ export function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+
+    const validationError = validateLoginForm(form.login, form.password)
+    if (validationError) {
+      setError(validationError)
+      return
+    }
+
     setLoading(true)
     try {
-      await login(form)
+      await login({ login: form.login.trim(), password: form.password })
       navigate('/', { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка входа')

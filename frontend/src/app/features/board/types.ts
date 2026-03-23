@@ -1,4 +1,6 @@
 import type { TaskRiskOutput } from '../../types'
+import { ProjectStatus } from '../../types'
+import { TaskStatus } from '../../types'
 
 export interface ProjectBoardUserSummary {
   id: number
@@ -21,7 +23,7 @@ export interface ProjectBoardTask {
   name: string
   description: string
   deadline: string
-  status: string
+  status: TaskStatus
   difficulty: number
   // Multi-assignees (new contract)
   assigneeIds?: number[] | null
@@ -40,7 +42,7 @@ export interface ProjectBoardProject {
   teamId: number
   name: string
   description: string
-  status: string
+  status: ProjectStatus
   createdAt: string
   updatedAt: string
 }

@@ -4,6 +4,10 @@ import type { TaskRiskOutput } from '../../types'
 import { formatBoardDateLabel, formatBoardDateTimeLabel } from './board-page-formatters'
 import type { ProjectBoardMember, ProjectBoardTask } from './types'
 
+function isTaskStatus(value: string): value is TaskStatus {
+  return Object.values(TaskStatus).includes(value as TaskStatus)
+}
+
 type BoardTaskFormModalProps = {
   open: boolean
   onClose: () => void
@@ -151,7 +155,11 @@ export function BoardTaskFormModal({
         <SelectField
           label="Статус"
           value={taskFormStatus}
-          onChange={(value) => onTaskFormStatusChange(value as TaskStatus)}
+          onChange={(value) => {
+            if (isTaskStatus(value)) {
+              onTaskFormStatusChange(value)
+            }
+          }}
           options={Object.values(TaskStatus).map((status) => ({
             value: status,
             label: TASK_STATUS_LABELS[status],
@@ -217,7 +225,7 @@ export function BoardTaskDetailsModal({
             <div className={`rounded-xl p-4 ${isDark ? 'bg-[#1c2534]' : 'bg-gray-50'}`}>
               <p className={`text-xs uppercase tracking-wider ${textSecondary}`}>Статус</p>
               <p className={`mt-1 text-sm font-semibold ${textPrimary}`}>
-                {TASK_STATUS_LABELS[task.status as TaskStatus]}
+                {TASK_STATUS_LABELS[task.status]}
               </p>
             </div>
             <div className={`rounded-xl p-4 ${isDark ? 'bg-[#1c2534]' : 'bg-gray-50'}`}>

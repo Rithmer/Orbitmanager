@@ -8,6 +8,7 @@ export type {
 export { useProjectBoardViewQuery } from './use-project-board-view-query'
 export { useBoardTeamMembersQuery } from './use-board-team-members-query'
 export { useBoardProjectPickerQuery } from './use-board-project-picker-query'
+export { useBoardMutations } from './use-board-mutations'
 export { BoardPickerSkeleton, BoardProjectPicker } from './board-project-picker'
 export { BoardKanbanColumns, type BoardColumnVm } from './board-kanban-columns'
 export { BoardTaskListView } from './board-task-list-view'

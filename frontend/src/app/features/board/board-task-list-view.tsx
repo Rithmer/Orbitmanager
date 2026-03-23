@@ -1,5 +1,5 @@
 import { AlertTriangle, Calendar, Tag, User as UserIcon } from 'lucide-react'
-import { RISK_LEVEL_LABELS, RiskLevel, TaskStatus } from '../../types'
+import { RISK_LEVEL_LABELS, RiskLevel } from '../../types'
 import { getOverdueLabel, getRiskBadgeClasses, PROJECT_BOARD_COLUMNS } from './board-view.constants'
 import { formatBoardDateLabel } from './board-page-formatters'
 import type { ProjectBoardTask, ProjectBoardView } from './types'
@@ -48,7 +48,7 @@ export function BoardTaskListView({
         {[...boardTasks]
           .sort((a, b) => {
             const order = PROJECT_BOARD_COLUMNS.map((c) => c.status)
-            return order.indexOf(a.status as TaskStatus) - order.indexOf(b.status as TaskStatus)
+            return order.indexOf(a.status) - order.indexOf(b.status)
           })
           .map((task) => {
             const risk = riskByTaskId[task.id]
