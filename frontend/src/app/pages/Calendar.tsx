@@ -21,7 +21,7 @@ import { Modal, InputField, SelectField, SubmitButton, ErrorMessage } from '../c
 import type { Task, CalendarEvent, Project } from '../types'
 import { TaskStatus, TASK_STATUS_LABELS, AccountRole } from '../types'
 
-const DAYS_OF_WEEK = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
+const DAYS_OF_WEEK = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 const MONTHS = [
   'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
   'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь',
@@ -94,7 +94,10 @@ function formatDuration(startDate: string, endDate: string): string {
 }
 
 function getFirstDayOfMonth(year: number, month: number) {
-  return new Date(year, month - 1, 1).getDay()
+  // Use UTC to avoid timezone-related weekday shifts.
+  // Convert weekday index to Monday-first format: Mon=0 ... Sun=6.
+  const sundayFirst = new Date(Date.UTC(year, month - 1, 1)).getUTCDay()
+  return (sundayFirst + 6) % 7
 }
 
 export function Calendar() {
@@ -361,11 +364,20 @@ export function Calendar() {
     }
   }
 
-  // Build a stable 6-week calendar grid (42 cells) including previous/next month days.
-  // Next-month days are muted by reduced opacity.
+  // Build a month grid by weeks:
+  // - weeks = ceil((firstDayOffset + daysInMonth) / 7)
+  // - for 28-day months, always add one extra week to show muted next-month days
+  //   (requested UX behavior)
   const nextMonthDate = new Date(currentYear, currentMonth, 1)
   const nextMonthNumber = nextMonthDate.getMonth() + 1
   const nextYear = nextMonthDate.getFullYear()
+  const daysInMonth = new Date(Date.UTC(currentYear, currentMonth, 0)).getUTCDate()
+  const occupiedCells = firstDayOfMonth + daysInMonth
+  let weekCount = Math.ceil(occupiedCells / 7)
+  if (daysInMonth === 28) {
+    weekCount += 1
+  }
+  const totalCells = weekCount * 7
   const gridStartDate = new Date(currentYear, currentMonth - 1, 1 - firstDayOfMonth)
 
   const cells: Array<{
@@ -376,7 +388,7 @@ export function Calendar() {
     isNextMonth: boolean
   }> = []
 
-  for (let i = 0; i < 42; i++) {
+  for (let i = 0; i < totalCells; i++) {
     const date = new Date(
       gridStartDate.getFullYear(),
       gridStartDate.getMonth(),
