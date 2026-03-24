@@ -18,7 +18,7 @@ import type { IAuditLogRepository } from '@/domain/repositories/audit-log.reposi
 import { AUDIT_LOG_REPOSITORY } from '@/domain/repositories/audit-log.repository';
 import { User } from '@/domain/models/user.model';
 import { AccountRole } from '@/common/enums/account-role.enum';
-import { CreateUserDto, UpdateMeUserDto, UpdateUserDto } from './dto';
+import { CreateUserDto, UpdateUserDto, UpdateProfileDto } from './dto';
 import {
   QueryParams,
   PaginatedResult,
@@ -135,6 +135,8 @@ export class UsersService {
       profession: dto.profession ?? '',
       accountStatus: dto.accountStatus ?? 'active',
       accountRole: dto.accountRole ?? AccountRole.MEMBER,
+      avatarUrl: null,
+      lastPasswordChangedAt: null,
       createdAt: now,
       updatedAt: now,
     });
@@ -185,7 +187,7 @@ export class UsersService {
     return this.toPublicUser(updated);
   }
 
-  async updateMe(id: number, dto: UpdateMeUserDto): Promise<PublicUser> {
+  async updateMe(id: number, dto: UpdateProfileDto): Promise<PublicUser> {
     const existing = await this.userRepository.findById(id);
     if (!existing) {
       throw new NotFoundException(`Пользователь #${id} не найден`);

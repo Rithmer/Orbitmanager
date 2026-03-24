@@ -32,6 +32,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   const logout = useCallback(() => {
+    const rt = api.getRefreshToken()
+    if (rt) {
+      authApi.logout(rt).catch(() => {})
+    }
     api.clearTokens()
     clearLastBoardProjectId()
     setUser(null)
@@ -69,19 +73,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const login = async (dto: LoginDto) => {
+  const login = useCallback(async (dto: LoginDto) => {
     const tokens = await authApi.login(dto)
     api.setTokens(tokens.accessToken, tokens.refreshToken)
     const me = await authApi.me()
     setUser(me)
-  }
+  }, [])
 
-  const register = async (dto: RegisterDto) => {
+  const register = useCallback(async (dto: RegisterDto) => {
     const tokens = await authApi.register(dto)
     api.setTokens(tokens.accessToken, tokens.refreshToken)
     const me = await authApi.me()
     setUser(me)
-  }
+  }, [])
 
   const refreshUser = async () => {
     try {

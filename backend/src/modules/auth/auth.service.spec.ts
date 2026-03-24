@@ -1,8 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { UnauthorizedException, ConflictException } from '@nestjs/common';
-import { createHash } from 'crypto';
+import {
+  UnauthorizedException,
+  ConflictException,
+  BadRequestException,
+  HttpException,
+} from '@nestjs/common';
+import * as argon2 from 'argon2';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { AuditService } from '../audit-logs/audit.service';
@@ -22,7 +27,7 @@ const mockUser: User = {
   accountStatus: 'active',
   accountRole: AccountRole.MEMBER,
   avatarUrl: null,
-  discriminator: '0001',
+  lastPasswordChangedAt: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
@@ -65,6 +70,15 @@ const mockAuditService = {
   log: jest.fn().mockResolvedValue(undefined),
 };
 
+const mockPrismaService = {
+  refreshToken: {
+    create: jest.fn().mockResolvedValue({ id: 1 }),
+    findUnique: jest.fn().mockResolvedValue({ id: 1, revokedAt: null }),
+    update: jest.fn().mockResolvedValue({ id: 1 }),
+    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+  },
+};
+
 describe('AuthService', () => {
   let service: AuthService;
 
@@ -76,6 +90,7 @@ describe('AuthService', () => {
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: AuditService, useValue: mockAuditService },
+        { provide: PrismaService, useValue: mockPrismaService },
       ],
     }).compile();
 
@@ -312,7 +327,7 @@ describe('AuthService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('throws TooManyRequestsException when password was changed less than 24 hours ago', async () => {
+    it('throws HttpException 429 when password was changed less than 24 hours ago', async () => {
       const realHash = await argon2.hash('CurrentPassword123!');
       mockUsersService.findEntityById.mockResolvedValueOnce({
         ...mockUser,
@@ -325,7 +340,7 @@ describe('AuthService', () => {
           currentPassword: 'CurrentPassword123!',
           newPassword: 'NewPassword123!',
         }),
-      ).rejects.toThrow(TooManyRequestsException);
+      ).rejects.toThrow(HttpException);
     });
   });
 });

@@ -63,7 +63,7 @@ export class UsersPrismaRepository implements IUserRepository {
     return row ? this.toDomain(row) : null;
   }
 
-  async create(user: Omit<User, 'id' | 'discriminator'>): Promise<User> {
+  async create(user: Omit<User, 'id'>): Promise<User> {
     const row = await this.prisma.user.create({
       data: {
         login: user.login,
@@ -115,6 +115,8 @@ export class UsersPrismaRepository implements IUserRepository {
       profession: row.profession,
       accountStatus: row.accountStatus as User['accountStatus'],
       accountRole: row.accountRole as User['accountRole'],
+      avatarUrl: row.avatarUrl ?? null,
+      lastPasswordChangedAt: row.lastPasswordChangedAt?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };

@@ -34,8 +34,8 @@ export function getRiskBadgeClasses(riskLevel?: RiskLevel) {
 export function getOverdueLabel(task: ProjectBoardTask): boolean {
   return (
     new Date(task.deadline).getTime() < Date.now() &&
-    task.status !== 'done' &&
-    task.status !== 'cancelled'
+    task.status !== TaskStatus.DONE &&
+    task.status !== TaskStatus.CANCELLED
   )
 }
 

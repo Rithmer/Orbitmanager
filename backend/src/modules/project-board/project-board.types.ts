@@ -110,7 +110,7 @@ export class ProjectBoardViewResponseDto {
   @ApiProperty({ description: 'Задачи проекта', type: () => [ProjectBoardTaskDto] })
   tasks!: ProjectBoardTaskDto[];
 
-  @ApiProperty({ description: 'Риск-данные по задачам (ключ — ID задачи)', type: 'object' })
+  @ApiProperty({ description: 'Риск-данные по задачам (ключ — ID задачи)', type: 'object', additionalProperties: true })
   riskByTaskId!: Record<number, TaskRiskOutputDto>;
 }
 

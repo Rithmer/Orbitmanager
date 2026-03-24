@@ -5,8 +5,6 @@ import { ProjectAccessService } from '@/common/access/project-access.service';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { CalendarViewService } from './calendar-view.service';
 
-const NOW = new Date('2026-03-15T12:00:00.000Z');
-
 const makeProjectRecord = (overrides = {}) => ({
   id: 1,
   name: 'Project Alpha',

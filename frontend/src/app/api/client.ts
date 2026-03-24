@@ -79,6 +79,10 @@ class ApiClient {
     return this.accessToken
   }
 
+  getRefreshToken() {
+    return this.refreshToken
+  }
+
   isAuthenticated() {
     return !!this.accessToken
   }

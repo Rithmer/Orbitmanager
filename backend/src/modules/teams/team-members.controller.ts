@@ -97,6 +97,8 @@ export class TeamMembersController {
   }
 
   @Patch('teams/:teamId/members/:id')
+  @UseGuards(TeamRolesGuard)
+  @TeamRoles(TeamRole.OWNER)
   @ApiOperation({ summary: 'Изменить роль участника (только owner)' })
   @ApiResponse({ status: 200, description: 'Роль обновлена' })
   @ApiResponse({ status: 403, description: 'Нет прав' })
@@ -112,6 +114,8 @@ export class TeamMembersController {
   }
 
   @Delete('teams/:teamId/members/:id')
+  @UseGuards(TeamRolesGuard)
+  @TeamRoles(TeamRole.OWNER)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Удалить участника из команды (только owner)' })
   @ApiResponse({ status: 204, description: 'Участник удалён' })

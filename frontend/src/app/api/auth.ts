@@ -14,6 +14,10 @@ export const authApi = {
     return api.post<AuthTokens>('/auth/refresh', { refreshToken })
   },
 
+  logout(refreshToken: string): Promise<void> {
+    return api.post<void>('/auth/logout', { refreshToken })
+  },
+
   me(options: ApiRequestOptions = {}): Promise<User> {
     return api.get<User>('/auth/me', options)
   },

@@ -16,6 +16,8 @@ import { PROJECT_MEMBER_REPOSITORY } from '@/domain/repositories/project-member.
 import { PROJECT_REPOSITORY } from '@/domain/repositories/project.repository';
 import { TASK_REPOSITORY } from '@/domain/repositories/task.repository';
 import { AuditService } from '../audit-logs/audit.service';
+import { InMemoryCacheService } from '@/common/cache/in-memory-cache.service';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { TasksService } from './tasks.service';
 
 const now = new Date();
@@ -134,6 +136,30 @@ describe('TasksService', () => {
         {
           provide: ProjectAccessService,
           useValue: mockProjectAccessService,
+        },
+        {
+          provide: InMemoryCacheService,
+          useValue: { get: jest.fn(), set: jest.fn(), invalidateByPrefix: jest.fn() },
+        },
+        {
+          provide: PrismaService,
+          useValue: {
+            $transaction: jest.fn((fn: (tx: unknown) => Promise<unknown>) =>
+              fn({
+                task: {
+                  create: jest.fn().mockResolvedValue({
+                    ...mockTask,
+                    deadline: new Date(mockTask.deadline),
+                    createdAt: new Date(mockTask.createdAt),
+                    updatedAt: new Date(mockTask.updatedAt),
+                    assignees: [],
+                  }),
+                },
+                auditLog: { create: jest.fn().mockResolvedValue({}) },
+                taskAssignee: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
+              }),
+            ),
+          },
         },
       ],
     }).compile();

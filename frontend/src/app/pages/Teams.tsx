@@ -578,7 +578,7 @@ export function Teams() {
             label="Найти и добавить"
             value={addMemberSearch}
             onChange={setAddMemberSearch}
-            placeholder="Логин, #дискриминатор или ФИО"
+            placeholder="Логин или ФИО"
             required={false}
             hint={
               addMemberUsersError
@@ -616,7 +616,6 @@ export function Teams() {
                     >
                       <span className={`font-semibold ${textPrimary}`}>
                         {u.login}
-                        {u.discriminator ? `#${u.discriminator}` : ''}
                       </span>
                       <span className={`text-xs ${textSecondary}`}>{u.fullName}</span>
                     </button>

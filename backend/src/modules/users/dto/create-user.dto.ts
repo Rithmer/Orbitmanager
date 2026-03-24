@@ -1,6 +1,5 @@
 import {
   IsEnum,
-  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -53,6 +52,11 @@ export class CreateUserDto {
   @IsNotEmpty()
   @MaxLength(100)
   profession?: string;
+
+  @ApiPropertyOptional({ default: 'active', description: 'Статус аккаунта' })
+  @IsString()
+  @IsOptional()
+  accountStatus?: 'active' | 'blocked';
 
   @ApiPropertyOptional({ enum: AccountRole, default: AccountRole.MEMBER })
   @IsEnum(AccountRole)

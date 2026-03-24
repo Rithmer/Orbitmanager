@@ -58,6 +58,18 @@ export class UsersController {
     });
   }
 
+  @Patch('me')
+  @ApiOperation({ summary: 'Обновить свой профиль' })
+  @ApiResponse({ status: 200, description: 'Профиль обновлён' })
+  @ApiResponse({ status: 404, description: 'Пользователь не найден' })
+  @ApiResponse({ status: 429, description: 'Слишком частые обновления' })
+  updateMe(
+    @CurrentUser('id') userId: number,
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return this.usersService.updateMe(userId, dto);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Получить пользователя по ID' })
   @ApiResponse({ status: 200, description: 'Пользователь найден' })

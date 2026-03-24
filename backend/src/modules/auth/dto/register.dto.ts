@@ -1,9 +1,12 @@
 import {
   IsNotEmpty,
-  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
   MinLength,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { StrongPasswordConstraint } from '@/common/validators/strong-password';
 
 export class RegisterDto {
   @ApiProperty({

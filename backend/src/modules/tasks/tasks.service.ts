@@ -43,8 +43,8 @@ export class TasksService {
     private readonly projectMemberRepository: IProjectMemberRepository,
     private readonly auditService: AuditService,
     private readonly projectAccessService: ProjectAccessService,
-    @Optional() private readonly prisma?: PrismaService,
     private readonly cache: InMemoryCacheService,
+    @Optional() private readonly prisma?: PrismaService,
   ) {}
 
   async findAll(

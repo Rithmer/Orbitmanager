@@ -26,7 +26,7 @@ function getHttpStatus(error: unknown): number | undefined {
 export function shouldRetryQuery(failureCount: number, error: unknown): boolean {
   const status = getHttpStatus(error)
 
-  if (typeof status === 'number' && status < 500) {
+  if (typeof status === 'number' && status < 500 && status !== 429) {
     return false
   }
 

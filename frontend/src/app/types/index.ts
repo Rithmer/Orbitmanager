@@ -58,7 +58,6 @@ export const ALLOWED_TASK_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
 export interface User {
   id: number
   login: string
-  discriminator?: string | null
   fullName: string
   profession?: string
   accountStatus: 'active' | 'blocked'

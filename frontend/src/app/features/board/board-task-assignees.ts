@@ -2,7 +2,7 @@ import type { ProjectBoardMember, ProjectBoardTask } from './types'
 
 export function getTaskAssigneeIds(task: ProjectBoardTask): number[] {
   const ids =
-    task.assigneeIds && task.assigneeIds.length >= 0
+    task.assigneeIds && task.assigneeIds.length > 0
       ? task.assigneeIds
       : typeof task.assigneeId === 'number'
         ? [task.assigneeId]

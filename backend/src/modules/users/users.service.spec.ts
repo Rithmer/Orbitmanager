@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import {
   ConflictException,
   NotFoundException,
-  TooManyRequestsException,
+  HttpException,
 } from '@nestjs/common';
 import { TtlCacheService } from '@/common/cache/ttl-cache.service';
 import { UsersService } from './users.service';
@@ -24,7 +24,7 @@ const mockUser: User = {
   accountStatus: 'active',
   accountRole: AccountRole.MEMBER,
   avatarUrl: null,
-  discriminator: '0001',
+  lastPasswordChangedAt: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
@@ -32,7 +32,7 @@ const mockUser: User = {
 const mockUserRepository = {
   findAll: jest.fn().mockResolvedValue([mockUser]),
   findById: jest.fn().mockResolvedValue(mockUser),
-  findPaginated: jest.fn().mockResolvedValue(paginatedUsers),
+  findPage: jest.fn().mockResolvedValue({ items: [mockUser], total: 1 }),
   findByLogin: jest.fn().mockResolvedValue(null),
   create: jest
     .fn()
@@ -114,9 +114,10 @@ describe('UsersService', () => {
       expect(
         (result.items[0] as Record<string, unknown>)['password'],
       ).toBeUndefined();
-      expect(mockUserRepository.findPaginated).toHaveBeenCalledWith(
+      expect(mockUserRepository.findPage).toHaveBeenCalledWith(
         expect.objectContaining({
-          searchFields: ['login', 'fullName', 'profession'],
+          page: 1,
+          limit: 20,
         }),
       );
     });
@@ -166,7 +167,6 @@ describe('UsersService', () => {
         expect.objectContaining({
           login: 'newuser',
           profession: 'Tester',
-          aiHintsEnabled: true,
           lastPasswordChangedAt: null,
         }),
       );
@@ -207,11 +207,11 @@ describe('UsersService', () => {
     it('updates personal settings and writes audit log', async () => {
       const result = await service.updateMe(1, {
         fullName: 'Updated Name',
-        aiHintsEnabled: false,
+        profession: 'Designer',
       });
 
       expect(result.fullName).toBe('Updated Name');
-      expect(result.aiHintsEnabled).toBe(false);
+      expect(result.profession).toBe('Designer');
       expect(mockAuditService.log).toHaveBeenCalledWith(
         1,
         AuditAction.UPDATE,
@@ -221,14 +221,14 @@ describe('UsersService', () => {
       );
     });
 
-    it('throws TooManyRequestsException after 5 changes in 5 minutes', async () => {
+    it('throws HttpException 429 after 5 changes in 5 minutes', async () => {
       for (let index = 0; index < 5; index += 1) {
         await service.updateMe(1, { profession: `Role ${index}` });
       }
 
       await expect(
         service.updateMe(1, { profession: 'One more role' }),
-      ).rejects.toThrow(TooManyRequestsException);
+      ).rejects.toThrow(HttpException);
     });
   });
 
