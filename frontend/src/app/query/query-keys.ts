@@ -36,6 +36,13 @@ export const appQueryKeys = {
       ['reports', 'summary', params ?? null] as const,
     projects: () => ['reports', 'projects'] as const,
   },
+  risks: {
+    projects: (params?: Record<string, unknown>) =>
+      ['risks', 'projects', params ?? null] as const,
+    projectRisks: (params?: Record<string, unknown>) =>
+      ['risks', 'project-risks', params ?? null] as const,
+    taskRisks: (projectId?: number) => ['risks', 'task-risks', projectId ?? null] as const,
+  },
   admin: {
     users: (params?: Record<string, unknown>) => ['admin', 'users', params ?? null] as const,
     audit: (params?: Record<string, unknown>) => ['admin', 'audit', params ?? null] as const,
