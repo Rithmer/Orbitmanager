@@ -42,7 +42,7 @@ const mockMember: TeamMember = {
 
 const mockTeamRepository = {
   findAll: jest.fn().mockResolvedValue([mockTeam]),
-  findPaginated: jest.fn().mockResolvedValue({
+  findPage: jest.fn().mockResolvedValue({
     items: [mockTeam],
     total: 1,
     page: 1,
@@ -163,15 +163,11 @@ describe('TeamsService', () => {
     jest.clearAllMocks();
   });
 
-  // ─── findAll ───
-
   describe('findAll', () => {
     it('should return all teams', async () => {
       const result = await service.findAll({});
-      expect(mockTeamRepository.findPaginated).toHaveBeenCalledWith(
-        expect.objectContaining({
-          searchFields: ['name', 'description'],
-        }),
+      expect(mockTeamRepository.findPage).toHaveBeenCalledWith(
+        expect.objectContaining({ page: 1, limit: 20 }),
       );
       expect(result.items).toHaveLength(1);
       expect(result.items[0].name).toBe('Test Team');
@@ -181,8 +177,6 @@ describe('TeamsService', () => {
       expect(result.totalPages).toBe(1);
     });
   });
-
-  // ─── findById ───
 
   describe('findById', () => {
     it('should return team by id', async () => {
@@ -196,8 +190,6 @@ describe('TeamsService', () => {
     });
   });
 
-  // ─── create ───
-
   describe('create', () => {
     it('should create team and add owner membership', async () => {
       const result = await service.create(
@@ -210,8 +202,6 @@ describe('TeamsService', () => {
       );
     });
   });
-
-  // ─── update ───
 
   describe('update', () => {
     it('should update team if caller is owner', async () => {
@@ -278,8 +268,6 @@ describe('TeamsService', () => {
     });
   });
 
-  // ─── remove ───
-
   describe('remove', () => {
     it('should delete team if caller is owner', async () => {
       await expect(
@@ -342,16 +330,14 @@ describe('TeamsService', () => {
     });
   });
 
-  // ─── addMember ───
-
   describe('addMember', () => {
     it('should throw ConflictException if user already a member', async () => {
       mockTeamMemberRepository.findByUserAndTeam.mockResolvedValueOnce(
         mockOwner,
-      ); // caller = owner
+      );
       mockTeamMemberRepository.findByUserAndTeam.mockResolvedValueOnce(
         mockMember,
-      ); // target already member
+      );
       await expect(
         service.addMember(
           1,

@@ -1,6 +1,7 @@
 export interface ReportsSummaryOverview {
   doneTasks: number
   inProgressTasks: number
+  reviewTasks: number
   newTasks: number
   overdueTasks: number
   totalTasks: number
@@ -32,4 +33,9 @@ export interface ReportsSummaryResponse {
   statusDistribution: ReportsStatusDistributionItem[]
   projectTaskBreakdown: ReportsProjectTaskBreakdownItem[]
   difficultyDistribution: ReportsDifficultyDistributionItem[]
+}
+
+export interface ReportsAccessibleProject {
+  id: number
+  name: string
 }

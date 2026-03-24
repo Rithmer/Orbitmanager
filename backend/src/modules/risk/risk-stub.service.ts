@@ -82,15 +82,20 @@ export class RiskStubService implements IRiskAssessmentService {
           l.action === AuditAction.STATUS_CHANGE,
       ).length;
 
-      const assigneeLoad = task.assigneeId
-        ? tasks.filter(
-            (t) =>
-              t.assigneeId === task.assigneeId &&
-              t.status !== TaskStatus.DONE &&
-              t.status !== TaskStatus.CANCELLED &&
-              t.id !== task.id,
-          ).length
-        : 0;
+      const assigneeLoad =
+        task.assigneeIds.length > 0
+          ? Math.max(
+              ...task.assigneeIds.map((uid) =>
+                tasks.filter(
+                  (t) =>
+                    t.assigneeIds.includes(uid) &&
+                    t.status !== TaskStatus.DONE &&
+                    t.status !== TaskStatus.CANCELLED &&
+                    t.id !== task.id,
+                ).length,
+              ),
+            )
+          : 0;
 
       const input = buildTaskRiskInput(task, statusChangesCount, assigneeLoad);
 
@@ -186,15 +191,20 @@ export class RiskStubService implements IRiskAssessmentService {
             l.action === AuditAction.STATUS_CHANGE,
         ).length;
 
-        const assigneeLoad = task.assigneeId
-          ? tasks.filter(
-              (t) =>
-                t.assigneeId === task.assigneeId &&
-                t.status !== TaskStatus.DONE &&
-                t.status !== TaskStatus.CANCELLED &&
-                t.id !== task.id,
-            ).length
-          : 0;
+        const assigneeLoad =
+          task.assigneeIds.length > 0
+            ? Math.max(
+                ...task.assigneeIds.map((uid) =>
+                  tasks.filter(
+                    (t) =>
+                      t.assigneeIds.includes(uid) &&
+                      t.status !== TaskStatus.DONE &&
+                      t.status !== TaskStatus.CANCELLED &&
+                      t.id !== task.id,
+                  ).length,
+                ),
+              )
+            : 0;
 
         const input = buildTaskRiskInput(
           task,
@@ -239,8 +249,6 @@ export class RiskStubService implements IRiskAssessmentService {
     return result;
   }
 
-  // ────────────── Private helpers ──────────────
-
   private calculateTaskRisk(input: TaskRiskInput): {
     delayProbability: number;
     riskFactors: string[];
@@ -248,36 +256,26 @@ export class RiskStubService implements IRiskAssessmentService {
     const riskFactors: string[] = [];
     let delayProbability: number;
 
-    // Rule 1: Deadline passed
     if (input.daysUntilDeadline < 0) {
       delayProbability = 0.95;
       riskFactors.push('Дедлайн уже прошёл');
-    }
-    // Rule 2: ≤2 days until deadline and status ≠ review
-    else if (
+    } else if (
       input.daysUntilDeadline <= 2 &&
       input.status !== TaskStatus.REVIEW
     ) {
       delayProbability = 0.7;
       riskFactors.push('До дедлайна менее 2 дней, задача не на ревью');
-    }
-    // Rule 3: difficulty ≥ 4 and assignee load > 5
-    else if (input.difficulty >= 4 && input.assigneeLoad > 5) {
+    } else if (input.difficulty >= 4 && input.assigneeLoad > 5) {
       delayProbability = 0.6;
       riskFactors.push('Высокая сложность задачи');
       riskFactors.push('Высокая нагрузка на исполнителя (более 5 задач)');
-    }
-    // Rule 4: difficulty ≥ 3 and ≤5 days
-    else if (input.difficulty >= 3 && input.daysUntilDeadline <= 5) {
+    } else if (input.difficulty >= 3 && input.daysUntilDeadline <= 5) {
       delayProbability = 0.4;
       riskFactors.push('Средняя/высокая сложность при близком дедлайне');
-    }
-    // Rule 5: otherwise
-    else {
+    } else {
       delayProbability = 0.1 + input.difficulty * 0.05;
     }
 
-    // Additional risk factors (informational, don't change probability)
     if (input.assigneeCount === 0) {
       riskFactors.push('Задача не назначена исполнителю');
     }
@@ -302,7 +300,6 @@ export class RiskStubService implements IRiskAssessmentService {
       return now.toISOString();
     }
 
-    // Estimate delay based on risk
     const { delayProbability } = this.calculateTaskRisk(input);
     const totalDuration =
       deadline.getTime() - new Date(input.createdAt).getTime();

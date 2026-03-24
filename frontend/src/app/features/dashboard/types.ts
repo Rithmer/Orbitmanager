@@ -3,6 +3,7 @@ import type { RiskLevel, TaskStatus } from '../../types'
 export interface DashboardSummaryOverview {
   doneTasks: number
   inProgressTasks: number
+  reviewTasks: number
   overdueTasks: number
   totalTasks: number
   progressPercent: number
@@ -17,6 +18,10 @@ export interface DashboardRecentTaskItem {
   status: TaskStatus
   statusLabel: string
   deadline: string
+  // Multi-assignees (new contract)
+  assigneeNames?: string[] | null
+  assigneeCount?: number | null
+  // Legacy single-assignee (old contract)
   assigneeName?: string | null
   isOverdue: boolean
 }

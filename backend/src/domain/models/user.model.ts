@@ -5,11 +5,11 @@ export interface User {
   login: string;
   password: string;
   fullName: string;
-  profession: string;
-  accountStatus: 'active' | 'blocked' | 'inactive';
+  profession?: string;
+  accountStatus: 'active' | 'blocked';
   accountRole: AccountRole;
-  aiHintsEnabled: boolean;
-  lastPasswordChangedAt: string | null;
+  avatarUrl: string | null;
+  discriminator: string;
   createdAt: string;
   updatedAt: string;
 }

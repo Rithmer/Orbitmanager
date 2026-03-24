@@ -9,15 +9,22 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { createHash } from 'crypto';
 import type { StringValue } from 'ms';
+import ms from 'ms';
 import * as argon2 from 'argon2';
 import { User } from '@/domain/models/user.model';
 import { UsersService } from '../users/users.service';
 import { AuditService } from '../audit-logs/audit.service';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { AuditAction } from '@/common/enums/audit-action.enum';
 import { RegisterDto, LoginDto, ChangePasswordDto } from './dto';
 import { JwtPayload } from './jwt.strategy';
+
+function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
 
 export interface TokenPair {
   accessToken: string;
@@ -33,6 +40,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly auditService: AuditService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async register(dto: RegisterDto): Promise<TokenPair> {
@@ -49,11 +57,10 @@ export class AuthService {
       accountRole: AccountRole.MEMBER,
     });
 
-    return this.generateTokens({
-      sub: user.id,
-      login: user.login,
-      accountRole: user.accountRole,
-    });
+    return this.generateTokens(
+      { sub: user.id, login: user.login, accountRole: user.accountRole },
+      user.id,
+    );
   }
 
   async login(dto: LoginDto): Promise<TokenPair> {
@@ -79,11 +86,10 @@ export class AuthService {
       `Пользователь "${user.login}" вошёл в систему`,
     );
 
-    return this.generateTokens({
-      sub: user.id,
-      login: user.login,
-      accountRole: user.accountRole,
-    });
+    return this.generateTokens(
+      { sub: user.id, login: user.login, accountRole: user.accountRole },
+      user.id,
+    );
   }
 
   async getMe(
@@ -145,6 +151,20 @@ export class AuthService {
       throw new UnauthorizedException('Невалидный refresh-токен');
     }
 
+    const hash = hashToken(refreshToken);
+    const stored = await this.prisma.refreshToken.findUnique({
+      where: { tokenHash: hash },
+    });
+
+    if (!stored || stored.revokedAt !== null) {
+      throw new UnauthorizedException('Токен отозван или не найден');
+    }
+
+    await this.prisma.refreshToken.update({
+      where: { tokenHash: hash },
+      data: { revokedAt: new Date() },
+    });
+
     const user = await this.usersService.findEntityById(payload.sub);
     if (!user) {
       throw new UnauthorizedException('Пользователь не найден');
@@ -154,14 +174,24 @@ export class AuthService {
       throw new UnauthorizedException('Аккаунт недоступен для входа');
     }
 
-    return this.generateTokens({
-      sub: user.id,
-      login: user.login,
-      accountRole: user.accountRole,
+    return this.generateTokens(
+      { sub: user.id, login: user.login, accountRole: user.accountRole },
+      user.id,
+    );
+  }
+
+  async logout(refreshToken: string): Promise<void> {
+    const hash = hashToken(refreshToken);
+    await this.prisma.refreshToken.updateMany({
+      where: { tokenHash: hash, revokedAt: null },
+      data: { revokedAt: new Date() },
     });
   }
 
-  private async generateTokens(payload: JwtPayload): Promise<TokenPair> {
+  private async generateTokens(
+    payload: JwtPayload,
+    userId: number,
+  ): Promise<TokenPair> {
     const accessExpiresIn =
       this.configService.get<string>('JWT_ACCESS_EXPIRES_IN') ?? '15m';
     const refreshExpiresIn =
@@ -182,6 +212,16 @@ export class AuthService {
         expiresIn: refreshExpiresIn as StringValue,
       }),
     ]);
+
+    await this.prisma.refreshToken.create({
+      data: {
+        userId,
+        tokenHash: hashToken(refreshToken),
+        expiresAt: new Date(
+          Date.now() + ms(refreshExpiresIn as ms.StringValue),
+        ),
+      },
+    });
 
     return { accessToken, refreshToken };
   }

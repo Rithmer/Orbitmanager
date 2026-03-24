@@ -23,8 +23,8 @@ const mockUser: User = {
   profession: 'Developer',
   accountStatus: 'active',
   accountRole: AccountRole.MEMBER,
-  aiHintsEnabled: true,
-  lastPasswordChangedAt: null,
+  avatarUrl: null,
+  discriminator: '0001',
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
@@ -32,10 +32,7 @@ const mockUser: User = {
 const mockUserRepository = {
   findAll: jest.fn().mockResolvedValue([mockUser]),
   findById: jest.fn().mockResolvedValue(mockUser),
-  findPage: jest.fn().mockResolvedValue({
-    items: [mockUser],
-    total: 1,
-  }),
+  findPaginated: jest.fn().mockResolvedValue(paginatedUsers),
   findByLogin: jest.fn().mockResolvedValue(null),
   create: jest
     .fn()
@@ -117,13 +114,9 @@ describe('UsersService', () => {
       expect(
         (result.items[0] as Record<string, unknown>)['password'],
       ).toBeUndefined();
-      expect(
-        (result.items[0] as Record<string, unknown>)['lastPasswordChangedAt'],
-      ).toBeUndefined();
-      expect(mockUserRepository.findPage).toHaveBeenCalledWith(
+      expect(mockUserRepository.findPaginated).toHaveBeenCalledWith(
         expect.objectContaining({
-          page: 1,
-          limit: 20,
+          searchFields: ['login', 'fullName', 'profession'],
         }),
       );
     });

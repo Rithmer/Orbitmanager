@@ -65,11 +65,6 @@ export class TeamsPrismaRepository implements ITeamRepository {
     return this.toDomain(row);
   }
 
-  /**
-   * Оптимизация: убран предварительный findUnique.
-   * Prisma выбрасывает P2025 если запись не найдена — перехватываем и возвращаем null.
-   * Это сокращает количество запросов к БД с 2 до 1.
-   */
   async update(id: number, partial: Partial<Team>): Promise<Team | null> {
     const {
       id: _id,
@@ -82,7 +77,7 @@ export class TeamsPrismaRepository implements ITeamRepository {
       return this.toDomain(row);
     } catch (e: unknown) {
       const prismaError = e as { code?: string };
-      if (prismaError.code === 'P2025') return null; // Record not found
+      if (prismaError.code === 'P2025') return null;
       throw e;
     }
   }

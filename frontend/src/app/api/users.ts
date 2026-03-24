@@ -27,9 +27,14 @@ export const usersApi = {
       profession: string
       accountRole: string
       accountStatus: string
+      avatarUrl: string | null
     }>,
   ): Promise<User> {
     return api.patch(`/users/${id}`, dto)
+  },
+
+  updateMe(dto: { fullName?: string; profession?: string; avatarUrl?: string | null }): Promise<User> {
+    return api.patch('/users/me', dto)
   },
 
   delete(id: number): Promise<void> {

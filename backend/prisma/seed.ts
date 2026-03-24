@@ -10,8 +10,6 @@ const pool = new pg.Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-// ──────────────────── helpers ────────────────────
-
 function days(n: number): number {
   return n * 24 * 60 * 60 * 1000;
 }
@@ -31,8 +29,6 @@ function futureDate(minDays: number, maxDays: number): Date {
 function pastDate(minDays: number, maxDays: number): Date {
   return new Date(Date.now() - days(randomBetween(minDays, maxDays)));
 }
-
-// ──────────────────── data ────────────────────
 
 const USERS_DATA = [
   { login: 'admin', fullName: 'Администратор Системы', profession: 'System Administrator', accountRole: 'admin' },
@@ -81,7 +77,7 @@ interface TaskDef {
   description: string;
   difficulty: number;
   status: string;
-  assigneeIdx: number | null;
+  assigneeUserIdx: number | null;
   deadlineDaysFromNow: number;
 }
 
@@ -108,12 +104,12 @@ const TEAMS: TeamDef[] = [
           { userIdx: 20, role: 'observer' },
         ],
         tasks: [
-          { name: 'Создать компонент Button', description: 'Варианты: primary, secondary, ghost, danger', difficulty: 2, status: 'done', assigneeIdx: 4, deadlineDaysFromNow: -5 },
-          { name: 'Создать компонент Modal', description: 'Модальное окно с анимацией и overlay', difficulty: 3, status: 'done', assigneeIdx: 14, deadlineDaysFromNow: -3 },
-          { name: 'Компонент DataTable', description: 'Таблица с сортировкой, фильтрацией и пагинацией', difficulty: 5, status: 'in_progress', assigneeIdx: 1, deadlineDaysFromNow: 14 },
-          { name: 'Компонент DatePicker', description: 'Выбор даты и времени с поддержкой диапазонов', difficulty: 4, status: 'in_progress', assigneeIdx: 4, deadlineDaysFromNow: 10 },
-          { name: 'Компонент Toast/Notification', description: 'Всплывающие уведомления с auto-dismiss', difficulty: 2, status: 'new', assigneeIdx: 14, deadlineDaysFromNow: 21 },
-          { name: 'Написать Storybook stories', description: 'Документация для всех компонентов в Storybook', difficulty: 3, status: 'new', assigneeIdx: null, deadlineDaysFromNow: 30 },
+          { name: 'Создать компонент Button', description: 'Варианты: primary, secondary, ghost, danger', difficulty: 2, status: 'done', assigneeUserIdx: 4, deadlineDaysFromNow: -5 },
+          { name: 'Создать компонент Modal', description: 'Модальное окно с анимацией и overlay', difficulty: 3, status: 'done', assigneeUserIdx: 14, deadlineDaysFromNow: -3 },
+          { name: 'Компонент DataTable', description: 'Таблица с сортировкой, фильтрацией и пагинацией', difficulty: 5, status: 'in_progress', assigneeUserIdx: 1, deadlineDaysFromNow: 14 },
+          { name: 'Компонент DatePicker', description: 'Выбор даты и времени с поддержкой диапазонов', difficulty: 4, status: 'in_progress', assigneeUserIdx: 4, deadlineDaysFromNow: 10 },
+          { name: 'Компонент Toast/Notification', description: 'Всплывающие уведомления с auto-dismiss', difficulty: 2, status: 'new', assigneeUserIdx: 14, deadlineDaysFromNow: 21 },
+          { name: 'Написать Storybook stories', description: 'Документация для всех компонентов в Storybook', difficulty: 3, status: 'new', assigneeUserIdx: null, deadlineDaysFromNow: 30 },
         ],
       },
       {
@@ -126,11 +122,11 @@ const TEAMS: TeamDef[] = [
           { userIdx: 6, role: 'developer' },
         ],
         tasks: [
-          { name: 'Дизайн макета Hero секции', description: 'Новый hero-блок с анимацией', difficulty: 3, status: 'done', assigneeIdx: 4, deadlineDaysFromNow: -10 },
-          { name: 'Адаптивная вёрстка', description: 'Mobile-first адаптация всех секций', difficulty: 4, status: 'in_progress', assigneeIdx: 14, deadlineDaysFromNow: 7 },
-          { name: 'Интеграция с аналитикой', description: 'Google Analytics 4 + Яндекс.Метрика', difficulty: 2, status: 'new', assigneeIdx: 6, deadlineDaysFromNow: 14 },
-          { name: 'SEO-оптимизация', description: 'Meta-теги, OpenGraph, структурированные данные', difficulty: 3, status: 'new', assigneeIdx: null, deadlineDaysFromNow: 21 },
-          { name: 'Тестирование на кросс-браузерность', description: 'Chrome, Firefox, Safari, Edge', difficulty: 2, status: 'new', assigneeIdx: 6, deadlineDaysFromNow: 18 },
+          { name: 'Дизайн макета Hero секции', description: 'Новый hero-блок с анимацией', difficulty: 3, status: 'done', assigneeUserIdx: 4, deadlineDaysFromNow: -10 },
+          { name: 'Адаптивная вёрстка', description: 'Mobile-first адаптация всех секций', difficulty: 4, status: 'in_progress', assigneeUserIdx: 14, deadlineDaysFromNow: 7 },
+          { name: 'Интеграция с аналитикой', description: 'Google Analytics 4 + Яндекс.Метрика', difficulty: 2, status: 'new', assigneeUserIdx: 6, deadlineDaysFromNow: 14 },
+          { name: 'SEO-оптимизация', description: 'Meta-теги, OpenGraph, структурированные данные', difficulty: 3, status: 'new', assigneeUserIdx: null, deadlineDaysFromNow: 21 },
+          { name: 'Тестирование на кросс-браузерность', description: 'Chrome, Firefox, Safari, Edge', difficulty: 2, status: 'new', assigneeUserIdx: 6, deadlineDaysFromNow: 18 },
         ],
       },
     ],
@@ -158,13 +154,13 @@ const TEAMS: TeamDef[] = [
           { userIdx: 21, role: 'observer' },
         ],
         tasks: [
-          { name: 'Миграция на Prisma ORM', description: 'Перевод слоя данных с JSON на PostgreSQL через Prisma', difficulty: 5, status: 'done', assigneeIdx: 2, deadlineDaysFromNow: -15 },
-          { name: 'Реализовать пагинацию cursor-based', description: 'Keyset pagination для больших датасетов', difficulty: 4, status: 'in_progress', assigneeIdx: 3, deadlineDaysFromNow: 10 },
-          { name: 'Rate limiting по API key', description: 'Индивидуальные лимиты для каждого клиента', difficulty: 3, status: 'in_progress', assigneeIdx: 13, deadlineDaysFromNow: 12 },
-          { name: 'WebSocket нотификации', description: 'Real-time уведомления через Socket.IO', difficulty: 4, status: 'new', assigneeIdx: 16, deadlineDaysFromNow: 25 },
-          { name: 'Кэширование Redis', description: 'Кэш для частых запросов (списки, справочники)', difficulty: 4, status: 'new', assigneeIdx: 3, deadlineDaysFromNow: 20 },
-          { name: 'Health checks и метрики', description: 'Prometheus метрики + health endpoint', difficulty: 2, status: 'review', assigneeIdx: 16, deadlineDaysFromNow: 5 },
-          { name: 'API versioning', description: 'Поддержка v1/v2 через URL prefix', difficulty: 3, status: 'new', assigneeIdx: null, deadlineDaysFromNow: 30 },
+          { name: 'Миграция на Prisma ORM', description: 'Перевод слоя данных с JSON на PostgreSQL через Prisma', difficulty: 5, status: 'done', assigneeUserIdx: 2, deadlineDaysFromNow: -15 },
+          { name: 'Реализовать пагинацию cursor-based', description: 'Keyset pagination для больших датасетов', difficulty: 4, status: 'in_progress', assigneeUserIdx: 3, deadlineDaysFromNow: 10 },
+          { name: 'Rate limiting по API key', description: 'Индивидуальные лимиты для каждого клиента', difficulty: 3, status: 'in_progress', assigneeUserIdx: 13, deadlineDaysFromNow: 12 },
+          { name: 'WebSocket нотификации', description: 'Real-time уведомления через Socket.IO', difficulty: 4, status: 'new', assigneeUserIdx: 16, deadlineDaysFromNow: 25 },
+          { name: 'Кэширование Redis', description: 'Кэш для частых запросов (списки, справочники)', difficulty: 4, status: 'new', assigneeUserIdx: 3, deadlineDaysFromNow: 20 },
+          { name: 'Health checks и метрики', description: 'Prometheus метрики + health endpoint', difficulty: 2, status: 'review', assigneeUserIdx: 16, deadlineDaysFromNow: 5 },
+          { name: 'API versioning', description: 'Поддержка v1/v2 через URL prefix', difficulty: 3, status: 'new', assigneeUserIdx: null, deadlineDaysFromNow: 30 },
         ],
       },
     ],
@@ -188,12 +184,12 @@ const TEAMS: TeamDef[] = [
           { userIdx: 16, role: 'developer' },
         ],
         tasks: [
-          { name: 'GitHub Actions workflow', description: 'Build → test → lint → deploy pipeline', difficulty: 4, status: 'done', assigneeIdx: 5, deadlineDaysFromNow: -20 },
-          { name: 'Docker multi-stage build', description: 'Оптимизация размера образов', difficulty: 3, status: 'done', assigneeIdx: 18, deadlineDaysFromNow: -12 },
-          { name: 'Kubernetes манифесты', description: 'Deployment, Service, Ingress для prod', difficulty: 5, status: 'in_progress', assigneeIdx: 5, deadlineDaysFromNow: 15 },
-          { name: 'Настройка Grafana дашборда', description: 'Мониторинг CPU/RAM/latency/errors', difficulty: 3, status: 'new', assigneeIdx: 18, deadlineDaysFromNow: 20 },
-          { name: 'SSL сертификаты auto-renew', description: 'Let\'s Encrypt + cert-manager', difficulty: 2, status: 'new', assigneeIdx: 16, deadlineDaysFromNow: 25 },
-          { name: 'Backup автоматизация', description: 'Ежедневные бекапы БД в S3', difficulty: 3, status: 'review', assigneeIdx: 5, deadlineDaysFromNow: 3 },
+          { name: 'GitHub Actions workflow', description: 'Build → test → lint → deploy pipeline', difficulty: 4, status: 'done', assigneeUserIdx: 5, deadlineDaysFromNow: -20 },
+          { name: 'Docker multi-stage build', description: 'Оптимизация размера образов', difficulty: 3, status: 'done', assigneeUserIdx: 18, deadlineDaysFromNow: -12 },
+          { name: 'Kubernetes манифесты', description: 'Deployment, Service, Ingress для prod', difficulty: 5, status: 'in_progress', assigneeUserIdx: 5, deadlineDaysFromNow: 15 },
+          { name: 'Настройка Grafana дашборда', description: 'Мониторинг CPU/RAM/latency/errors', difficulty: 3, status: 'new', assigneeUserIdx: 18, deadlineDaysFromNow: 20 },
+          { name: 'SSL сертификаты auto-renew', description: 'Let\'s Encrypt + cert-manager', difficulty: 2, status: 'new', assigneeUserIdx: 16, deadlineDaysFromNow: 25 },
+          { name: 'Backup автоматизация', description: 'Ежедневные бекапы БД в S3', difficulty: 3, status: 'review', assigneeUserIdx: 5, deadlineDaysFromNow: 3 },
         ],
       },
     ],
@@ -219,11 +215,11 @@ const TEAMS: TeamDef[] = [
           { userIdx: 20, role: 'observer' },
         ],
         tasks: [
-          { name: 'Playwright setup', description: 'Настройка Playwright для E2E тестирования', difficulty: 3, status: 'done', assigneeIdx: 15, deadlineDaysFromNow: -8 },
-          { name: 'Page Object Model', description: 'Создать POM для основных страниц', difficulty: 4, status: 'in_progress', assigneeIdx: 6, deadlineDaysFromNow: 8 },
-          { name: 'API тесты (Supertest)', description: 'Покрытие всех endpoints E2E тестами', difficulty: 4, status: 'in_progress', assigneeIdx: 12, deadlineDaysFromNow: 12 },
-          { name: 'Тесты безопасности OWASP', description: 'Проверка на основные уязвимости', difficulty: 5, status: 'new', assigneeIdx: null, deadlineDaysFromNow: 30 },
-          { name: 'Отчётность Allure', description: 'Интеграция Allure Reporter с CI', difficulty: 2, status: 'new', assigneeIdx: 6, deadlineDaysFromNow: 18 },
+          { name: 'Playwright setup', description: 'Настройка Playwright для E2E тестирования', difficulty: 3, status: 'done', assigneeUserIdx: 15, deadlineDaysFromNow: -8 },
+          { name: 'Page Object Model', description: 'Создать POM для основных страниц', difficulty: 4, status: 'in_progress', assigneeUserIdx: 6, deadlineDaysFromNow: 8 },
+          { name: 'API тесты (Supertest)', description: 'Покрытие всех endpoints E2E тестами', difficulty: 4, status: 'in_progress', assigneeUserIdx: 12, deadlineDaysFromNow: 12 },
+          { name: 'Тесты безопасности OWASP', description: 'Проверка на основные уязвимости', difficulty: 5, status: 'new', assigneeUserIdx: null, deadlineDaysFromNow: 30 },
+          { name: 'Отчётность Allure', description: 'Интеграция Allure Reporter с CI', difficulty: 2, status: 'new', assigneeUserIdx: 6, deadlineDaysFromNow: 18 },
         ],
       },
     ],
@@ -249,12 +245,12 @@ const TEAMS: TeamDef[] = [
           { userIdx: 4, role: 'developer' },
         ],
         tasks: [
-          { name: 'Экран авторизации', description: 'Login/Register с biometric auth', difficulty: 3, status: 'done', assigneeIdx: 9, deadlineDaysFromNow: -14 },
-          { name: 'Список задач', description: 'Экран со списком задач, pull-to-refresh, infinite scroll', difficulty: 4, status: 'done', assigneeIdx: 3, deadlineDaysFromNow: -7 },
-          { name: 'Push-уведомления', description: 'Firebase Cloud Messaging для Android и iOS', difficulty: 4, status: 'in_progress', assigneeIdx: 14, deadlineDaysFromNow: 10 },
-          { name: 'Оффлайн режим', description: 'SQLite + синхронизация при подключении', difficulty: 5, status: 'new', assigneeIdx: 3, deadlineDaysFromNow: 28 },
-          { name: 'Тёмная тема', description: 'Dark mode с системными настройками', difficulty: 2, status: 'in_progress', assigneeIdx: 4, deadlineDaysFromNow: 6 },
-          { name: 'Экран календаря', description: 'Календарь событий с drag-and-drop', difficulty: 4, status: 'new', assigneeIdx: 9, deadlineDaysFromNow: 21 },
+          { name: 'Экран авторизации', description: 'Login/Register с biometric auth', difficulty: 3, status: 'done', assigneeUserIdx: 9, deadlineDaysFromNow: -14 },
+          { name: 'Список задач', description: 'Экран со списком задач, pull-to-refresh, infinite scroll', difficulty: 4, status: 'done', assigneeUserIdx: 3, deadlineDaysFromNow: -7 },
+          { name: 'Push-уведомления', description: 'Firebase Cloud Messaging для Android и iOS', difficulty: 4, status: 'in_progress', assigneeUserIdx: 14, deadlineDaysFromNow: 10 },
+          { name: 'Оффлайн режим', description: 'SQLite + синхронизация при подключении', difficulty: 5, status: 'new', assigneeUserIdx: 3, deadlineDaysFromNow: 28 },
+          { name: 'Тёмная тема', description: 'Dark mode с системными настройками', difficulty: 2, status: 'in_progress', assigneeUserIdx: 4, deadlineDaysFromNow: 6 },
+          { name: 'Экран календаря', description: 'Календарь событий с drag-and-drop', difficulty: 4, status: 'new', assigneeUserIdx: 9, deadlineDaysFromNow: 21 },
         ],
       },
     ],
@@ -278,11 +274,11 @@ const TEAMS: TeamDef[] = [
           { userIdx: 11, role: 'developer' },
         ],
         tasks: [
-          { name: 'KPI виджеты', description: 'Карточки с ключевыми показателями', difficulty: 3, status: 'done', assigneeIdx: 8, deadlineDaysFromNow: -6 },
-          { name: 'Графики активности', description: 'Chart.js графики: задачи по дням, burndown', difficulty: 4, status: 'in_progress', assigneeIdx: 19, deadlineDaysFromNow: 8 },
-          { name: 'Экспорт в CSV/PDF', description: 'Выгрузка отчётов в разных форматах', difficulty: 3, status: 'new', assigneeIdx: 11, deadlineDaysFromNow: 16 },
-          { name: 'Фильтры по периоду', description: 'Выбор периода: неделя/месяц/квартал/custom', difficulty: 2, status: 'in_progress', assigneeIdx: 8, deadlineDaysFromNow: 5 },
-          { name: 'Email отчёты', description: 'Автоматическая рассылка еженедельных отчётов', difficulty: 4, status: 'new', assigneeIdx: null, deadlineDaysFromNow: 28 },
+          { name: 'KPI виджеты', description: 'Карточки с ключевыми показателями', difficulty: 3, status: 'done', assigneeUserIdx: 8, deadlineDaysFromNow: -6 },
+          { name: 'Графики активности', description: 'Chart.js графики: задачи по дням, burndown', difficulty: 4, status: 'in_progress', assigneeUserIdx: 19, deadlineDaysFromNow: 8 },
+          { name: 'Экспорт в CSV/PDF', description: 'Выгрузка отчётов в разных форматах', difficulty: 3, status: 'new', assigneeUserIdx: 11, deadlineDaysFromNow: 16 },
+          { name: 'Фильтры по периоду', description: 'Выбор периода: неделя/месяц/квартал/custom', difficulty: 2, status: 'in_progress', assigneeUserIdx: 8, deadlineDaysFromNow: 5 },
+          { name: 'Email отчёты', description: 'Автоматическая рассылка еженедельных отчётов', difficulty: 4, status: 'new', assigneeUserIdx: null, deadlineDaysFromNow: 28 },
         ],
       },
     ],
@@ -308,12 +304,12 @@ const TEAMS: TeamDef[] = [
           { userIdx: 21, role: 'observer' },
         ],
         tasks: [
-          { name: 'Pentest веб-приложения', description: 'Тестирование на проникновение: XSS, CSRF, SQLi', difficulty: 5, status: 'in_progress', assigneeIdx: 18, deadlineDaysFromNow: 14 },
-          { name: 'Ревью JWT реализации', description: 'Проверка безопасности токенов, ротация, хранение', difficulty: 4, status: 'done', assigneeIdx: 13, deadlineDaysFromNow: -4 },
-          { name: 'RBAC аудит', description: 'Проверка корректности разграничения прав', difficulty: 3, status: 'in_progress', assigneeIdx: 5, deadlineDaysFromNow: 10 },
-          { name: 'Логирование security events', description: 'Мониторинг подозрительной активности', difficulty: 4, status: 'new', assigneeIdx: 18, deadlineDaysFromNow: 22 },
-          { name: 'Compliance checklist', description: 'Подготовка документации соответствия стандартам', difficulty: 2, status: 'new', assigneeIdx: null, deadlineDaysFromNow: 30 },
-          { name: 'Dependency audit', description: 'npm audit + Snyk сканирование зависимостей', difficulty: 2, status: 'review', assigneeIdx: 5, deadlineDaysFromNow: 3 },
+          { name: 'Pentest веб-приложения', description: 'Тестирование на проникновение: XSS, CSRF, SQLi', difficulty: 5, status: 'in_progress', assigneeUserIdx: 18, deadlineDaysFromNow: 14 },
+          { name: 'Ревью JWT реализации', description: 'Проверка безопасности токенов, ротация, хранение', difficulty: 4, status: 'done', assigneeUserIdx: 13, deadlineDaysFromNow: -4 },
+          { name: 'RBAC аудит', description: 'Проверка корректности разграничения прав', difficulty: 3, status: 'in_progress', assigneeUserIdx: 5, deadlineDaysFromNow: 10 },
+          { name: 'Логирование security events', description: 'Мониторинг подозрительной активности', difficulty: 4, status: 'new', assigneeUserIdx: 18, deadlineDaysFromNow: 22 },
+          { name: 'Compliance checklist', description: 'Подготовка документации соответствия стандартам', difficulty: 2, status: 'new', assigneeUserIdx: null, deadlineDaysFromNow: 30 },
+          { name: 'Dependency audit', description: 'npm audit + Snyk сканирование зависимостей', difficulty: 2, status: 'review', assigneeUserIdx: 5, deadlineDaysFromNow: 3 },
         ],
       },
     ],
@@ -339,12 +335,12 @@ const TEAMS: TeamDef[] = [
           { userIdx: 10, role: 'developer' },
         ],
         tasks: [
-          { name: 'Анализ обратной связи', description: 'Систематизация фидбэка от пользователей', difficulty: 2, status: 'done', assigneeIdx: 7, deadlineDaysFromNow: -10 },
-          { name: 'Приоритизация фич (RICE)', description: 'Скоринг backlog методом RICE', difficulty: 3, status: 'done', assigneeIdx: 17, deadlineDaysFromNow: -5 },
-          { name: 'User Story Mapping', description: 'Карта пользовательских историй для Q2', difficulty: 3, status: 'in_progress', assigneeIdx: 12, deadlineDaysFromNow: 7 },
-          { name: 'Конкурентный анализ', description: 'Сравнение с Jira, Asana, ClickUp, Notion', difficulty: 3, status: 'in_progress', assigneeIdx: 10, deadlineDaysFromNow: 10 },
-          { name: 'OKR планирование', description: 'Objectives and Key Results для команды', difficulty: 2, status: 'new', assigneeIdx: 7, deadlineDaysFromNow: 14 },
-          { name: 'Презентация для стейкхолдеров', description: 'Подготовка квартального отчёта', difficulty: 2, status: 'new', assigneeIdx: 17, deadlineDaysFromNow: 20 },
+          { name: 'Анализ обратной связи', description: 'Систематизация фидбэка от пользователей', difficulty: 2, status: 'done', assigneeUserIdx: 7, deadlineDaysFromNow: -10 },
+          { name: 'Приоритизация фич (RICE)', description: 'Скоринг backlog методом RICE', difficulty: 3, status: 'done', assigneeUserIdx: 17, deadlineDaysFromNow: -5 },
+          { name: 'User Story Mapping', description: 'Карта пользовательских историй для Q2', difficulty: 3, status: 'in_progress', assigneeUserIdx: 12, deadlineDaysFromNow: 7 },
+          { name: 'Конкурентный анализ', description: 'Сравнение с Jira, Asana, ClickUp, Notion', difficulty: 3, status: 'in_progress', assigneeUserIdx: 10, deadlineDaysFromNow: 10 },
+          { name: 'OKR планирование', description: 'Objectives and Key Results для команды', difficulty: 2, status: 'new', assigneeUserIdx: 7, deadlineDaysFromNow: 14 },
+          { name: 'Презентация для стейкхолдеров', description: 'Подготовка квартального отчёта', difficulty: 2, status: 'new', assigneeUserIdx: 17, deadlineDaysFromNow: 20 },
         ],
       },
     ],
@@ -370,13 +366,13 @@ const TEAMS: TeamDef[] = [
           { userIdx: 20, role: 'observer' },
         ],
         tasks: [
-          { name: 'Сбор данных для обучения', description: 'Генерация синтетического датасета (1000+ записей)', difficulty: 3, status: 'done', assigneeIdx: 19, deadlineDaysFromNow: -12 },
-          { name: 'Feature engineering', description: 'Выделение признаков: сложность, дедлайн, нагрузка', difficulty: 4, status: 'done', assigneeIdx: 8, deadlineDaysFromNow: -7 },
-          { name: 'Обучение Gradient Boosting', description: 'Регрессионная модель для прогноза времени', difficulty: 5, status: 'in_progress', assigneeIdx: 19, deadlineDaysFromNow: 10 },
-          { name: 'Logistic Regression классификатор', description: 'Бинарная классификация: срыв/не-срыв', difficulty: 4, status: 'in_progress', assigneeIdx: 8, deadlineDaysFromNow: 12 },
-          { name: 'Валидация модели', description: 'Cross-validation, метрики: F1, AUC-ROC, MAE', difficulty: 3, status: 'new', assigneeIdx: 11, deadlineDaysFromNow: 18 },
-          { name: 'REST API для inference', description: 'Эндпоинты для получения предсказаний', difficulty: 3, status: 'new', assigneeIdx: null, deadlineDaysFromNow: 25 },
-          { name: 'A/B тест rule-based vs ML', description: 'Сравнение текущего stub с ML-моделью', difficulty: 3, status: 'new', assigneeIdx: 19, deadlineDaysFromNow: 30 },
+          { name: 'Сбор данных для обучения', description: 'Генерация синтетического датасета (1000+ записей)', difficulty: 3, status: 'done', assigneeUserIdx: 19, deadlineDaysFromNow: -12 },
+          { name: 'Feature engineering', description: 'Выделение признаков: сложность, дедлайн, нагрузка', difficulty: 4, status: 'done', assigneeUserIdx: 8, deadlineDaysFromNow: -7 },
+          { name: 'Обучение Gradient Boosting', description: 'Регрессионная модель для прогноза времени', difficulty: 5, status: 'in_progress', assigneeUserIdx: 19, deadlineDaysFromNow: 10 },
+          { name: 'Logistic Regression классификатор', description: 'Бинарная классификация: срыв/не-срыв', difficulty: 4, status: 'in_progress', assigneeUserIdx: 8, deadlineDaysFromNow: 12 },
+          { name: 'Валидация модели', description: 'Cross-validation, метрики: F1, AUC-ROC, MAE', difficulty: 3, status: 'new', assigneeUserIdx: 11, deadlineDaysFromNow: 18 },
+          { name: 'REST API для inference', description: 'Эндпоинты для получения предсказаний', difficulty: 3, status: 'new', assigneeUserIdx: null, deadlineDaysFromNow: 25 },
+          { name: 'A/B тест rule-based vs ML', description: 'Сравнение текущего stub с ML-моделью', difficulty: 3, status: 'new', assigneeUserIdx: 19, deadlineDaysFromNow: 30 },
         ],
       },
     ],
@@ -400,12 +396,12 @@ const TEAMS: TeamDef[] = [
           { userIdx: 12, role: 'developer' },
         ],
         tasks: [
-          { name: 'Swagger полная документация', description: 'Описание всех endpoints с примерами', difficulty: 3, status: 'done', assigneeIdx: 10, deadlineDaysFromNow: -8 },
-          { name: 'Архитектурная схема', description: 'Диаграммы C4: контекст, контейнеры, компоненты', difficulty: 3, status: 'in_progress', assigneeIdx: 12, deadlineDaysFromNow: 7 },
-          { name: 'Гайд по развёртыванию', description: 'Пошаговая инструкция: Docker, env, миграции', difficulty: 2, status: 'done', assigneeIdx: 7, deadlineDaysFromNow: -3 },
-          { name: 'Пользовательская инструкция', description: 'Руководство для конечных пользователей', difficulty: 3, status: 'in_progress', assigneeIdx: 10, deadlineDaysFromNow: 14 },
-          { name: 'Changelog и Release Notes', description: 'Автоматизация CHANGELOG из коммитов', difficulty: 2, status: 'new', assigneeIdx: null, deadlineDaysFromNow: 21 },
-          { name: 'Contributing guide', description: 'Правила контрибуции в проект', difficulty: 1, status: 'new', assigneeIdx: 12, deadlineDaysFromNow: 18 },
+          { name: 'Swagger полная документация', description: 'Описание всех endpoints с примерами', difficulty: 3, status: 'done', assigneeUserIdx: 10, deadlineDaysFromNow: -8 },
+          { name: 'Архитектурная схема', description: 'Диаграммы C4: контекст, контейнеры, компоненты', difficulty: 3, status: 'in_progress', assigneeUserIdx: 12, deadlineDaysFromNow: 7 },
+          { name: 'Гайд по развёртыванию', description: 'Пошаговая инструкция: Docker, env, миграции', difficulty: 2, status: 'done', assigneeUserIdx: 7, deadlineDaysFromNow: -3 },
+          { name: 'Пользовательская инструкция', description: 'Руководство для конечных пользователей', difficulty: 3, status: 'in_progress', assigneeUserIdx: 10, deadlineDaysFromNow: 14 },
+          { name: 'Changelog и Release Notes', description: 'Автоматизация CHANGELOG из коммитов', difficulty: 2, status: 'new', assigneeUserIdx: null, deadlineDaysFromNow: 21 },
+          { name: 'Contributing guide', description: 'Правила контрибуции в проект', difficulty: 1, status: 'new', assigneeUserIdx: 12, deadlineDaysFromNow: 18 },
         ],
       },
     ],
@@ -413,8 +409,6 @@ const TEAMS: TeamDef[] = [
 ];
 
 const EVENT_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
-
-// ──────────────────── main ────────────────────
 
 async function main(): Promise<void> {
   console.log('Cleaning database...');
@@ -427,7 +421,6 @@ async function main(): Promise<void> {
   await prisma.team.deleteMany();
   await prisma.user.deleteMany();
 
-  // Reset sequences
   await prisma.$executeRawUnsafe(`ALTER SEQUENCE users_id_seq RESTART WITH 1`);
   await prisma.$executeRawUnsafe(`ALTER SEQUENCE teams_id_seq RESTART WITH 1`);
   await prisma.$executeRawUnsafe(`ALTER SEQUENCE team_members_id_seq RESTART WITH 1`);
@@ -437,7 +430,6 @@ async function main(): Promise<void> {
   await prisma.$executeRawUnsafe(`ALTER SEQUENCE audit_logs_id_seq RESTART WITH 1`);
   await prisma.$executeRawUnsafe(`ALTER SEQUENCE calendar_events_id_seq RESTART WITH 1`);
 
-  // ── Users ──
   console.log('Creating users...');
   const password = await argon2.hash('Password123!');
   const adminPassword = await argon2.hash('Admin123!');
@@ -458,7 +450,6 @@ async function main(): Promise<void> {
   }
   console.log(`  Created ${userIds.length} users`);
 
-  // ── Teams, Members, Projects, Tasks ──
   let totalTeams = 0;
   let totalMembers = 0;
   let totalProjects = 0;
@@ -478,13 +469,11 @@ async function main(): Promise<void> {
     });
     totalTeams++;
 
-    // Owner as team member
     await prisma.teamMember.create({
       data: { userId: ownerId, teamId: team.id, teamRole: 'owner' },
     });
     totalMembers++;
 
-    // Other members
     for (const m of teamDef.members) {
       await prisma.teamMember.create({
         data: {
@@ -496,7 +485,6 @@ async function main(): Promise<void> {
       totalMembers++;
     }
 
-    // Projects
     for (const projDef of teamDef.projects) {
       const project = await prisma.project.create({
         data: {
@@ -508,7 +496,6 @@ async function main(): Promise<void> {
       });
       totalProjects++;
 
-      // Project members
       for (const pm of projDef.members) {
         await prisma.projectMember.create({
           data: {
@@ -519,7 +506,6 @@ async function main(): Promise<void> {
         });
       }
 
-      // Tasks
       for (const taskDef of projDef.tasks) {
         const deadline =
           taskDef.deadlineDaysFromNow >= 0
@@ -533,7 +519,7 @@ async function main(): Promise<void> {
               ? pastDate(7, 15)
               : pastDate(1, 5);
 
-        const assigneeId = taskDef.assigneeIdx !== null ? userIds[taskDef.assigneeIdx] : null;
+        const assigneeUserId = taskDef.assigneeUserIdx !== null ? userIds[taskDef.assigneeUserIdx] : null;
         const creatorId = userIds[teamDef.ownerIdx];
 
         const task = await prisma.task.create({
@@ -544,14 +530,15 @@ async function main(): Promise<void> {
             deadline,
             status: taskDef.status,
             difficulty: taskDef.difficulty,
-            assigneeId,
+            ...(assigneeUserId !== null && {
+              assignees: { create: { userId: assigneeUserId } },
+            }),
             createdById: creatorId,
             createdAt,
           },
         });
         totalTasks++;
 
-        // Audit log for task creation
         await prisma.auditLog.create({
           data: {
             userId: creatorId,
@@ -563,7 +550,6 @@ async function main(): Promise<void> {
           },
         });
 
-        // Status change audit if not 'new'
         if (taskDef.status !== 'new') {
           const transitions: Record<string, string[]> = {
             in_progress: ['new', 'in_progress'],
@@ -575,7 +561,7 @@ async function main(): Promise<void> {
             for (let i = 1; i < chain.length; i++) {
               await prisma.auditLog.create({
                 data: {
-                  userId: assigneeId ?? creatorId,
+                  userId: assigneeUserId ?? creatorId,
                   action: 'status_change',
                   entityType: 'task',
                   entityId: task.id,
@@ -591,12 +577,11 @@ async function main(): Promise<void> {
           }
         }
 
-        // Calendar event for tasks with deadlines (50% chance)
-        if (assigneeId && Math.random() > 0.5) {
+        if (assigneeUserId && Math.random() > 0.5) {
           const eventStart = new Date(deadline.getTime() - days(1));
           await prisma.calendarEvent.create({
             data: {
-              userId: assigneeId,
+              userId: assigneeUserId,
               projectId: project.id,
               taskId: task.id,
               title: `Дедлайн: ${taskDef.name}`,
@@ -613,7 +598,6 @@ async function main(): Promise<void> {
     }
   }
 
-  // ── Standalone calendar events (meetings, standups, etc.) ──
   console.log('Creating standalone calendar events...');
 
   const meetingEvents = [
@@ -650,7 +634,6 @@ async function main(): Promise<void> {
     }
   }
 
-  // Personal events for various users
   const personalEvents = [
     'Отпуск', 'Больничный', 'Обучение', 'Конференция', 'Хакатон',
     'Собеседование кандидата', 'Подготовка отчёта', 'Обновление документации',
@@ -693,7 +676,6 @@ async function main(): Promise<void> {
     totalEvents++;
   }
 
-  // Login audit for all users
   for (let i = 0; i < userIds.length - 1; i++) {
     await prisma.auditLog.create({
       data: {

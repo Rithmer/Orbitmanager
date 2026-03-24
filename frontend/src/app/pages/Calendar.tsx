@@ -13,7 +13,7 @@ import {
   Tag,
 } from 'lucide-react'
 import { useTheme } from '../context/useTheme'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 import { tasksApi } from '../api/tasks'
 import { calendarApi } from '../api/calendar'
 import { projectsApi } from '../api/projects'
@@ -75,6 +75,14 @@ const DURATION_OPTIONS = [
   { value: '480', label: '8 часов (весь день)' },
 ]
 
+function getCalendarFallbackErrorMessage(source: 'projects' | 'events'): string {
+  if (source === 'projects') {
+    return 'Список проектов временно недоступен. Доступны задачи и события.'
+  }
+
+  return 'Список событий временно недоступен. Проверьте соединение и попробуйте снова.'
+}
+
 function formatDuration(startDate: string, endDate: string): string {
   const diffMs = new Date(endDate).getTime() - new Date(startDate).getTime()
   const mins = Math.round(diffMs / 60000)
@@ -83,10 +91,6 @@ function formatDuration(startDate: string, endDate: string): string {
   const remainMins = mins % 60
   if (remainMins === 0) return `${hrs} ч`
   return `${hrs} ч ${remainMins} мин`
-}
-
-function getDaysInMonth(year: number, month: number) {
-  return new Date(year, month, 0).getDate()
 }
 
 function getFirstDayOfMonth(year: number, month: number) {
@@ -117,6 +121,7 @@ export function Calendar() {
   const [formDuration, setFormDuration] = useState('60')
   const [formColor, setFormColor] = useState('#3b82f6')
   const [formProjectId, setFormProjectId] = useState('')
+  const [formAllDay, setFormAllDay] = useState(false)
   const [formLoading, setFormLoading] = useState(false)
   const [formError, setFormError] = useState('')
 
@@ -136,12 +141,14 @@ export function Calendar() {
     try {
       const [tasksRes, projectsRes] = await Promise.all([
         tasksApi.list({ limit: 500 }),
-        projectsApi.list({ limit: 100 }).catch((e) => { console.warn('Failed to load projects:', e); return { items: [] as Project[], total: 0, page: 1, limit: 100, totalPages: 0 } }),
+        projectsApi.list({ limit: 100 }).catch(() => {
+          setError(getCalendarFallbackErrorMessage('projects'))
+          return { items: [] as Project[], total: 0, page: 1, limit: 100, totalPages: 0 }
+        }),
       ])
       setTasks(tasksRes.items)
       setProjects(projectsRes.items)
-    } catch (e) {
-      console.error('Calendar: failed to load static data:', e)
+    } catch {
       setError('Не удалось загрузить данные календаря. Попробуйте обновить страницу.')
     }
   }, [])
@@ -150,13 +157,13 @@ export function Calendar() {
     try {
       const from = new Date(currentYear, currentMonth - 1, 1).toISOString()
       const to = new Date(currentYear, currentMonth, 0, 23, 59, 59).toISOString()
-      const eventsRes = await calendarApi.list({ limit: 500, from, to }).catch((e) => {
-        console.warn('Failed to load calendar events:', e)
+      const eventsRes = await calendarApi.list({ limit: 500, from, to }).catch(() => {
+        setError(getCalendarFallbackErrorMessage('events'))
         return { items: [] as CalendarEvent[], total: 0, page: 1, limit: 500, totalPages: 0 }
       })
       setEvents(eventsRes.items)
-    } catch (e) {
-      console.error('Calendar: failed to load events:', e)
+    } catch {
+      setError('Не удалось загрузить события календаря. Попробуйте обновить страницу.')
     }
   }, [currentYear, currentMonth])
 
@@ -178,13 +185,18 @@ export function Calendar() {
     return projects.find((p) => p.id === projectId)?.name || ''
   }
 
-  const getItemsForDay = (day: number): CalItem[] => {
-    const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  const toLocalDateStr = (isoString: string): string => {
+    const d = new Date(isoString)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+
+  const getItemsForDate = (year: number, month: number, day: number): CalItem[] => {
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
     const items: CalItem[] = []
 
     if (filterType === 'all' || filterType === 'tasks') {
       tasks
-        .filter((t) => t.deadline && t.deadline.startsWith(dateStr))
+        .filter((t) => t.deadline && toLocalDateStr(t.deadline) === dateStr)
         .forEach((t) => {
           const sc = STATUS_COLORS[t.status] || STATUS_COLORS[TaskStatus.NEW]
           items.push({
@@ -204,7 +216,7 @@ export function Calendar() {
 
     if (filterType === 'all' || filterType === 'events') {
       events
-        .filter((e) => e.startDate.startsWith(dateStr))
+        .filter((e) => toLocalDateStr(e.startDate) === dateStr)
         .forEach((e) => {
           items.push({
             id: `event-${e.id}`,
@@ -224,27 +236,32 @@ export function Calendar() {
     return items.sort((a, b) => a.time.localeCompare(b.time))
   }
 
-  const daysInMonth = getDaysInMonth(currentYear, currentMonth)
   const firstDayOfMonth = getFirstDayOfMonth(currentYear, currentMonth)
 
   const prevMonth = () => {
+    setSelectedDay(null)
     if (currentMonth === 1) { setCurrentMonth(12); setCurrentYear(currentYear - 1) }
     else setCurrentMonth(currentMonth - 1)
   }
 
   const nextMonth = () => {
+    setSelectedDay(null)
     if (currentMonth === 12) { setCurrentMonth(1); setCurrentYear(currentYear + 1) }
     else setCurrentMonth(currentMonth + 1)
   }
 
-  const isToday = (day: number) =>
-    today.getFullYear() === currentYear && today.getMonth() + 1 === currentMonth && today.getDate() === day
+  const isToday = (year: number, month: number, day: number) =>
+    today.getFullYear() === year &&
+    today.getMonth() + 1 === month &&
+    today.getDate() === day
 
   const handleDayClick = (day: number) => {
     setSelectedDay(day)
   }
 
-  const selectedDayItems = selectedDay ? getItemsForDay(selectedDay) : []
+  const selectedDayItems = selectedDay
+    ? getItemsForDate(currentYear, currentMonth, selectedDay)
+    : []
 
   const getDayOfWeek = (day: number) => {
     const date = new Date(currentYear, currentMonth - 1, day)
@@ -261,6 +278,7 @@ export function Calendar() {
     setFormDuration('60')
     setFormColor('#3b82f6')
     setFormProjectId('')
+    setFormAllDay(false)
     setFormError('')
     setShowCreateModal(true)
   }
@@ -278,6 +296,7 @@ export function Calendar() {
         endDate,
         color: formColor,
         projectId: formProjectId ? Number(formProjectId) : undefined,
+        allDay: formAllDay,
       })
       setShowCreateModal(false)
       await loadEvents()
@@ -295,12 +314,13 @@ export function Calendar() {
     const start = new Date(ev.startDate)
     setFormTitle(ev.title)
     setFormDesc(ev.description || '')
-    setFormDate(ev.startDate.split('T')[0])
+    setFormDate(`${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`)
     setFormTime(start.toTimeString().slice(0, 5))
     const diffMin = Math.round((new Date(ev.endDate).getTime() - start.getTime()) / 60000)
     setFormDuration(String(diffMin))
     setFormColor(ev.color)
     setFormProjectId(ev.projectId ? String(ev.projectId) : '')
+    setFormAllDay(ev.allDay)
     setFormError('')
     setShowEditModal(true)
   }
@@ -319,6 +339,7 @@ export function Calendar() {
         endDate,
         color: formColor,
         projectId: formProjectId ? Number(formProjectId) : null,
+        allDay: formAllDay,
       })
       setShowEditModal(false)
       setEditingEvent(null)
@@ -340,9 +361,40 @@ export function Calendar() {
     }
   }
 
-  const cells: Array<{ type: 'empty' } | { type: 'day'; day: number }> = []
-  for (let i = 0; i < firstDayOfMonth; i++) cells.push({ type: 'empty' })
-  for (let d = 1; d <= daysInMonth; d++) cells.push({ type: 'day', day: d })
+  // Build a stable 6-week calendar grid (42 cells) including previous/next month days.
+  // Next-month days are muted by reduced opacity.
+  const nextMonthDate = new Date(currentYear, currentMonth, 1)
+  const nextMonthNumber = nextMonthDate.getMonth() + 1
+  const nextYear = nextMonthDate.getFullYear()
+  const gridStartDate = new Date(currentYear, currentMonth - 1, 1 - firstDayOfMonth)
+
+  const cells: Array<{
+    year: number
+    month: number
+    day: number
+    inCurrentMonth: boolean
+    isNextMonth: boolean
+  }> = []
+
+  for (let i = 0; i < 42; i++) {
+    const date = new Date(
+      gridStartDate.getFullYear(),
+      gridStartDate.getMonth(),
+      gridStartDate.getDate() + i,
+    )
+
+    const year = date.getFullYear()
+    const month = date.getMonth() + 1
+    const day = date.getDate()
+
+    cells.push({
+      year,
+      month,
+      day,
+      inCurrentMonth: year === currentYear && month === currentMonth,
+      isNextMonth: year === nextYear && month === nextMonthNumber,
+    })
+  }
 
   const filterBtns: { key: EventFilterType; label: string }[] = [
     { key: 'all', label: 'Все' },
@@ -401,7 +453,6 @@ export function Calendar() {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="flex items-center gap-2 mb-4 flex-wrap page-load-stagger">
         <Filter className={`w-4 h-4 ${textSecondary}`} />
         {filterBtns.map((f) => (
@@ -430,26 +481,34 @@ export function Calendar() {
 
         <div className="grid grid-cols-7">
           {cells.map((cell, idx) => {
-            if (cell.type === 'empty') {
-              return <div key={`empty-${idx}`} className={`border-t border-r ${dayCellBorder} min-h-[80px] md:min-h-[110px] ${idx % 7 === 6 ? 'border-r-0' : ''}`} />
-            }
-            const { day } = cell
-            const dayItems = getItemsForDay(day)
-            const todayCell = isToday(day)
-            const colIdx = (firstDayOfMonth + day - 1) % 7
+            const { year, month, day, inCurrentMonth, isNextMonth } = cell
+            const dayItems = getItemsForDate(year, month, day)
+            const todayCell = isToday(year, month, day)
+            const colIdx = idx % 7
+
+            const mutedOpacity = inCurrentMonth ? '' : isNextMonth ? 'opacity-40' : 'opacity-25'
+            const clickable = inCurrentMonth
 
             return (
               <div
-                key={`day-${day}`}
-                onClick={() => handleDayClick(day)}
-                className={`border-t border-r ${dayCellBorder} min-h-[80px] md:min-h-[110px] p-1.5 md:p-2 transition-colors cursor-pointer
-                  ${colIdx === 6 ? 'border-r-0' : ''}
-                  ${dayCellHover}
-                  ${todayCell ? (isDark ? 'bg-[#4880ff]/10' : 'bg-blue-50/60') : ''}
-                `}
+                key={`day-${year}-${month}-${day}`}
+                onClick={clickable ? () => handleDayClick(day) : undefined}
+                className={`border-t border-r ${dayCellBorder} min-h-[80px] md:min-h-[110px] p-1.5 md:p-2 transition-colors ${
+                  colIdx === 6 ? 'border-r-0' : ''
+                } ${clickable ? dayCellHover : ''} ${
+                  todayCell ? (isDark ? 'bg-[#4880ff]/10' : 'bg-blue-50/60') : ''
+                } ${mutedOpacity} ${clickable ? 'cursor-pointer' : 'cursor-default'}`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className={`text-xs md:text-sm font-bold w-6 h-6 md:w-7 md:h-7 flex items-center justify-center rounded-full ${todayCell ? 'bg-[#4880ff] text-white' : textPrimary}`}>
+                  <span
+                    className={`text-xs md:text-sm font-bold w-6 h-6 md:w-7 md:h-7 flex items-center justify-center rounded-full ${
+                      todayCell
+                        ? 'bg-[#4880ff] text-white'
+                        : inCurrentMonth
+                          ? textPrimary
+                          : textSecondary
+                    }`}
+                  >
                     {day}
                   </span>
                 </div>
@@ -462,14 +521,26 @@ export function Calendar() {
                           ? `${item.color} ${item.textColor}`
                           : 'text-white'
                       }`}
-                      style={item.type === 'event' ? { backgroundColor: events.find((e) => e.id === item.eventId)?.color || '#3b82f6' } : undefined}
+                      style={
+                        item.type === 'event'
+                          ? {
+                              backgroundColor:
+                                events.find((e) => e.id === item.eventId)?.color ||
+                                '#3b82f6',
+                            }
+                          : undefined
+                      }
                     >
-                      {item.type === 'event' && <span className="mr-0.5">&#9679;</span>}
+                      {item.type === 'event' && (
+                        <span className="mr-0.5">&#9679;</span>
+                      )}
                       {item.title}
                     </div>
                   ))}
                   {dayItems.length > 2 && (
-                    <div className={`text-[9px] md:text-[10px] font-semibold ${textSecondary}`}>+{dayItems.length - 2} ещё</div>
+                    <div className={`text-[9px] md:text-[10px] font-semibold ${textSecondary}`}>
+                      +{dayItems.length - 2} ещё
+                    </div>
                   )}
                 </div>
               </div>
@@ -478,7 +549,6 @@ export function Calendar() {
         </div>
       </div>
 
-      {/* Day Detail Modal */}
       {selectedDay !== null && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 modal-overlay-enter" onClick={() => setSelectedDay(null)}>
           <div className={`${modalBg} rounded-2xl shadow-2xl w-full max-w-md overflow-hidden modal-content-enter`} onClick={(e) => e.stopPropagation()}>
@@ -487,7 +557,7 @@ export function Calendar() {
                 <h2 className={`font-bold text-lg ${textPrimary}`}>{selectedDay} {MONTHS[currentMonth - 1]}</h2>
                 <p className={`text-sm capitalize ${textSecondary}`}>
                   {getDayOfWeek(selectedDay)}
-                  {isToday(selectedDay) && (
+                  {isToday(currentYear, currentMonth, selectedDay) && (
                     <span className="ml-2 text-[10px] font-bold bg-[#4880ff] text-white px-2 py-0.5 rounded-full uppercase tracking-wide">Сегодня</span>
                   )}
                 </p>
@@ -589,7 +659,6 @@ export function Calendar() {
         document.body,
       )}
 
-      {/* Create Event Modal */}
       <Modal open={showCreateModal} onClose={() => setShowCreateModal(false)} title="Новое событие">
         <ErrorMessage message={formError} />
         <form onSubmit={(e) => { e.preventDefault(); handleCreate() }} className="space-y-4">
@@ -627,6 +696,14 @@ export function Calendar() {
               ))}
             </div>
           </div>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={formAllDay}
+              onChange={(e) => setFormAllDay(e.target.checked)}
+            />
+            <span>Весь день</span>
+          </label>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => setShowCreateModal(false)} className={`px-4 py-2 rounded-lg text-sm font-semibold ${textSecondary}`}>Отмена</button>
             <SubmitButton loading={formLoading}>Создать</SubmitButton>
@@ -634,7 +711,6 @@ export function Calendar() {
         </form>
       </Modal>
 
-      {/* Edit Event Modal */}
       <Modal open={showEditModal} onClose={() => { setShowEditModal(false); setEditingEvent(null) }} title="Редактировать событие">
         <ErrorMessage message={formError} />
         <form onSubmit={(e) => { e.preventDefault(); handleEdit() }} className="space-y-4">
@@ -672,6 +748,14 @@ export function Calendar() {
               ))}
             </div>
           </div>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={formAllDay}
+              onChange={(e) => setFormAllDay(e.target.checked)}
+            />
+            <span>Весь день</span>
+          </label>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => { setShowEditModal(false); setEditingEvent(null) }} className={`px-4 py-2 rounded-lg text-sm font-semibold ${textSecondary}`}>Отмена</button>
             <SubmitButton loading={formLoading}>Сохранить</SubmitButton>

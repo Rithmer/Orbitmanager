@@ -5,15 +5,33 @@ import type {
   TaskListQuery,
 } from '@/domain/repositories/task.repository';
 import { Task } from '@/domain/models/task.model';
-import type { Task as PrismaTask } from '@prisma/client';
 import { buildOrderBy, buildStringSearch, getPagination } from './prisma-query.utils';
+
+type TaskWithAssignees = {
+  id: number;
+  projectId: number;
+  name: string;
+  description: string;
+  deadline: Date;
+  status: string;
+  difficulty: number;
+  createdById: number;
+  createdAt: Date;
+  updatedAt: Date;
+  assignees: { userId: number }[];
+};
+
+const TASK_INCLUDE = { assignees: { select: { userId: true } } } as const;
 
 @Injectable()
 export class TasksPrismaRepository implements ITaskRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(): Promise<Task[]> {
-    const rows = await this.prisma.task.findMany({ orderBy: { id: 'asc' } });
+    const rows = await this.prisma.task.findMany({
+      orderBy: { id: 'asc' },
+      include: TASK_INCLUDE,
+    });
     return rows.map((r) => this.toDomain(r));
   }
 
@@ -24,13 +42,16 @@ export class TasksPrismaRepository implements ITaskRepository {
       ...(params.projectId !== undefined ? { projectId: params.projectId } : {}),
       ...(params.status ? { status: params.status } : {}),
       ...(params.difficulty !== undefined ? { difficulty: params.difficulty } : {}),
-      ...(params.assigneeId !== undefined ? { assigneeId: params.assigneeId } : {}),
+      ...(params.assigneeId !== undefined
+        ? { assignees: { some: { userId: params.assigneeId } } }
+        : {}),
       ...buildStringSearch(params.search, ['name', 'description']),
     };
 
     const [rows, total] = await Promise.all([
       this.prisma.task.findMany({
         where,
+        include: TASK_INCLUDE,
         orderBy: buildOrderBy(
           params.sort,
           [
@@ -41,7 +62,6 @@ export class TasksPrismaRepository implements ITaskRepository {
             'deadline',
             'status',
             'difficulty',
-            'assigneeId',
             'createdById',
             'createdAt',
             'updatedAt',
@@ -61,7 +81,10 @@ export class TasksPrismaRepository implements ITaskRepository {
   }
 
   async findById(id: number): Promise<Task | null> {
-    const row = await this.prisma.task.findUnique({ where: { id } });
+    const row = await this.prisma.task.findUnique({
+      where: { id },
+      include: TASK_INCLUDE,
+    });
     return row ? this.toDomain(row) : null;
   }
 
@@ -69,6 +92,7 @@ export class TasksPrismaRepository implements ITaskRepository {
     const rows = await this.prisma.task.findMany({
       where: { projectId },
       orderBy: { id: 'asc' },
+      include: TASK_INCLUDE,
     });
     return rows.map((r) => this.toDomain(r));
   }
@@ -78,6 +102,7 @@ export class TasksPrismaRepository implements ITaskRepository {
     const rows = await this.prisma.task.findMany({
       where: { projectId: { in: projectIds } },
       orderBy: { id: 'asc' },
+      include: TASK_INCLUDE,
     });
     return rows.map((r) => this.toDomain(r));
   }
@@ -86,6 +111,7 @@ export class TasksPrismaRepository implements ITaskRepository {
     const rows = await this.prisma.task.findMany({
       where: { createdById: userId },
       orderBy: { id: 'asc' },
+      include: TASK_INCLUDE,
     });
     return rows.map((r) => this.toDomain(r));
   }
@@ -98,13 +124,10 @@ export class TasksPrismaRepository implements ITaskRepository {
       return 0;
     }
 
-    const result = await this.prisma.task.updateMany({
+    const result = await this.prisma.taskAssignee.deleteMany({
       where: {
-        assigneeId: userId,
-        projectId: { in: projectIds },
-      },
-      data: {
-        assigneeId: null,
+        userId,
+        task: { projectId: { in: projectIds } },
       },
     });
 
@@ -120,32 +143,50 @@ export class TasksPrismaRepository implements ITaskRepository {
         deadline: new Date(task.deadline),
         status: task.status,
         difficulty: task.difficulty,
-        assigneeId: task.assigneeId,
         createdById: task.createdById,
+        assignees:
+          task.assigneeIds.length > 0
+            ? { create: task.assigneeIds.map((userId) => ({ userId })) }
+            : undefined,
       },
+      include: TASK_INCLUDE,
     });
     return this.toDomain(row);
   }
 
-  /**
-   * Оптимизация: убран предварительный findUnique — экономия 1 запроса к БД.
-   * Prisma P2025 = запись не найдена → возвращаем null.
-   */
   async update(id: number, partial: Partial<Task>): Promise<Task | null> {
-    const data: Record<string, unknown> = {};
-    if (partial.name !== undefined) data['name'] = partial.name;
-    if (partial.description !== undefined)
-      data['description'] = partial.description;
-    if (partial.deadline !== undefined)
-      data['deadline'] = new Date(partial.deadline);
-    if (partial.status !== undefined) data['status'] = partial.status;
-    if (partial.difficulty !== undefined)
-      data['difficulty'] = partial.difficulty;
-    if (partial.assigneeId !== undefined)
-      data['assigneeId'] = partial.assigneeId;
-
     try {
-      const row = await this.prisma.task.update({ where: { id }, data });
+      const scalarData: Record<string, unknown> = {};
+      if (partial.name !== undefined) scalarData['name'] = partial.name;
+      if (partial.description !== undefined) scalarData['description'] = partial.description;
+      if (partial.deadline !== undefined) scalarData['deadline'] = new Date(partial.deadline);
+      if (partial.status !== undefined) scalarData['status'] = partial.status;
+      if (partial.difficulty !== undefined) scalarData['difficulty'] = partial.difficulty;
+
+      if (partial.assigneeIds !== undefined) {
+        const newIds = partial.assigneeIds ?? [];
+        const row = await this.prisma.$transaction(async (tx) => {
+          await tx.taskAssignee.deleteMany({ where: { taskId: id } });
+          const updated = await tx.task.update({
+            where: { id },
+            data: {
+              ...scalarData,
+              ...(newIds.length > 0
+                ? { assignees: { create: newIds.map((userId) => ({ userId })) } }
+                : {}),
+            },
+            include: TASK_INCLUDE,
+          });
+          return updated;
+        });
+        return this.toDomain(row);
+      }
+
+      const row = await this.prisma.task.update({
+        where: { id },
+        data: scalarData,
+        include: TASK_INCLUDE,
+      });
       return this.toDomain(row);
     } catch (e: unknown) {
       const prismaError = e as { code?: string };
@@ -165,7 +206,7 @@ export class TasksPrismaRepository implements ITaskRepository {
     }
   }
 
-  private toDomain(row: PrismaTask): Task {
+  private toDomain(row: TaskWithAssignees): Task {
     return {
       id: row.id,
       projectId: row.projectId,
@@ -174,7 +215,7 @@ export class TasksPrismaRepository implements ITaskRepository {
       deadline: row.deadline.toISOString(),
       status: row.status as Task['status'],
       difficulty: row.difficulty,
-      assigneeId: row.assigneeId,
+      assigneeIds: row.assignees.map((a) => a.userId),
       createdById: row.createdById,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),

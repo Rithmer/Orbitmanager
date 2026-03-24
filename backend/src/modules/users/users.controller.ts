@@ -14,14 +14,13 @@ import {
 } from '@nestjs/common';
 import {
   ApiTags,
-  ApiBearerAuth,
   ApiOperation,
   ApiResponse,
   ApiQuery,
 } from '@nestjs/swagger';
+import { ApiAuth } from '@/common/decorators/api-auth.decorator';
 import { UsersService } from './users.service';
-import { CreateUserDto, UpdateMeUserDto, UpdateUserDto } from './dto';
-import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
+import { CreateUserDto, UpdateUserDto, UpdateProfileDto } from './dto';
 import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
@@ -29,8 +28,8 @@ import { AccountRole } from '@/common/enums/account-role.enum';
 import { parseOptionalInt } from '@/common/helpers/query.helper';
 
 @ApiTags('Users')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard, AccountRolesGuard)
+@ApiAuth()
+@UseGuards(AccountRolesGuard)
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
@@ -74,20 +73,6 @@ export class UsersController {
   @ApiResponse({ status: 409, description: 'Логин уже занят' })
   create(@CurrentUser('id') callerId: number, @Body() dto: CreateUserDto) {
     return this.usersService.create(dto, callerId);
-  }
-
-  @Patch('me')
-  @ApiOperation({ summary: 'Обновить личные настройки текущего пользователя' })
-  @ApiResponse({ status: 200, description: 'Личные настройки обновлены' })
-  @ApiResponse({
-    status: 429,
-    description: 'Превышен лимит изменений настроек',
-  })
-  updateMe(
-    @CurrentUser('id') userId: number,
-    @Body() dto: UpdateMeUserDto,
-  ) {
-    return this.usersService.updateMe(userId, dto);
   }
 
   @Patch(':id')

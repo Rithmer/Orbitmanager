@@ -1,11 +1,31 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Moon, Sun, Bell, Lock, User, Shield, ChevronRight, LogOut } from 'lucide-react'
+import { Moon, Sun, Lock, User, Shield, ChevronRight, LogOut } from 'lucide-react'
 import { useTheme } from '../context/useTheme'
 import { useAuth } from '../context/useAuth'
 import { usersApi } from '../api/users'
 import { ErrorMessage } from '../components/Modal'
 import { ACCOUNT_ROLE_LABELS, AccountRole } from '../types'
+
+function validateProfileFields(fullName: string, profession: string): string | null {
+  const normalizedFullName = fullName.trim()
+  const normalizedProfession = profession.trim()
+
+  if (!normalizedFullName) {
+    return 'ФИО обязательно'
+  }
+  if (normalizedFullName.length < 3) {
+    return 'ФИО должно быть не менее 3 символов'
+  }
+  if (normalizedFullName.length > 100) {
+    return 'ФИО должно быть не более 100 символов'
+  }
+  if (normalizedProfession.length > 100) {
+    return 'Должность должна быть не более 100 символов'
+  }
+
+  return null
+}
 
 export function Settings() {
   const { isDark, toggleTheme } = useTheme()
@@ -18,6 +38,15 @@ export function Settings() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
+  const [avatarUrlPreview, setAvatarUrlPreview] = useState<string | null>(user?.avatarUrl ?? null)
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const [avatarUploadError, setAvatarUploadError] = useState('')
+  const [avatarUploadSuccess, setAvatarUploadSuccess] = useState('')
+
+  useEffect(() => {
+    setAvatarUrlPreview(user?.avatarUrl ?? null)
+  }, [user?.avatarUrl])
+
   const pageBg = isDark ? 'bg-[#1c2534]' : 'bg-[#f5f6fa]'
   const cardBg = isDark ? 'bg-[#273142]' : 'bg-white'
   const cardBorder = isDark ? 'border-[#313d4f]' : 'border-[#e8e8e8]'
@@ -28,16 +57,19 @@ export function Settings() {
   const inputText = isDark ? 'text-[#f4f3f2]' : 'text-[#202224]'
   const sectionIconBg = isDark ? 'bg-[#4880ff]/15' : 'bg-blue-50'
 
-  const [notifications, setNotifications] = useState({ ai: true })
-  const toggleNotif = (key: keyof typeof notifications) => setNotifications((n) => ({ ...n, [key]: !n[key] }))
-
   const handleSaveProfile = async () => {
     if (!user) return
+    const validationError = validateProfileFields(fullName, profession)
+    if (validationError) {
+      setError(validationError)
+      setSuccess('')
+      return
+    }
     setSaving(true)
     setError('')
     setSuccess('')
     try {
-      await usersApi.update(user.id, { fullName, profession })
+      await usersApi.updateMe({ fullName: fullName.trim(), profession: profession.trim() || undefined })
       await refreshUser()
       setSuccess('Изменения сохранены')
       setTimeout(() => setSuccess(''), 3000)
@@ -53,6 +85,58 @@ export function Settings() {
     navigate('/login', { replace: true })
   }
 
+  const abbreviateFullName = (name?: string | null) => {
+    const full = (name ?? '').trim()
+    if (!full) return ''
+    const parts = full.split(/\s+/).filter(Boolean)
+    if (parts.length < 2) return full
+    const lastName = parts[0]
+    const initials = parts
+      .slice(1, 3)
+      .map((p) => `${p.charAt(0).toUpperCase()}.`)
+      .join(' ')
+    // Example: "Иванов Алексей Петрович" => "Иванов А. П."
+    return `${lastName} ${initials}`
+  }
+
+  const handleAvatarFileChange = (file: File | null) => {
+    setAvatarUploadError('')
+    setAvatarUploadSuccess('')
+    if (!file) {
+      setAvatarUrlPreview(null)
+      return
+    }
+
+    // Upload contract is assumed to accept `avatarUrl` as a data url.
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : null
+      setAvatarUrlPreview(result)
+    }
+    reader.onerror = () => {
+      setAvatarUploadError('Не удалось прочитать файл изображения')
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleUploadAvatar = async () => {
+    if (!user) return
+    setAvatarUploading(true)
+    setAvatarUploadError('')
+    setAvatarUploadSuccess('')
+
+    try {
+      await usersApi.updateMe({ avatarUrl: avatarUrlPreview })
+      await refreshUser()
+      setAvatarUploadSuccess('Аватар обновлён')
+      setTimeout(() => setAvatarUploadSuccess(''), 3000)
+    } catch (err) {
+      setAvatarUploadError(err instanceof Error ? err.message : 'Ошибка загрузки аватара')
+    } finally {
+      setAvatarUploading(false)
+    }
+  }
+
   const userInitial = user?.fullName?.charAt(0)?.toUpperCase() || 'U'
   const roleLabel = user ? ACCOUNT_ROLE_LABELS[user.accountRole as AccountRole] || user.accountRole : ''
 
@@ -64,7 +148,6 @@ export function Settings() {
       </div>
 
       <div className="max-w-3xl space-y-6 page-load-stagger">
-        {/* Profile */}
         <div className={`${cardBg} border ${cardBorder} rounded-xl overflow-hidden card-hover stagger-row`}>
           <div className={`flex items-center gap-3 px-6 py-4 border-b ${dividerColor}`}>
             <div className={`w-8 h-8 ${sectionIconBg} rounded-lg flex items-center justify-center`}>
@@ -74,15 +157,65 @@ export function Settings() {
           </div>
           <div className="p-6 space-y-5">
             <div className="flex items-center gap-4 mb-6">
-              <div className="w-16 h-16 bg-[#4880ff] rounded-full flex items-center justify-center text-white text-xl font-bold">
-                {userInitial}
+              <div className="w-16 h-16 bg-[#4880ff] rounded-full flex items-center justify-center text-white text-xl font-bold overflow-hidden">
+                {avatarUrlPreview ? (
+                  <img src={avatarUrlPreview} alt="Аватар" className="w-full h-full object-cover" />
+                ) : (
+                  userInitial
+                )}
               </div>
               <div>
-                <p className={`font-bold ${textPrimary}`}>{user?.fullName || 'Пользователь'}</p>
+                <p className={`font-bold ${textPrimary}`}>
+                  {abbreviateFullName(user?.fullName) || 'Пользователь'}
+                </p>
                 <p className={`text-sm ${textSecondary}`}>
                   {roleLabel} · {user?.login}
                 </p>
               </div>
+            </div>
+
+            <div className={`rounded-xl border ${cardBorder} p-4 ${isDark ? 'bg-[#1c2534]' : 'bg-white'}`}>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className={`text-sm font-semibold ${textPrimary}`}>Аватар</p>
+                  <p className={`text-xs mt-1 ${textSecondary}`}>Загрузите изображение — оно появится сразу после сохранения.</p>
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleAvatarFileChange(e.target.files?.[0] ?? null)}
+                  disabled={avatarUploading}
+                  className={`text-xs ${isDark ? 'text-[#94a3b8]' : 'text-[#737373]'}`}
+                />
+              </div>
+
+              <div className="mt-4 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => void handleUploadAvatar()}
+                  disabled={avatarUploading || !avatarUrlPreview}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                    avatarUploading || !avatarUrlPreview
+                      ? isDark
+                        ? 'bg-[#4880ff]/15 text-[#94a3b8] cursor-not-allowed'
+                        : 'bg-blue-50 text-[#737373] cursor-not-allowed'
+                      : 'bg-[#4880ff] hover:bg-[#3a6fe0] text-white'
+                  }`}
+                >
+                  {avatarUploading ? 'Загрузка...' : 'Загрузить'}
+                </button>
+              </div>
+
+              {avatarUploadError ? (
+                <div className="mt-3">
+                  <ErrorMessage message={avatarUploadError} />
+                </div>
+              ) : null}
+              {avatarUploadSuccess ? (
+                <div className="mt-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3">
+                  <p className="text-sm text-emerald-500">{avatarUploadSuccess}</p>
+                </div>
+              ) : null}
             </div>
 
             <ErrorMessage message={error} />
@@ -137,7 +270,6 @@ export function Settings() {
           </div>
         </div>
 
-        {/* Appearance */}
         <div className={`${cardBg} border ${cardBorder} rounded-xl overflow-hidden card-hover stagger-row`}>
           <div className={`flex items-center gap-3 px-6 py-4 border-b ${dividerColor}`}>
             <div className={`w-8 h-8 ${sectionIconBg} rounded-lg flex items-center justify-center`}>
@@ -180,35 +312,6 @@ export function Settings() {
           </div>
         </div>
 
-        {/* Notifications */}
-        <div className={`${cardBg} border ${cardBorder} rounded-xl overflow-hidden card-hover stagger-row`}>
-          <div className={`flex items-center gap-3 px-6 py-4 border-b ${dividerColor}`}>
-            <div className={`w-8 h-8 ${sectionIconBg} rounded-lg flex items-center justify-center`}>
-              <Bell className="w-4 h-4 text-[#4880ff]" />
-            </div>
-            <h2 className={`font-bold ${textPrimary}`}>Уведомления</h2>
-          </div>
-          <div className="p-6">
-            <div className="flex items-center justify-between py-3">
-              <div>
-                <p className={`font-semibold text-sm ${textPrimary}`}>AI подсказки</p>
-                <p className={`text-xs mt-0.5 ${textSecondary}`}>Получать AI-рекомендации по задачам</p>
-              </div>
-              <button
-                onClick={() => toggleNotif('ai')}
-                className={`relative inline-flex w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none shrink-0
-                  ${notifications.ai ? 'bg-[#4880ff]' : 'bg-gray-300'}`}
-              >
-                <span
-                  className="inline-block w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 mt-0.5"
-                  style={{ transform: notifications.ai ? 'translateX(22px)' : 'translateX(2px)' }}
-                />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Security */}
         <div className={`${cardBg} border ${cardBorder} rounded-xl overflow-hidden card-hover stagger-row`}>
           <div className={`flex items-center gap-3 px-6 py-4 border-b ${dividerColor}`}>
             <div className={`w-8 h-8 ${sectionIconBg} rounded-lg flex items-center justify-center`}>

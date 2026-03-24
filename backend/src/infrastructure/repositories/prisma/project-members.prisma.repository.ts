@@ -66,10 +66,6 @@ export class ProjectMembersPrismaRepository implements IProjectMemberRepository 
     return this.toDomain(row);
   }
 
-  /**
-   * Оптимизация: убран предварительный findUnique.
-   * Prisma P2025 = запись не найдена → возвращаем null.
-   */
   async update(
     id: number,
     partial: Partial<ProjectMember>,

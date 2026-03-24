@@ -14,8 +14,7 @@ model User {
   profession    String   @default("")
   accountStatus String   @default("active") @map("account_status")
   accountRole   String   @default("member") @map("account_role")
-  aiHintsEnabled Boolean  @default(true) @map("ai_hints_enabled")
-  lastPasswordChangedAt DateTime? @map("last_password_changed_at")
+  avatarUrl     String?  @map("avatar_url")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
@@ -23,9 +22,10 @@ model User {
   teamMembers    TeamMember[]
   projectMembers ProjectMember[]
   createdTasks   Task[]          @relation("TaskCreator")
-  assignedTasks  Task[]          @relation("TaskAssignee")
+  taskAssignees  TaskAssignee[]
   auditLogs      AuditLog[]
   calendarEvents CalendarEvent[]
+  refreshTokens  RefreshToken[]
 
   @@map("users")
 }
@@ -100,19 +100,32 @@ model Task {
   deadline    DateTime
   status      String   @default("new")
   difficulty  Int
-  assigneeId  Int?     @map("assignee_id")
   createdById Int      @map("created_by_id")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  assignee       User?           @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   createdBy      User            @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  assignees      TaskAssignee[]
   calendarEvents CalendarEvent[]
 
   @@index([projectId])
-  @@index([assigneeId])
+  @@index([deadline])
+  @@index([status])
   @@map("tasks")
+}
+
+model TaskAssignee {
+  id     Int @id @default(autoincrement())
+  taskId Int @map("task_id")
+  userId Int @map("user_id")
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@index([userId])
+  @@map("task_assignees")
 }
 
 model AuditLog {
@@ -131,6 +144,7 @@ model AuditLog {
   @@index([userId])
   @@index([entityType, entityId])
   @@index([timestamp])
+  @@index([action])
   @@map("audit_logs")
 }
 
@@ -154,4 +168,19 @@ model CalendarEvent {
 
   @@index([userId, startDate])
   @@map("calendar_events")
+}
+
+model RefreshToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
 }

@@ -60,30 +60,28 @@ export class ProjectAccessService {
       return [];
     }
 
-    const fullAccessTeamIds = [
+    const ownerTeamIds = [
       ...new Set(
         teamMemberships
-          .filter((membership) =>
-            this.canViewAllTeamProjects(membership.teamRole),
-          )
+          .filter((membership) => membership.teamRole === TeamRole.OWNER)
           .map((membership) => membership.teamId),
       ),
     ];
 
-    const observerTeamIds = [
+    const attachedOnlyTeamIds = [
       ...new Set(
         teamMemberships
-          .filter((membership) => membership.teamRole === TeamRole.OBSERVER)
+          .filter((membership) => membership.teamRole !== TeamRole.OWNER)
           .map((membership) => membership.teamId),
       ),
     ];
 
-    const [fullAccessProjectIds, observerProjectIds] = await Promise.all([
-      this.getProjectIdsForTeams(fullAccessTeamIds),
-      this.getObserverProjectIds(userId, observerTeamIds),
+    const [ownerProjectIds, attachedProjectIds] = await Promise.all([
+      this.getProjectIdsForTeams(ownerTeamIds),
+      this.getAttachedProjectIdsForTeams(userId, attachedOnlyTeamIds),
     ]);
 
-    return [...new Set([...fullAccessProjectIds, ...observerProjectIds])];
+    return [...new Set([...ownerProjectIds, ...attachedProjectIds])];
   }
 
   async assertProjectVisibility(
@@ -101,7 +99,7 @@ export class ProjectAccessService {
       );
     }
 
-    if (this.canViewAllTeamProjects(teamMembership.teamRole)) {
+    if (teamMembership.teamRole === TeamRole.OWNER) {
       return;
     }
 
@@ -119,12 +117,8 @@ export class ProjectAccessService {
   async assertTeamOwnerOrAdmin(
     userId: number,
     teamId: number,
-    accountRole: AccountRole,
+    _accountRole: AccountRole,
   ): Promise<void> {
-    if (accountRole === AccountRole.ADMIN) {
-      return;
-    }
-
     const membership = await this.teamMemberRepository.findByUserAndTeam(
       userId,
       teamId,
@@ -174,12 +168,8 @@ export class ProjectAccessService {
     userId: number,
     teamId: number,
     projectId: number,
-    accountRole: AccountRole,
+    _accountRole: AccountRole,
   ): Promise<boolean> {
-    if (accountRole === AccountRole.ADMIN) {
-      return true;
-    }
-
     const teamMembership = await this.teamMemberRepository.findByUserAndTeam(
       userId,
       teamId,
@@ -203,19 +193,15 @@ export class ProjectAccessService {
       return [];
     }
 
-    if (this.projectRepository.findIdsByTeams) {
-      return this.projectRepository.findIdsByTeams(teamIds);
-    }
-
-    const projects = await this.projectRepository.findByTeams(teamIds);
-    return projects.map((project) => project.id);
+    return this.projectRepository.findIdsByTeams(teamIds);
   }
 
-  private async getObserverProjectIds(
+  /** Проекты команд, где пользователь не владелец: только с явным участием в проекте. */
+  private async getAttachedProjectIdsForTeams(
     userId: number,
-    observerTeamIds: number[],
+    teamIds: number[],
   ): Promise<number[]> {
-    if (observerTeamIds.length === 0) {
+    if (teamIds.length === 0) {
       return [];
     }
 
@@ -228,23 +214,17 @@ export class ProjectAccessService {
     const membershipProjectIds = [
       ...new Set(projectMemberships.map((membership) => membership.projectId)),
     ];
-    const membershipProjects = this.projectRepository.findByIds
-      ? await this.projectRepository.findByIds(membershipProjectIds)
-      : await this.projectRepository.findByTeams(observerTeamIds);
+    const membershipProjects = await this.projectRepository.findByIds(membershipProjectIds);
 
-    const observerTeamSet = new Set(observerTeamIds);
+    const teamSet = new Set(teamIds);
     const membershipProjectIdSet = new Set(membershipProjectIds);
     return membershipProjects
       .filter(
         (project) =>
-          observerTeamSet.has(project.teamId) &&
+          teamSet.has(project.teamId) &&
           membershipProjectIdSet.has(project.id),
       )
       .map((project) => project.id);
-  }
-
-  private canViewAllTeamProjects(teamRole: TeamRole): boolean {
-    return teamRole === TeamRole.OWNER || teamRole === TeamRole.MEMBER;
   }
 
   private dedupeProjects(projects: Project[]): Project[] {

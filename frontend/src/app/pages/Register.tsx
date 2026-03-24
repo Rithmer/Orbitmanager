@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router'
 import { Eye, EyeOff } from 'lucide-react'
 import { useTheme } from '../context/useTheme'
 import { useAuth } from '../context/useAuth'
+import { PASSWORD_POLICY_HINT, validatePasswordPolicy } from '../utils/passwordPolicy'
 
 export function Register() {
   const { isDark } = useTheme()
@@ -36,12 +37,21 @@ export function Register() {
       setError('Пароли не совпадают')
       return
     }
-    if (form.password.length < 8) {
-      setError('Пароль должен быть не менее 8 символов')
+    const pwdError = validatePasswordPolicy(form.password)
+    if (pwdError) {
+      setError(pwdError)
       return
     }
     if (form.login.length < 3) {
       setError('Логин должен быть не менее 3 символов')
+      return
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(form.login)) {
+      setError('Логин может содержать только буквы, цифры и символ подчёркивания')
+      return
+    }
+    if (form.login.length > 50) {
+      setError('Логин должен быть не более 50 символов')
       return
     }
 
@@ -111,7 +121,7 @@ export function Register() {
                 type={showPassword ? 'text' : 'password'}
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
-                placeholder="Минимум 8 символов"
+                placeholder="Например, SecurePass1!"
                 required
                 className={`w-full px-3 py-2.5 pr-10 rounded-lg border text-sm transition-colors focus:outline-none focus:border-[#4880ff] ${inputBg} ${inputText}`}
               />
@@ -123,6 +133,7 @@ export function Register() {
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+            <p className={`mt-1 text-xs ${textSecondary}`}>{PASSWORD_POLICY_HINT}</p>
           </div>
 
           <div>

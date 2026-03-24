@@ -27,16 +27,16 @@ interface DashboardTaskRow {
   deadline: Date;
   status: string;
   difficulty: number;
-  assigneeId: number | null;
   createdById: number;
   createdAt: Date;
   updatedAt: Date;
   project: {
     name: string;
   };
-  assignee: {
-    fullName: string;
-  } | null;
+  assignees: Array<{
+    userId: number;
+    user: { fullName: string };
+  }>;
 }
 
 interface DashboardActiveTaskRow {
@@ -47,15 +47,27 @@ interface DashboardActiveTaskRow {
   deadline: Date;
   status: string;
   difficulty: number;
-  assigneeId: number | null;
   createdById: number;
   createdAt: Date;
   updatedAt: Date;
   project: {
     name: string;
   };
+  assignees: Array<{ userId: number }>;
 }
 
+/**
+ * @architecture CQRS Query Service
+ *
+ * Сервис агрегированного чтения данных. Использует PrismaService напрямую —
+ * намеренное архитектурное решение: запросы включают сложные агрегации
+ * (count, groupBy, многотабличные JOIN), которые не выражаются через
+ * CRUD-репозитории без значительного усложнения их интерфейсов.
+ *
+ * Паттерн: CQRS-light — command-сервисы (TasksService, ProjectsService и др.)
+ * работают через репозитории; query-сервисы (этот класс) обращаются к БД
+ * напрямую для оптимальных read-path запросов.
+ */
 @Injectable()
 export class DashboardService {
   constructor(
@@ -90,6 +102,7 @@ export class DashboardService {
         overview: {
           doneTasks: 0,
           inProgressTasks: 0,
+          reviewTasks: 0,
           overdueTasks: 0,
           totalTasks: 0,
           progressPercent: 0,
@@ -105,6 +118,7 @@ export class DashboardService {
       totalTasks,
       doneTasks,
       inProgressTasks,
+      reviewTasks,
       overdueTasks,
       recentTaskRows,
       activeTaskRows,
@@ -130,6 +144,12 @@ export class DashboardService {
       this.prisma.task.count({
         where: {
           projectId: { in: visibleProjectIds },
+          status: TaskStatus.REVIEW,
+        },
+      }),
+      this.prisma.task.count({
+        where: {
+          projectId: { in: visibleProjectIds },
           deadline: { lt: new Date() },
           status: {
             notIn: [TaskStatus.DONE, TaskStatus.CANCELLED],
@@ -148,7 +168,6 @@ export class DashboardService {
           deadline: true,
           status: true,
           difficulty: true,
-          assigneeId: true,
           createdById: true,
           createdAt: true,
           updatedAt: true,
@@ -157,9 +176,12 @@ export class DashboardService {
               name: true,
             },
           },
-          assignee: {
+          assignees: {
             select: {
-              fullName: true,
+              userId: true,
+              user: {
+                select: { fullName: true },
+              },
             },
           },
         },
@@ -180,13 +202,17 @@ export class DashboardService {
           deadline: true,
           status: true,
           difficulty: true,
-          assigneeId: true,
           createdById: true,
           createdAt: true,
           updatedAt: true,
           project: {
             select: {
               name: true,
+            },
+          },
+          assignees: {
+            select: {
+              userId: true,
             },
           },
         },
@@ -224,14 +250,12 @@ export class DashboardService {
 
     const activeTasksByAssignee = new Map<number, number>();
     for (const task of activeTaskRows) {
-      if (task.assigneeId === null) {
-        continue;
+      for (const { userId } of task.assignees) {
+        activeTasksByAssignee.set(
+          userId,
+          (activeTasksByAssignee.get(userId) ?? 0) + 1,
+        );
       }
-
-      activeTasksByAssignee.set(
-        task.assigneeId,
-        (activeTasksByAssignee.get(task.assigneeId) ?? 0) + 1,
-      );
     }
 
     const riskInsights = (
@@ -240,9 +264,17 @@ export class DashboardService {
           const task = this.toTaskDomain(taskRow);
           const statusChangesCount =
             statusChangesByTaskId.get(task.id) ?? 0;
-          const assigneeLoad = task.assigneeId
-            ? Math.max((activeTasksByAssignee.get(task.assigneeId) ?? 0) - 1, 0)
-            : 0;
+          const assigneeLoad =
+            task.assigneeIds.length > 0
+              ? Math.max(
+                  Math.max(
+                    ...task.assigneeIds.map(
+                      (uid) => activeTasksByAssignee.get(uid) ?? 0,
+                    ),
+                  ) - 1,
+                  0,
+                )
+              : 0;
           const riskInput = buildTaskRiskInput(
             task,
             statusChangesCount,
@@ -266,6 +298,7 @@ export class DashboardService {
       overview: {
         doneTasks,
         inProgressTasks,
+        reviewTasks,
         overdueTasks,
         totalTasks,
         progressPercent:
@@ -301,7 +334,7 @@ export class DashboardService {
       deadline: row.deadline.toISOString(),
       status: row.status as Task['status'],
       difficulty: row.difficulty,
-      assigneeId: row.assigneeId,
+      assigneeIds: row.assignees.map((a) => a.userId),
       createdById: row.createdById,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
@@ -310,6 +343,9 @@ export class DashboardService {
 
   private toRecentTask(row: DashboardTaskRow): DashboardRecentTaskItemDto {
     const status = row.status as TaskStatus;
+    const assigneeNames = row.assignees
+      .map((a) => a.user?.fullName ?? '')
+      .filter(Boolean);
     return {
       id: row.id,
       projectId: row.projectId,
@@ -318,7 +354,9 @@ export class DashboardService {
       status,
       statusLabel: this.getStatusLabel(status),
       deadline: row.deadline.toISOString(),
-      assigneeName: row.assignee?.fullName ?? null,
+      assigneeName: assigneeNames[0] ?? null,
+      assigneeNames,
+      assigneeCount: assigneeNames.length,
       isOverdue:
         row.deadline.getTime() < Date.now() &&
         status !== TaskStatus.DONE &&
@@ -357,7 +395,7 @@ export class DashboardService {
       case TaskStatus.IN_PROGRESS:
         return 'В процессе';
       case TaskStatus.REVIEW:
-        return 'На проверке';
+        return 'Тестирование';
       case TaskStatus.DONE:
         return 'Выполнена';
       case TaskStatus.CANCELLED:

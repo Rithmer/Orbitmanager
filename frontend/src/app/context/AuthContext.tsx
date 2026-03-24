@@ -1,15 +1,9 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useCallback,
-  type ReactNode,
-} from 'react'
+import { createContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import { api, ApiError } from '../api/client'
 import { authApi } from '../api/auth'
 import type { User, LoginDto, RegisterDto } from '../types'
 import { AccountRole } from '../types'
+import { clearLastBoardProjectId } from '../utils/lastBoardProjectStorage'
 
 export interface AuthContextType {
   user: User | null
@@ -39,6 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     api.clearTokens()
+    clearLastBoardProjectId()
     setUser(null)
   }, [])
 
@@ -48,18 +43,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     api.loadTokens()
-    if (api.isAuthenticated()) {
-      authApi
-        .me()
-        .then(setUser)
-        .catch((err) => {
+
+    let isMounted = true
+    const bootstrapAuth = async () => {
+      if (api.isAuthenticated()) {
+        try {
+          const me = await authApi.me()
+          if (isMounted) {
+            setUser(me)
+          }
+        } catch (err) {
           if (err instanceof ApiError && err.status === 401) {
             api.clearTokens()
           }
-        })
-        .finally(() => setLoading(false))
-    } else {
-      setLoading(false)
+        }
+      }
+      if (isMounted) {
+        setLoading(false)
+      }
+    }
+
+    void bootstrapAuth()
+    return () => {
+      isMounted = false
     }
   }, [])
 
@@ -102,8 +108,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   )
-}
-
-export function useAuth() {
-  return useContext(AuthContext)
 }

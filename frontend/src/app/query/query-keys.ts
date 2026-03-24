@@ -1,4 +1,9 @@
 export const appQueryKeys = {
+  nav: {
+    /** Batch membership for sidebar access (teams + projects). */
+    teamsMembersBatch: () => ['nav', 'teams-members-batch'] as const,
+    projectsMembersBatch: () => ['nav', 'projects-members-batch'] as const,
+  },
   auth: {
     me: ['auth', 'me'] as const,
   },
@@ -18,6 +23,10 @@ export const appQueryKeys = {
     members: (projectIds?: readonly number[]) =>
       ['projects', 'members', projectIds ?? []] as const,
   },
+  board: {
+    teamMembers: (teamId: number | null) => ['board', 'team-members', teamId] as const,
+    projectPickerList: () => ['board', 'project-picker-projects'] as const,
+  },
   calendar: {
     monthView: (params?: Record<string, unknown>) =>
       ['calendar', 'month-view', params ?? null] as const,
@@ -25,6 +34,7 @@ export const appQueryKeys = {
   reports: {
     summary: (params?: Record<string, unknown>) =>
       ['reports', 'summary', params ?? null] as const,
+    projects: () => ['reports', 'projects'] as const,
   },
   admin: {
     users: (params?: Record<string, unknown>) => ['admin', 'users', params ?? null] as const,

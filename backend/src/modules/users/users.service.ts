@@ -94,9 +94,8 @@ export class UsersService {
           }
 
           const search = params.search.toLowerCase();
-          return [user.login, user.fullName, user.profession].some((field) =>
-            field.toLowerCase().includes(search),
-          );
+          return [user.login, user.fullName, user.profession]
+            .some((field) => field?.toLowerCase().includes(search));
         }),
       page,
       limit,
@@ -136,8 +135,6 @@ export class UsersService {
       profession: dto.profession ?? '',
       accountStatus: dto.accountStatus ?? 'active',
       accountRole: dto.accountRole ?? AccountRole.MEMBER,
-      aiHintsEnabled: true,
-      lastPasswordChangedAt: null,
       createdAt: now,
       updatedAt: now,
     });

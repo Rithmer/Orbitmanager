@@ -1,12 +1,13 @@
 import { RiskLevel } from '../../types'
+import { TaskStatus } from '../../types'
 import type { ProjectBoardTask } from './types'
 
 export const PROJECT_BOARD_COLUMNS = [
-  { status: 'new', title: 'К выполнению', accent: '#4880ff' },
-  { status: 'in_progress', title: 'В процессе', accent: '#f59e0b' },
-  { status: 'review', title: 'На проверке', accent: '#8b5cf6' },
-  { status: 'done', title: 'Выполнено', accent: '#10b981' },
-  { status: 'cancelled', title: 'Отменено', accent: '#ef4444' },
+  { status: TaskStatus.NEW, title: 'Запланировано', accent: '#4880ff' },
+  { status: TaskStatus.IN_PROGRESS, title: 'В процессе', accent: '#f59e0b' },
+  { status: TaskStatus.REVIEW, title: 'Тестирование', accent: '#8b5cf6' },
+  { status: TaskStatus.DONE, title: 'Выполнено', accent: '#10b981' },
+  { status: TaskStatus.CANCELLED, title: 'Отменено', accent: '#ef4444' },
 ] as const
 
 export function getRiskBadgeClasses(riskLevel?: RiskLevel) {
@@ -38,6 +39,16 @@ export function getOverdueLabel(task: ProjectBoardTask): boolean {
   )
 }
 
-export function getColumnTasks(tasks: ProjectBoardTask[], status: string) {
+export function getColumnTasks(tasks: ProjectBoardTask[], status: TaskStatus) {
   return tasks.filter((task) => task.status === status)
 }
+
+export const KANBAN_COLUMN_PREVIEW_TASKS = 3
+
+export const BOARD_PROJECT_CARD_COLORS = [
+  'bg-[#4880ff]',
+  'bg-[#10b981]',
+  'bg-[#8b5cf6]',
+  'bg-[#f59e0b]',
+  'bg-[#ef4444]',
+] as const

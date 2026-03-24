@@ -14,14 +14,13 @@ import {
 } from '@nestjs/common';
 import {
   ApiTags,
-  ApiBearerAuth,
   ApiQuery,
   ApiOperation,
   ApiResponse,
 } from '@nestjs/swagger';
+import { ApiAuth } from '@/common/decorators/api-auth.decorator';
 import { TeamsService } from './teams.service';
 import { AddTeamMemberDto, UpdateTeamMemberDto } from './dto';
-import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { TeamRolesGuard } from '@/common/guards/team-roles.guard';
 import { TeamRoles } from '@/common/decorators/team-roles.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
@@ -30,8 +29,7 @@ import { TeamRole } from '@/common/enums/team-role.enum';
 import { ReadModelResponseFactory } from '@/common/read-models/read-model-response.factory';
 
 @ApiTags('Team Members')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@ApiAuth()
 @Controller()
 export class TeamMembersController {
   constructor(
@@ -98,12 +96,13 @@ export class TeamMembersController {
     return this.teamsService.addMember(teamId, dto, userId, userRole);
   }
 
-  @Patch('team-members/:id')
+  @Patch('teams/:teamId/members/:id')
   @ApiOperation({ summary: 'Изменить роль участника (только owner)' })
   @ApiResponse({ status: 200, description: 'Роль обновлена' })
   @ApiResponse({ status: 403, description: 'Нет прав' })
   @ApiResponse({ status: 404, description: 'Участник не найден' })
   updateMember(
+    @Param('teamId', ParseIntPipe) _teamId: number,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateTeamMemberDto,
     @CurrentUser('id') userId: number,
@@ -112,13 +111,14 @@ export class TeamMembersController {
     return this.teamsService.updateMember(id, dto, userId, userRole);
   }
 
-  @Delete('team-members/:id')
+  @Delete('teams/:teamId/members/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Удалить участника из команды (только owner)' })
   @ApiResponse({ status: 204, description: 'Участник удалён' })
   @ApiResponse({ status: 403, description: 'Нет прав / единственный owner' })
   @ApiResponse({ status: 404, description: 'Участник не найден' })
   removeMember(
+    @Param('teamId', ParseIntPipe) _teamId: number,
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('id') userId: number,
     @CurrentUser('accountRole') userRole: AccountRole,

@@ -1,16 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import {
-  UnauthorizedException,
-  ConflictException,
-  BadRequestException,
-  TooManyRequestsException,
-} from '@nestjs/common';
-import * as argon2 from 'argon2';
+import { UnauthorizedException, ConflictException } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { AuditService } from '../audit-logs/audit.service';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { AuditAction } from '@/common/enums/audit-action.enum';
 import { User } from '@/domain/models/user.model';
@@ -25,8 +21,8 @@ const mockUser: User = {
   profession: 'Developer',
   accountStatus: 'active',
   accountRole: AccountRole.MEMBER,
-  aiHintsEnabled: true,
-  lastPasswordChangedAt: null,
+  avatarUrl: null,
+  discriminator: '0001',
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };

@@ -11,11 +11,11 @@ import {
   getAuthenticatedUser,
   getRouteParamAsNumber,
 } from '@/common/http/authenticated-request';
+import { AccountRole } from '../enums/account-role.enum';
 import { TeamRole } from '../enums/team-role.enum';
 import { TEAM_ROLES_KEY } from '../decorators/team-roles.decorator';
 import type { ITeamMemberRepository } from '@/domain/repositories/team-member.repository';
 import { TEAM_MEMBER_REPOSITORY } from '@/domain/repositories/team-member.repository';
-import { AccountRole } from '../enums/account-role.enum';
 
 @Injectable()
 export class TeamRolesGuard implements CanActivate {

@@ -34,6 +34,7 @@ import {
 import { AuditService } from '@/modules/audit-logs/audit.service';
 import { AuditAction } from '@/common/enums/audit-action.enum';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
+import { auditLogCreateInput } from '@/common/helpers/audit-log-prisma.helper';
 
 @Injectable()
 export class TeamsService {
@@ -115,11 +116,9 @@ export class TeamsService {
       });
     } catch (error) {
       if (team) {
-        // Best-effort rollback to avoid orphan teams if owner membership creation fails.
         try {
           await this.teamRepository.delete(team.id);
         } catch {
-          // ignore rollback errors and rethrow the original failure below
         }
       }
 
@@ -347,7 +346,7 @@ export class TeamsService {
       });
 
       await tx.auditLog.create({
-        data: createAuditLogData(
+        data: auditLogCreateInput(
           userId,
           AuditAction.CREATE,
           'team',
@@ -382,13 +381,10 @@ export class TeamsService {
             });
 
       if (teamProjectIds.length > 0) {
-        await tx.task.updateMany({
+        await tx.taskAssignee.deleteMany({
           where: {
-            assigneeId: member.userId,
-            projectId: { in: teamProjectIds },
-          },
-          data: {
-            assigneeId: null,
+            userId: member.userId,
+            task: { projectId: { in: teamProjectIds } },
           },
         });
 
@@ -402,7 +398,7 @@ export class TeamsService {
         if (projectMemberships.length > 0) {
           await tx.auditLog.createMany({
             data: projectMemberships.map((membership) =>
-              createAuditLogData(
+              auditLogCreateInput(
                 actorUserId,
                 AuditAction.DELETE,
                 'project_member',
@@ -422,7 +418,7 @@ export class TeamsService {
       });
 
       await tx.auditLog.create({
-        data: createAuditLogData(
+        data: auditLogCreateInput(
           actorUserId,
           AuditAction.DELETE,
           'team_member',
@@ -437,10 +433,8 @@ export class TeamsService {
   private async assertOwnerOrAdmin(
     userId: number,
     teamId: number,
-    accountRole: AccountRole,
+    _accountRole: AccountRole,
   ): Promise<void> {
-    if (accountRole === AccountRole.ADMIN) return;
-
     const membership = await this.teamMemberRepository.findByUserAndTeam(
       userId,
       teamId,
@@ -475,13 +469,15 @@ export class TeamsService {
       teamProjectIds,
     );
 
-    for (const membership of projectMemberships) {
-      await this.auditService.log(
-        actorUserId,
-        AuditAction.DELETE,
-        'project_member',
-        membership.id,
-        `Участник #${userId} автоматически удалён из проекта #${membership.projectId} после удаления из команды #${teamId}`,
+    if (projectMemberships.length > 0) {
+      await this.auditService.logMany(
+        projectMemberships.map((membership) => ({
+          userId: actorUserId,
+          action: AuditAction.DELETE,
+          entityType: 'project_member',
+          entityId: membership.id,
+          description: `Участник #${userId} автоматически удалён из проекта #${membership.projectId} после удаления из команды #${teamId}`,
+        })),
       );
     }
   }
@@ -502,6 +498,16 @@ export class TeamsService {
         membership.role !== ProjectRole.OBSERVER,
     );
 
+    const auditEntries: Array<{
+      userId: number;
+      action: AuditAction;
+      entityType: string;
+      entityId: number;
+      description: string;
+      oldValue: string;
+      newValue: string;
+    }> = [];
+
     for (const membership of memberships) {
       const updated = await this.projectMemberRepository.update(membership.id, {
         role: ProjectRole.OBSERVER,
@@ -509,15 +515,19 @@ export class TeamsService {
 
       if (!updated) continue;
 
-      await this.auditService.log(
-        actorUserId,
-        AuditAction.UPDATE,
-        'project_member',
-        membership.id,
-        `Роль участника #${membership.id} автоматически изменена на observer после перевода в observer в команде #${teamId}`,
-        membership.role,
-        ProjectRole.OBSERVER,
-      );
+      auditEntries.push({
+        userId: actorUserId,
+        action: AuditAction.UPDATE,
+        entityType: 'project_member',
+        entityId: membership.id,
+        description: `Роль участника #${membership.id} автоматически изменена на observer после перевода в observer в команде #${teamId}`,
+        oldValue: membership.role,
+        newValue: ProjectRole.OBSERVER,
+      });
+    }
+
+    if (auditEntries.length > 0) {
+      await this.auditService.logMany(auditEntries);
     }
   }
 
@@ -583,24 +593,3 @@ function mapTeamRecord(team: {
   };
 }
 
-function createAuditLogData(
-  userId: number,
-  action: AuditAction,
-  entityType: string,
-  entityId: number | null,
-  description: string,
-  timestamp: Date,
-  oldValue?: string | null,
-  newValue?: string | null,
-) {
-  return {
-    userId,
-    action,
-    entityType,
-    entityId,
-    description,
-    oldValue: oldValue ?? null,
-    newValue: newValue ?? null,
-    timestamp,
-  };
-}

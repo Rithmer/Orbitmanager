@@ -12,6 +12,9 @@ import { Request, Response } from 'express';
 export class GlobalExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(GlobalExceptionFilter.name);
 
+  private readonly isProduction =
+    process.env['NODE_ENV'] === 'production';
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
@@ -40,12 +43,20 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     } else {
       statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
       error = 'InternalServerError';
-      message = 'Internal server error';
+      message = this.isProduction
+        ? 'Сервис временно недоступен. Попробуйте позже.'
+        : 'Internal server error';
 
       this.logger.error(
         `Unhandled exception on ${request.method} ${request.url}`,
         exception instanceof Error ? exception.stack : String(exception),
       );
+    }
+
+    if (this.isProduction && statusCode >= 500) {
+      message = 'Сервис временно недоступен. Попробуйте позже.';
+      details = [];
+      error = 'InternalServerError';
     }
 
     response.status(statusCode).json({

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Outlet, NavLink, useNavigate, useLocation } from 'react-router'
+import { Outlet, NavLink, useLocation } from 'react-router'
 import {
   LayoutGrid,
   FolderOpen,
@@ -9,27 +9,39 @@ import {
   PieChart,
   Settings2,
   Menu,
-  Sun,
-  Moon,
-  ChevronDown,
-  LogOut,
   ShieldCheck,
   X,
 } from 'lucide-react'
 import { useTheme } from '../context/useTheme'
 import { useAuth } from '../context/useAuth'
+import { useAnalyticsSectionAccess } from '../hooks/useAnalyticsSectionAccess'
+import { useProjectsSectionAccess } from '../hooks/useProjectsSectionAccess'
 import { AccountRole, ACCOUNT_ROLE_LABELS } from '../types'
+import {
+  readLastBoardProjectId,
+  LAST_BOARD_PROJECT_CHANGED_EVENT,
+} from '../utils/lastBoardProjectStorage'
 
 export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [bounceKey, setBounceKey] = useState(0)
   const bounceTimerRef = useRef<ReturnType<typeof setTimeout>>(null)
-  const { isDark, toggleTheme } = useTheme()
-  const { user, logout, isAdmin } = useAuth()
-  const navigate = useNavigate()
+  const { isDark } = useTheme()
+  const { user, isAdmin } = useAuth()
   const location = useLocation()
+  const { allowed: canSeeProjectsNav, isLoading: projectsNavLoading } = useProjectsSectionAccess()
+  const { allowed: canSeeAnalyticsNav, isLoading: analyticsNavLoading } = useAnalyticsSectionAccess()
+
+  const [boardNavPath, setBoardNavPath] = useState(
+    () => `/board/${readLastBoardProjectId() ?? 0}`,
+  )
+
+  useEffect(() => {
+    const syncBoardNav = () => setBoardNavPath(`/board/${readLastBoardProjectId() ?? 0}`)
+    window.addEventListener(LAST_BOARD_PROJECT_CHANGED_EVENT, syncBoardNav)
+    return () => window.removeEventListener(LAST_BOARD_PROJECT_CHANGED_EVENT, syncBoardNav)
+  }, [])
 
   const toggleSidebar = () => {
     const next = !sidebarOpen
@@ -63,11 +75,15 @@ export function Layout() {
 
   const navItems = [
     { path: '/', label: 'Главная', icon: LayoutGrid, end: true },
-    { path: '/projects', label: 'Проекты', icon: FolderOpen, end: false },
-    { path: '/board/0', label: 'Задачи', icon: ClipboardList, end: false },
+    ...(isAdmin || (!projectsNavLoading && canSeeProjectsNav)
+      ? [{ path: '/projects', label: 'Проекты', icon: FolderOpen, end: false }]
+      : []),
+    { path: boardNavPath, label: 'Задачи', icon: ClipboardList, end: false },
     { path: '/teams', label: 'Команды', icon: Users, end: false },
     { path: '/calendar', label: 'Календарь', icon: CalendarDays, end: false },
-    { path: '/reports', label: 'Аналитика', icon: PieChart, end: false },
+    ...(isAdmin || (!analyticsNavLoading && canSeeAnalyticsNav)
+      ? [{ path: '/reports', label: 'Аналитика', icon: PieChart, end: false }]
+      : []),
     { path: '/settings', label: 'Настройки', icon: Settings2, end: false },
     ...(isAdmin
       ? [{ path: '/admin', label: 'Админ-панель', icon: ShieldCheck, end: false }]
@@ -76,27 +92,17 @@ export function Layout() {
 
   const sidebarBg = isDark ? 'bg-[#1b2431]' : 'bg-white'
   const sidebarBorderColor = isDark ? 'border-[#273142]' : 'border-[#e8e8e8]'
-  const topBarBg = isDark ? 'bg-[#273142]' : 'bg-white'
-  const topBarBorder = isDark ? 'border-[#313d4f]' : 'border-[#e8e8e8]'
   const mainBg = isDark ? 'bg-[#1c2534]' : 'bg-[#f5f6fa]'
   const logoTextColor = isDark ? 'text-[#f4f3f2]' : 'text-[#202224]'
   const navTextInactive = isDark ? 'text-[#f4f3f2]' : 'text-[#202224]'
   const navHover = isDark ? 'hover:bg-[#273142]' : 'hover:bg-[#f0f4ff]'
   const profileNameColor = isDark ? 'text-[#f4f3f2]' : 'text-[#404040]'
   const profileRoleColor = isDark ? 'text-[#94a3b8]' : 'text-[#565656]'
-  const chevronColor = isDark ? 'text-[#f4f3f2]' : 'text-[#565656]'
   const burgerColor = isDark ? 'text-[#f4f3f2]' : 'text-[#1a202c]'
   const burgerHover = isDark ? 'hover:bg-[#313d4f]' : 'hover:bg-gray-100'
-  const themeIconColor = isDark ? 'text-[#94a3b8]' : 'text-[#64748b]'
-  const themeIconHover = isDark ? 'hover:bg-[#313d4f]' : 'hover:bg-gray-100'
 
   const userInitial = user?.fullName?.charAt(0)?.toUpperCase() || 'U'
   const roleLabel = user ? ACCOUNT_ROLE_LABELS[user.accountRole as AccountRole] || user.accountRole : ''
-
-  const handleLogout = () => {
-    logout()
-    navigate('/login', { replace: true })
-  }
 
   const handleNavClick = () => {
     setMobileOpen(false)
@@ -192,14 +198,21 @@ export function Layout() {
       </nav>
 
       <div className={`border-t ${sidebarBorderColor} shrink-0 relative`}>
-        <button
-          onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+        <div
           className={`w-full flex items-center transition-colors duration-150 ${
             isMobile || sidebarOpen ? 'gap-3 p-4' : 'justify-center p-3'
           } ${navHover}`}
         >
-          <div className="w-10 h-10 rounded-full bg-[#4880ff] text-white flex items-center justify-center shrink-0 font-bold">
-            {userInitial}
+          <div className="w-10 h-10 rounded-full bg-[#4880ff] text-white flex items-center justify-center shrink-0 font-bold overflow-hidden">
+            {user?.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt="Аватар"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              userInitial
+            )}
           </div>
           {(isMobile || sidebarOpen) && (
             <>
@@ -209,39 +222,15 @@ export function Layout() {
                 </div>
                 <div className={`text-xs ${profileRoleColor}`}>{roleLabel}</div>
               </div>
-              <ChevronDown
-                className={`w-4 h-4 shrink-0 transition-transform duration-200 ${chevronColor} ${
-                  profileMenuOpen ? 'rotate-180' : ''
-                }`}
-              />
             </>
           )}
-        </button>
-
-        {profileMenuOpen && (
-          <div
-            className={`absolute bottom-full left-0 right-0 mb-1 mx-2 ${
-              isDark ? 'bg-[#273142] border-[#313d4f]' : 'bg-white border-[#e8e8e8]'
-            } border rounded-xl shadow-xl overflow-hidden z-50 dropdown-up-enter`}
-          >
-            <button
-              onClick={handleLogout}
-              className={`w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-red-500 ${
-                isDark ? 'hover:bg-[#1c2534]' : 'hover:bg-gray-50'
-              } transition-colors`}
-            >
-              <LogOut className="w-4 h-4" />
-              Выйти
-            </button>
-          </div>
-        )}
+        </div>
       </div>
     </>
   )
 
   return (
     <div className={`flex h-screen overflow-hidden ${mainBg}`}>
-      {/* Desktop Sidebar */}
       <aside
         className={`
           ${sidebarBg} border-r ${sidebarBorderColor}
@@ -253,7 +242,6 @@ export function Layout() {
         {sidebarContent(false)}
       </aside>
 
-      {/* Mobile Sidebar Overlay */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden" onClick={() => setMobileOpen(false)}>
           <div className="absolute inset-0 bg-black/50 sidebar-overlay-enter" />
@@ -266,32 +254,14 @@ export function Layout() {
         </div>
       )}
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header
-          className={`
-            ${topBarBg} border-b ${topBarBorder}
-            h-[60px] md:h-[70px] flex items-center justify-between px-4 md:px-6 shrink-0
-          `}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+        <button
+          onClick={() => setMobileOpen(!mobileOpen)}
+          className={`fixed top-3 left-3 z-[60] p-2 rounded-lg transition-all duration-200 btn-press md:hidden ${burgerColor} ${burgerHover}`}
+          aria-label="Переключить боковое меню"
         >
-          <button
-            onClick={() => setMobileOpen(!mobileOpen)}
-            className={`p-2 rounded-lg transition-all duration-200 btn-press md:hidden ${burgerColor} ${burgerHover}`}
-            aria-label="Переключить боковое меню"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-          <div className="hidden md:block" />
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={toggleTheme}
-              className={`p-2 rounded-lg transition-all duration-200 icon-btn-hover ${themeIconColor} ${themeIconHover}`}
-              aria-label="Переключить тему"
-            >
-              {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
-          </div>
-        </header>
+          <Menu className="w-5 h-5" />
+        </button>
 
         <main className="flex-1 overflow-auto">
           <div key={location.pathname} className="page-enter">

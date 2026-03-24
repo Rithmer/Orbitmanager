@@ -1,12 +1,26 @@
-import { QueryClient } from '@tanstack/react-query'
+import { MutationCache, QueryClient } from '@tanstack/react-query'
+import { ApiError } from '../api/client'
+import { dispatchApiError } from '../api/api-error-dispatch'
 
 function getHttpStatus(error: unknown): number | undefined {
   if (!error || typeof error !== 'object') {
     return undefined
   }
 
+  if (error instanceof ApiError) {
+    return error.status
+  }
+
   const response = 'response' in error ? (error as { response?: { status?: number } }).response : undefined
-  return response?.status
+  if (typeof response?.status === 'number') {
+    return response.status
+  }
+
+  if ('cause' in error && error.cause !== undefined) {
+    return getHttpStatus(error.cause)
+  }
+
+  return undefined
 }
 
 export function shouldRetryQuery(failureCount: number, error: unknown): boolean {
@@ -21,6 +35,14 @@ export function shouldRetryQuery(failureCount: number, error: unknown): boolean 
 
 export function createAppQueryClient() {
   return new QueryClient({
+    mutationCache: new MutationCache({
+      onError: (error, _variables, _context, mutation) => {
+        if (mutation.options.meta?.suppressErrorBanner === true) {
+          return
+        }
+        dispatchApiError(error)
+      },
+    }),
     defaultOptions: {
       queries: {
         staleTime: 60_000,

@@ -3,6 +3,7 @@ import {
   IsOptional,
   MaxLength,
   IsInt,
+  IsArray,
   IsEnum,
   Min,
   Max,
@@ -41,8 +42,9 @@ export class UpdateTaskDto {
   @IsOptional()
   difficulty?: number;
 
-  @ApiPropertyOptional({ example: 3 })
-  @IsInt()
+  @ApiPropertyOptional({ example: [3, 5], type: [Number] })
+  @IsArray()
+  @IsInt({ each: true })
   @IsOptional()
-  assigneeId?: number | null;
+  assigneeIds?: number[];
 }

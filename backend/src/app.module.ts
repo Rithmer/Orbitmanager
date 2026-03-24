@@ -23,6 +23,7 @@ import { CalendarViewModule } from './modules/calendar-view/calendar-view.module
 import { TeamsListViewModule } from './modules/teams-list-view/teams-list-view.module';
 import { ProjectsListViewModule } from './modules/projects-list-view/projects-list-view.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 
 @Module({
   imports: [
@@ -36,9 +37,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
     ThrottlerModule.forRoot({
       throttlers: [
         {
-          // TTL в миллисекундах: 60000 = 60 секунд
           ttl: parseInt(process.env['THROTTLE_TTL'] ?? '60000', 10),
-          // Максимум запросов за TTL-период
           limit: parseInt(process.env['THROTTLE_LIMIT'] ?? '180', 10),
         },
       ],
@@ -66,8 +65,10 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
-    // Регистрация LoggingInterceptor через DI позволяет инжектировать
-    // NestJS Logger, который направляет вывод в Winston (настроенный в main.ts)
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,

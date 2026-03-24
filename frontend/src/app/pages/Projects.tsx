@@ -13,7 +13,7 @@ import {
   LoaderCircle,
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useSearchParams } from 'react-router'
+import { Navigate, useNavigate, useSearchParams } from 'react-router'
 import { useTheme } from '../context/useTheme'
 import { projectsApi } from '../api/projects'
 import { ErrorMessage, Modal, InputField, SelectField, SubmitButton } from '../components/Modal'
@@ -25,6 +25,7 @@ import {
   RefreshBadge,
 } from '../components/PageShell'
 import { useSmoothPageSkeleton } from '../hooks/useSmoothPageSkeleton'
+import { useProjectsSectionAccess } from '../hooks/useProjectsSectionAccess'
 import { ProjectRole, PROJECT_ROLE_LABELS, ProjectStatus, PROJECT_STATUS_LABELS, RiskLevel } from '../types'
 import {
   useProjectMemberUsersQuery,
@@ -114,6 +115,10 @@ export function Projects() {
   const searchTerm = searchParams.get('search') ?? ''
 
   const [searchInput, setSearchInput] = useState(searchTerm)
+
+  const [filterTeamId, setFilterTeamId] = useState<number | null>(null)
+  const [filterStatus, setFilterStatus] = useState<ProjectStatus | ''>('')
+
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showMembersModal, setShowMembersModal] = useState(false)
@@ -132,10 +137,35 @@ export function Projects() {
   const [pendingDeleteProjectId, setPendingDeleteProjectId] = useState<number | null>(null)
   const [pendingRemoveMemberId, setPendingRemoveMemberId] = useState<number | null>(null)
 
+  useEffect(() => {
+    if (openMenuId === null) return
+
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null
+      if (!target) return
+
+      const clickedMenu = target.closest(
+        `[data-project-menu-id="${openMenuId}"]`,
+      )
+      const clickedButton = target.closest(
+        `[data-project-menu-button-id="${openMenuId}"]`,
+      )
+
+      if (!clickedMenu && !clickedButton) {
+        setOpenMenuId(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [openMenuId])
+
   const projectsQuery = useProjectsListViewQuery({
     page,
     limit: PAGE_SIZE,
     search: searchTerm || undefined,
+    teamId: filterTeamId ?? undefined,
+    status: filterStatus,
   })
   const projects = projectsQuery.data?.items ?? []
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null
@@ -147,7 +177,7 @@ export function Projects() {
   const projectMemberUsersQuery = useProjectMemberUsersQuery(
     showMembersModal || showAddMemberModal,
   )
-  const teamsOptionsQuery = useProjectTeamOptionsQuery(showCreateModal)
+  const teamsOptionsQuery = useProjectTeamOptionsQuery(true)
 
   const isInitialLoading = projectsQuery.isPending && !projectsQuery.data
   const isRefreshing = projectsQuery.isFetching && !!projectsQuery.data
@@ -222,7 +252,7 @@ export function Projects() {
 
   useEffect(() => {
     setOpenMenuId(null)
-  }, [page, searchTerm])
+  }, [page, searchTerm, filterTeamId, filterStatus])
 
   useEffect(() => {
     if (!showCreateModal) {
@@ -373,13 +403,17 @@ export function Projects() {
   }
 
   const handleRemoveProjectMember = async (memberId: number) => {
+    if (selectedProjectId === null) {
+      return
+    }
+
     if (!confirm('Убрать участника из проекта?')) {
       return
     }
 
     setPendingRemoveMemberId(memberId)
     try {
-      await projectsApi.removeMember(memberId)
+      await projectsApi.removeMember(selectedProjectId, memberId)
       await invalidateProjectQueries()
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Не удалось удалить участника')
@@ -408,6 +442,11 @@ export function Projects() {
   }
 
   const showInitialSkeleton = useSmoothPageSkeleton(isInitialLoading)
+  const projectsSectionAccess = useProjectsSectionAccess()
+
+  if (!projectsSectionAccess.isLoading && !projectsSectionAccess.allowed) {
+    return <Navigate to="/" replace />
+  }
 
   return (
     <PageShell
@@ -442,6 +481,43 @@ export function Projects() {
                 className={`w-full rounded-xl border px-9 py-2.5 text-sm transition-colors focus:border-[#4880ff] focus:outline-none ${inputBg}`}
               />
             </div>
+              <div className="mt-3 flex items-center gap-2 flex-wrap">
+                <select
+                  value={filterTeamId ?? ''}
+                  onChange={(e) => {
+                    const next = e.target.value ? Number(e.target.value) : null
+                    setFilterTeamId(next)
+                    const nextParams = buildPageQueryParams(searchParams, 1, searchTerm)
+                    setSearchParams(nextParams, { replace: true })
+                  }}
+                  className={`rounded-xl border px-3 py-2.5 text-sm transition-colors focus:border-[#4880ff] focus:outline-none ${inputBg}`}
+                >
+                  <option value="">Все команды</option>
+                  {(teamsOptionsQuery.data?.items ?? []).map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={filterStatus}
+                  onChange={(e) => {
+                    const next = (e.target.value || '') as ProjectStatus | ''
+                    setFilterStatus(next)
+                    const nextParams = buildPageQueryParams(searchParams, 1, searchTerm)
+                    setSearchParams(nextParams, { replace: true })
+                  }}
+                  className={`rounded-xl border px-3 py-2.5 text-sm transition-colors focus:border-[#4880ff] focus:outline-none ${inputBg}`}
+                >
+                  <option value="">Все статусы</option>
+                  {Object.entries(PROJECT_STATUS_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             <div className={`mt-2 flex items-center justify-between gap-3 text-xs ${textSecondary}`}>
               <span>0 проектов</span>
             </div>
@@ -460,6 +536,43 @@ export function Projects() {
                 onChange={(event) => setSearchInput(event.target.value)}
                 className={`w-full rounded-xl border px-9 py-2.5 text-sm transition-colors focus:border-[#4880ff] focus:outline-none ${inputBg}`}
               />
+            </div>
+            <div className="mt-3 flex items-center gap-2 flex-wrap">
+              <select
+                value={filterTeamId ?? ''}
+                onChange={(e) => {
+                  const next = e.target.value ? Number(e.target.value) : null
+                  setFilterTeamId(next)
+                  const nextParams = buildPageQueryParams(searchParams, 1, searchTerm)
+                  setSearchParams(nextParams, { replace: true })
+                }}
+                className={`rounded-xl border px-3 py-2.5 text-sm transition-colors focus:border-[#4880ff] focus:outline-none ${inputBg}`}
+              >
+                <option value="">Все команды</option>
+                {(teamsOptionsQuery.data?.items ?? []).map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={filterStatus}
+                onChange={(e) => {
+                  const next = (e.target.value || '') as ProjectStatus | ''
+                  setFilterStatus(next)
+                  const nextParams = buildPageQueryParams(searchParams, 1, searchTerm)
+                  setSearchParams(nextParams, { replace: true })
+                }}
+                className={`rounded-xl border px-3 py-2.5 text-sm transition-colors focus:border-[#4880ff] focus:outline-none ${inputBg}`}
+              >
+                <option value="">Все статусы</option>
+                {Object.entries(PROJECT_STATUS_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className={`mt-2 flex items-center justify-between gap-3 text-xs ${textSecondary}`}>
               <div className="flex items-center gap-2">
@@ -521,9 +634,12 @@ export function Projects() {
                           </div>
                         </div>
                       </div>
-                      <div className="relative">
+                      <div
+                        className={`relative ${openMenuId === project.id ? 'z-[70]' : ''}`}
+                      >
                         <button
                           type="button"
+                          data-project-menu-button-id={project.id}
                           onClick={(event) => {
                             event.stopPropagation()
                             setOpenMenuId((currentMenuId) =>
@@ -536,7 +652,8 @@ export function Projects() {
                         </button>
                         {openMenuId === project.id ? (
                           <div
-                            className={`dropdown-enter absolute right-0 top-8 z-10 w-52 overflow-hidden rounded-xl border shadow-xl ${
+                            data-project-menu-id={project.id}
+                            className={`dropdown-enter absolute right-0 top-8 z-[80] w-52 overflow-hidden rounded-xl border shadow-xl ${
                               isDark
                                 ? 'border-[#313d4f] bg-[#273142]'
                                 : 'border-[#e8e8e8] bg-white'
@@ -925,10 +1042,12 @@ export function Projects() {
             value={memberRole}
             onChange={(value) => setMemberRole(value as ProjectRole)}
             hint="Роль задаётся только для этого проекта."
-            options={Object.entries(PROJECT_ROLE_LABELS).map(([value, label]) => ({
-              value,
-              label,
-            }))}
+            options={Object.entries(PROJECT_ROLE_LABELS)
+              .filter(([value]) => value !== ProjectRole.TEAM_LEAD)
+              .map(([value, label]) => ({
+                value,
+                label,
+              }))}
           />
           <div className="flex justify-end gap-3 pt-2">
             <button

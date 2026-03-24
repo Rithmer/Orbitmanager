@@ -3,6 +3,7 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
+  NotFoundException,
   Inject,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -11,9 +12,9 @@ import {
   getAuthenticatedUser,
   getRouteParamAsNumber,
 } from '@/common/http/authenticated-request';
+import { AccountRole } from '../enums/account-role.enum';
 import { ProjectRole } from '../enums/project-role.enum';
 import { TeamRole } from '../enums/team-role.enum';
-import { AccountRole } from '../enums/account-role.enum';
 import { PROJECT_ROLES_KEY } from '../decorators/project-roles.decorator';
 import type { IProjectMemberRepository } from '@/domain/repositories/project-member.repository';
 import { PROJECT_MEMBER_REPOSITORY } from '@/domain/repositories/project-member.repository';
@@ -51,7 +52,6 @@ export class ProjectRolesGuard implements CanActivate {
       throw new ForbiddenException('Доступ запрещён');
     }
 
-    // Admin bypasses all project-level checks
     if (user.accountRole === AccountRole.ADMIN) {
       return true;
     }
@@ -63,7 +63,7 @@ export class ProjectRolesGuard implements CanActivate {
 
     const project = await this.projectRepository.findById(projectId);
     if (!project) {
-      throw new ForbiddenException('Проект не найден');
+      throw new NotFoundException('Проект не найден');
     }
 
     const teamMembership = await this.teamMemberRepository.findByUserAndTeam(

@@ -10,6 +10,7 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AccountRole } from '@/common/enums/account-role.enum';
+import { StrongPasswordConstraint } from '@/common/validators/strong-password';
 
 export class CreateUserDto {
   @ApiProperty({
@@ -28,13 +29,14 @@ export class CreateUserDto {
   login!: string;
 
   @ApiProperty({
-    example: 'secureP@ss1',
-    description: 'РџР°СЂРѕР»СЊ (РјРёРЅ. 8 СЃРёРјРІРѕР»РѕРІ)',
+    example: 'SecurePass1!',
+    description:
+      'Пароль: мин. 8 символов, строчные и прописные латинские буквы, цифра и спецсимвол',
   })
   @IsString()
   @IsNotEmpty()
-  @MinLength(8)
   @MaxLength(100)
+  @StrongPasswordConstraint()
   password!: string;
 
   @ApiProperty({
@@ -46,12 +48,9 @@ export class CreateUserDto {
   @MaxLength(100)
   fullName!: string;
 
-  @ApiPropertyOptional({
-    example: 'Backend Developer',
-    description: 'РџСЂРѕС„РµСЃСЃРёСЏ',
-  })
+  @ApiProperty({ example: 'Backend Developer', description: 'Профессия' })
   @IsString()
-  @IsOptional()
+  @IsNotEmpty()
   @MaxLength(100)
   profession?: string;
 
@@ -59,12 +58,4 @@ export class CreateUserDto {
   @IsEnum(AccountRole)
   @IsOptional()
   accountRole?: AccountRole;
-
-  @ApiPropertyOptional({
-    enum: ['active', 'blocked', 'inactive'],
-    default: 'active',
-  })
-  @IsIn(['active', 'blocked', 'inactive'])
-  @IsOptional()
-  accountStatus?: 'active' | 'blocked' | 'inactive';
 }

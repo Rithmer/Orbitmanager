@@ -33,12 +33,11 @@ const mockPrisma = {
             deadline: new Date(Date.now() + 86_400_000),
             status: TaskStatus.NEW,
             difficulty: 3,
-            assigneeId: 20,
             createdById: 1,
             createdAt: new Date(),
             updatedAt: new Date(),
             project: { name: 'Project 1' },
-            assignee: { fullName: 'User 20' },
+            assignees: [{ userId: 20, user: { fullName: 'User 20' } }],
           },
         ];
       }
@@ -52,11 +51,11 @@ const mockPrisma = {
           deadline: new Date(Date.now() + 86_400_000),
           status: TaskStatus.NEW,
           difficulty: 3,
-          assigneeId: 20,
           createdById: 1,
           createdAt: new Date(),
           updatedAt: new Date(),
           project: { name: 'Project 1' },
+          assignees: [{ userId: 20 }],
         },
       ];
     }),
@@ -79,6 +78,7 @@ const mockRiskService: IRiskAssessmentService = {
     recommendation: 'Check',
   }),
   assessProject: jest.fn(),
+  assessProjectsBatch: jest.fn().mockResolvedValue({}),
 };
 
 describe('DashboardService', () => {

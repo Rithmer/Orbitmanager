@@ -36,6 +36,24 @@ export class AuditService {
     });
   }
 
+  async logMany(
+    entries: Array<{
+      userId: number;
+      action: AuditAction;
+      entityType: string;
+      entityId: number | null;
+      description?: string;
+      oldValue?: string | null;
+      newValue?: string | null;
+    }>,
+  ): Promise<void> {
+    await Promise.all(
+      entries.map((e) =>
+        this.log(e.userId, e.action, e.entityType, e.entityId, e.description, e.oldValue, e.newValue),
+      ),
+    );
+  }
+
   async findAll(
     params: QueryParams,
     filters?: {

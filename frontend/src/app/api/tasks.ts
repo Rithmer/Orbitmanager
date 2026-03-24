@@ -1,5 +1,6 @@
 import { api, buildQuery, type ApiRequestOptions } from './client'
 import type { Task, PaginatedResult, QueryParams } from '../types'
+import { TaskStatus } from '../types'
 
 export const tasksApi = {
   list(params: QueryParams = {}, options: ApiRequestOptions = {}): Promise<PaginatedResult<Task>> {
@@ -16,7 +17,7 @@ export const tasksApi = {
     description?: string
     deadline: string
     difficulty: number
-    assigneeId?: number
+    assigneeIds?: number[]
   }): Promise<Task> {
     return api.post('/tasks', dto)
   },
@@ -28,8 +29,8 @@ export const tasksApi = {
       description: string
       deadline: string
       difficulty: number
-      status: string
-      assigneeId: number | null
+      status: TaskStatus
+      assigneeIds: number[]
     }>,
   ): Promise<Task> {
     return api.patch(`/tasks/${id}`, dto)

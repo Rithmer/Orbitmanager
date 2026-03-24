@@ -1,4 +1,32 @@
 const API_BASE = '/api'
+const AUTH_STORAGE_MODE = import.meta.env.VITE_AUTH_STORAGE_MODE ?? 'session'
+
+type AuthStorageMode = 'session' | 'local' | 'memory'
+
+function resolveAuthStorageMode(): AuthStorageMode {
+  if (AUTH_STORAGE_MODE === 'local') {
+    return 'local'
+  }
+  if (AUTH_STORAGE_MODE === 'memory') {
+    return 'memory'
+  }
+  return 'session'
+}
+
+const authStorageMode = resolveAuthStorageMode()
+
+function getStorage(): Storage | null {
+  if (typeof window === 'undefined') {
+    return null
+  }
+  if (authStorageMode === 'local') {
+    return window.localStorage
+  }
+  if (authStorageMode === 'session') {
+    return window.sessionStorage
+  }
+  return null
+}
 
 export interface ApiRequestOptions {
   signal?: AbortSignal
@@ -28,20 +56,23 @@ class ApiClient {
   setTokens(access: string, refresh: string) {
     this.accessToken = access
     this.refreshToken = refresh
-    localStorage.setItem('accessToken', access)
-    localStorage.setItem('refreshToken', refresh)
+    const storage = getStorage()
+    storage?.setItem('accessToken', access)
+    storage?.setItem('refreshToken', refresh)
   }
 
   loadTokens() {
-    this.accessToken = localStorage.getItem('accessToken')
-    this.refreshToken = localStorage.getItem('refreshToken')
+    const storage = getStorage()
+    this.accessToken = storage?.getItem('accessToken') ?? null
+    this.refreshToken = storage?.getItem('refreshToken') ?? null
   }
 
   clearTokens() {
     this.accessToken = null
     this.refreshToken = null
-    localStorage.removeItem('accessToken')
-    localStorage.removeItem('refreshToken')
+    const storage = getStorage()
+    storage?.removeItem('accessToken')
+    storage?.removeItem('refreshToken')
   }
 
   getAccessToken() {
@@ -53,16 +84,21 @@ class ApiClient {
   }
 
   private async doRefresh(): Promise<boolean> {
-    if (!this.refreshToken) return false
+    const canRefreshWithCookieOnly = authStorageMode === 'memory'
+    if (!this.refreshToken && !canRefreshWithCookieOnly) return false
     try {
+      const refreshBody = this.refreshToken ? { refreshToken: this.refreshToken } : undefined
       const res = await fetch(`${API_BASE}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: this.refreshToken }),
+        body: refreshBody ? JSON.stringify(refreshBody) : undefined,
+        credentials: 'include',
       })
       if (!res.ok) return false
       const data = await res.json()
-      this.setTokens(data.accessToken, data.refreshToken)
+      if (data.accessToken && data.refreshToken) {
+        this.setTokens(data.accessToken, data.refreshToken)
+      }
       return true
     } catch {
       return false
@@ -79,7 +115,7 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${this.accessToken}`
     }
 
-    let res = await fetch(`${API_BASE}${path}`, { ...options, headers })
+    let res = await fetch(`${API_BASE}${path}`, { ...options, headers, credentials: 'include' })
 
     if (res.status === 401 && this.refreshToken) {
       if (!this.refreshPromise) {
@@ -91,7 +127,7 @@ class ApiClient {
 
       if (refreshed) {
         headers['Authorization'] = `Bearer ${this.accessToken}`
-        res = await fetch(`${API_BASE}${path}`, { ...options, headers })
+        res = await fetch(`${API_BASE}${path}`, { ...options, headers, credentials: 'include' })
       } else {
         this.clearTokens()
         this.onAuthExpired?.()

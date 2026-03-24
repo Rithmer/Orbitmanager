@@ -49,7 +49,7 @@ const mockTask: Task = {
   deadline: futureISO,
   status: TaskStatus.NEW,
   difficulty: 3,
-  assigneeId: DEVELOPER_ID,
+  assigneeIds: [DEVELOPER_ID],
   createdById: OWNER_ID,
   createdAt: nowISO,
   updatedAt: nowISO,
@@ -68,7 +68,7 @@ const mockTaskRepository = {
   findById: jest.fn().mockResolvedValue(mockTask),
   findByProject: jest.fn().mockResolvedValue([mockTask]),
   findByProjects: jest.fn().mockResolvedValue([mockTask]),
-  findPaginated: jest.fn().mockResolvedValue(paginatedTasks),
+  findPage: jest.fn().mockResolvedValue(paginatedTasks),
   create: jest
     .fn()
     .mockImplementation((data: Omit<Task, 'id'>) =>
@@ -157,8 +157,8 @@ describe('TasksService', () => {
     it('returns all tasks for admin', async () => {
       const result = await service.findAll({}, OWNER_ID, AccountRole.ADMIN);
       expect(result.items).toHaveLength(1);
-      expect(mockTaskRepository.findPaginated).toHaveBeenCalledWith(
-        expect.objectContaining({ searchFields: ['name', 'description'] }),
+      expect(mockTaskRepository.findPage).toHaveBeenCalledWith(
+        expect.objectContaining({ page: 1, limit: 20 }),
       );
     });
 
@@ -168,9 +168,8 @@ describe('TasksService', () => {
       ]);
       const result = await service.findAll({}, OWNER_ID, AccountRole.MEMBER);
       expect(result.items).toHaveLength(1);
-      expect(mockTaskRepository.findPaginated).toHaveBeenCalledWith(
-        expect.objectContaining({ searchFields: ['name', 'description'] }),
-        [PROJECT_ID],
+      expect(mockTaskRepository.findPage).toHaveBeenCalledWith(
+        expect.objectContaining({ page: 1, limit: 20, projectIds: [PROJECT_ID] }),
       );
     });
   });
@@ -209,7 +208,7 @@ describe('TasksService', () => {
       description: 'desc',
       deadline: futureISO,
       difficulty: 3,
-      assigneeId: undefined,
+      assigneeIds: undefined,
     };
 
     it('creates task when access is allowed', async () => {
@@ -257,7 +256,7 @@ describe('TasksService', () => {
       );
       await expect(
         service.create(
-          { ...createDto, assigneeId: 999 },
+          { ...createDto, assigneeIds: [999] },
           OWNER_ID,
           AccountRole.MEMBER,
         ),
@@ -311,7 +310,7 @@ describe('TasksService', () => {
     it('allows developer to change status of own task', async () => {
       const devTask: Task = {
         ...mockTask,
-        assigneeId: DEVELOPER_ID,
+        assigneeIds: [DEVELOPER_ID],
         status: TaskStatus.IN_PROGRESS,
       };
       mockTaskRepository.findById.mockResolvedValueOnce(devTask);

@@ -22,7 +22,7 @@ export function buildTaskRiskInput(
     deadline: task.deadline,
     createdAt: task.createdAt,
     status: task.status,
-    assigneeCount: task.assigneeId ? 1 : 0,
+    assigneeCount: task.assigneeIds.length,
     assigneeLoad,
     statusChangesCount,
     daysSinceCreation,

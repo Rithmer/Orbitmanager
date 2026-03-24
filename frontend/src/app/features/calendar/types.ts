@@ -1,3 +1,5 @@
+import { TaskStatus } from '../../types'
+
 export interface CalendarViewProject {
   id: number
   name: string
@@ -11,7 +13,7 @@ export interface CalendarViewTask {
   name: string
   description: string
   deadline: string
-  status: string
+  status: TaskStatus
   difficulty: number
 }
 

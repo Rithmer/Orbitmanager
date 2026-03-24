@@ -6,6 +6,7 @@ import {
   ConflictException,
   BadRequestException,
 } from '@nestjs/common';
+import { InMemoryCacheService } from '@/common/cache/in-memory-cache.service';
 import { ProjectAccessService } from '@/common/access/project-access.service';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { AuditAction } from '@/common/enums/audit-action.enum';
@@ -34,6 +35,7 @@ import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectMemberDto } from './dto/update-project-member.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
+import { auditLogCreateInput } from '@/common/helpers/audit-log-prisma.helper';
 
 @Injectable()
 export class ProjectsService {
@@ -50,6 +52,7 @@ export class ProjectsService {
     private readonly teamRepository: ITeamRepository,
     private readonly auditService: AuditService,
     private readonly projectAccessService: ProjectAccessService,
+    private readonly cache: InMemoryCacheService,
     @Optional() private readonly prisma?: PrismaService,
   ) {}
 
@@ -150,7 +153,9 @@ export class ProjectsService {
     );
 
     if (this.prisma) {
-      return this.createWithTransaction(dto, userId);
+      const project = await this.createWithTransaction(dto, userId);
+      this.invalidateUserCaches(userId);
+      return project;
     }
 
     const now = new Date().toISOString();
@@ -171,6 +176,7 @@ export class ProjectsService {
       `Создан проект "${project.name}"`,
     );
 
+    this.invalidateUserCaches(userId);
     return project;
   }
 
@@ -204,6 +210,7 @@ export class ProjectsService {
       `Обновлён проект "${updated.name}"`,
     );
 
+    this.invalidateUserCaches(userId);
     return updated;
   }
 
@@ -229,6 +236,8 @@ export class ProjectsService {
       id,
       `Удалён проект "${project.name}"`,
     );
+
+    this.invalidateUserCaches(userId);
   }
 
   async findMembers(
@@ -406,6 +415,11 @@ export class ProjectsService {
     return member;
   }
 
+  private invalidateUserCaches(userId: number): void {
+    this.cache.invalidateByPrefix(`dashboard:summary:${userId}:`);
+    this.cache.invalidateByPrefix(`reports:summary:${userId}:`);
+  }
+
   private async createWithTransaction(
     dto: CreateProjectDto,
     userId: number,
@@ -423,8 +437,32 @@ export class ProjectsService {
         },
       });
 
+      const teamMembers = await tx.teamMember.findMany({
+        where: { teamId: dto.teamId },
+      });
+
+      for (const tm of teamMembers) {
+        let projectRole: ProjectRole;
+        if (tm.teamRole === TeamRole.OWNER) {
+          projectRole = ProjectRole.TEAM_LEAD;
+        } else if (tm.teamRole === TeamRole.OBSERVER) {
+          projectRole = ProjectRole.OBSERVER;
+        } else {
+          projectRole = ProjectRole.DEVELOPER;
+        }
+
+        await tx.projectMember.create({
+          data: {
+            projectId: createdProject.id,
+            userId: tm.userId,
+            role: projectRole,
+            assignedAt: timestamp,
+          },
+        });
+      }
+
       await tx.auditLog.create({
-        data: createAuditLogData(
+        data: auditLogCreateInput(
           userId,
           AuditAction.CREATE,
           'project',
@@ -447,13 +485,10 @@ export class ProjectsService {
     const timestamp = new Date();
 
     await this.prisma!.$transaction(async (tx) => {
-      await tx.task.updateMany({
+      await tx.taskAssignee.deleteMany({
         where: {
-          assigneeId: member.userId,
-          projectId: member.projectId,
-        },
-        data: {
-          assigneeId: null,
+          userId: member.userId,
+          task: { projectId: member.projectId },
         },
       });
 
@@ -464,7 +499,7 @@ export class ProjectsService {
       });
 
       await tx.auditLog.create({
-        data: createAuditLogData(
+        data: auditLogCreateInput(
           actorUserId,
           AuditAction.DELETE,
           'project_member',
@@ -559,24 +594,3 @@ function mapProjectRecord(project: {
   };
 }
 
-function createAuditLogData(
-  userId: number,
-  action: AuditAction,
-  entityType: string,
-  entityId: number | null,
-  description: string,
-  timestamp: Date,
-  oldValue?: string | null,
-  newValue?: string | null,
-) {
-  return {
-    userId,
-    action,
-    entityType,
-    entityId,
-    description,
-    oldValue: oldValue ?? null,
-    newValue: newValue ?? null,
-    timestamp,
-  };
-}

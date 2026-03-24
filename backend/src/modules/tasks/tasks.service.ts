@@ -1,14 +1,15 @@
 import {
   Injectable,
   Inject,
+  Optional,
   NotFoundException,
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
+import { InMemoryCacheService } from '@/common/cache/in-memory-cache.service';
 import { ProjectAccessService } from '@/common/access/project-access.service';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { AuditAction } from '@/common/enums/audit-action.enum';
-import { ProjectRole } from '@/common/enums/project-role.enum';
 import {
   ALLOWED_TASK_TRANSITIONS,
   TaskStatus,
@@ -28,6 +29,8 @@ import { TASK_REPOSITORY } from '@/domain/repositories/task.repository';
 import { AuditService } from '../audit-logs/audit.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service';
+import { auditLogCreateInput } from '@/common/helpers/audit-log-prisma.helper';
 
 @Injectable()
 export class TasksService {
@@ -40,6 +43,8 @@ export class TasksService {
     private readonly projectMemberRepository: IProjectMemberRepository,
     private readonly auditService: AuditService,
     private readonly projectAccessService: ProjectAccessService,
+    @Optional() private readonly prisma?: PrismaService,
+    private readonly cache: InMemoryCacheService,
   ) {}
 
   async findAll(
@@ -109,7 +114,7 @@ export class TasksService {
         .filter((task) => (projectId !== undefined ? task.projectId === projectId : true))
         .filter((task) => (status ? task.status === status : true))
         .filter((task) => (difficulty !== undefined ? task.difficulty === difficulty : true))
-        .filter((task) => (assigneeId !== undefined ? task.assigneeId === assigneeId : true))
+        .filter((task) => (assigneeId !== undefined ? task.assigneeIds.includes(assigneeId) : true))
         .filter((task) => {
           if (!params.search) {
             return true;
@@ -169,19 +174,32 @@ export class TasksService {
       throw new BadRequestException('Дедлайн должен быть в будущем');
     }
 
-    if (dto.assigneeId !== undefined && dto.assigneeId !== null) {
+    const assigneeIds = dto.assigneeIds ?? [];
+    for (const assigneeId of assigneeIds) {
       const assigneeMembership =
         await this.projectMemberRepository.findByUserAndProject(
-          dto.assigneeId,
+          assigneeId,
           dto.projectId,
         );
       if (!assigneeMembership) {
         throw new BadRequestException(
-          `Пользователь #${dto.assigneeId} не является участником проекта #${dto.projectId}`,
+          `Пользователь #${assigneeId} не является участником проекта #${dto.projectId}`,
         );
       }
     }
 
+    const task = await (this.prisma
+      ? this.createWithAuditTransaction(dto, userId, assigneeIds, deadlineDate)
+      : this.createViaRepository(dto, userId, assigneeIds));
+    this.invalidateUserCaches(userId);
+    return task;
+  }
+
+  private async createViaRepository(
+    dto: CreateTaskDto,
+    userId: number,
+    assigneeIds: number[],
+  ): Promise<Task> {
     const now = new Date().toISOString();
     const task = await this.taskRepository.create({
       projectId: dto.projectId,
@@ -190,7 +208,7 @@ export class TasksService {
       deadline: dto.deadline,
       status: TaskStatus.NEW,
       difficulty: dto.difficulty,
-      assigneeId: dto.assigneeId ?? null,
+      assigneeIds,
       createdById: userId,
       createdAt: now,
       updatedAt: now,
@@ -205,6 +223,65 @@ export class TasksService {
     );
 
     return task;
+  }
+
+  private invalidateUserCaches(userId: number): void {
+    this.cache.invalidateByPrefix(`dashboard:summary:${userId}:`);
+    this.cache.invalidateByPrefix(`reports:summary:${userId}:`);
+  }
+
+  private async createWithAuditTransaction(
+    dto: CreateTaskDto,
+    userId: number,
+    assigneeIds: number[],
+    deadlineDate: Date,
+  ): Promise<Task> {
+    const timestamp = new Date();
+    const row = await this.prisma!.$transaction(async (tx) => {
+      const created = await tx.task.create({
+        data: {
+          projectId: dto.projectId,
+          name: dto.name,
+          description: dto.description ?? '',
+          deadline: deadlineDate,
+          status: TaskStatus.NEW,
+          difficulty: dto.difficulty,
+          createdById: userId,
+          assignees:
+            assigneeIds.length > 0
+              ? { create: assigneeIds.map((uid) => ({ userId: uid })) }
+              : undefined,
+        },
+        include: { assignees: { select: { userId: true } } },
+      });
+
+      await tx.auditLog.create({
+        data: auditLogCreateInput(
+          userId,
+          AuditAction.CREATE,
+          'task',
+          created.id,
+          `Создана задача "${created.name}"`,
+          timestamp,
+        ),
+      });
+
+      return created;
+    });
+
+    return {
+      id: row.id,
+      projectId: row.projectId,
+      name: row.name,
+      description: row.description,
+      deadline: row.deadline.toISOString(),
+      status: row.status as TaskStatus,
+      difficulty: row.difficulty,
+      assigneeIds: row.assignees.map((a) => a.userId),
+      createdById: row.createdById,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
   }
 
   async update(
@@ -231,16 +308,18 @@ export class TasksService {
       );
     }
 
-    if (dto.assigneeId !== undefined && dto.assigneeId !== null) {
-      const assigneeMembership =
-        await this.projectMemberRepository.findByUserAndProject(
-          dto.assigneeId,
-          task.projectId,
-        );
-      if (!assigneeMembership) {
-        throw new BadRequestException(
-          `Пользователь #${dto.assigneeId} не является участником проекта #${task.projectId}`,
-        );
+    if (dto.assigneeIds && dto.assigneeIds.length > 0) {
+      for (const assigneeId of dto.assigneeIds) {
+        const assigneeMembership =
+          await this.projectMemberRepository.findByUserAndProject(
+            assigneeId,
+            task.projectId,
+          );
+        if (!assigneeMembership) {
+          throw new BadRequestException(
+            `Пользователь #${assigneeId} не является участником проекта #${task.projectId}`,
+          );
+        }
       }
     }
 
@@ -275,6 +354,7 @@ export class TasksService {
       );
     }
 
+    this.invalidateUserCaches(userId);
     return updated;
   }
 
@@ -305,6 +385,8 @@ export class TasksService {
       id,
       `Удалена задача "${task.name}"`,
     );
+
+    this.invalidateUserCaches(userId);
   }
 
   private async assertCanChangeStatus(
@@ -325,16 +407,7 @@ export class TasksService {
       return;
     }
 
-    const projectMembership =
-      await this.projectMemberRepository.findByUserAndProject(
-        userId,
-        task.projectId,
-      );
-
-    if (
-      projectMembership?.role === ProjectRole.DEVELOPER &&
-      task.assigneeId === userId
-    ) {
+    if (task.assigneeIds.includes(userId)) {
       return;
     }
 
