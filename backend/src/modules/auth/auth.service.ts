@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import type { StringValue } from 'ms';
 import ms from 'ms';
 import * as argon2 from 'argon2';
@@ -152,18 +152,14 @@ export class AuthService {
     }
 
     const hash = hashToken(refreshToken);
-    const stored = await this.prisma.refreshToken.findUnique({
-      where: { tokenHash: hash },
-    });
-
-    if (!stored || stored.revokedAt !== null) {
-      throw new UnauthorizedException('Токен отозван или не найден');
-    }
-
-    await this.prisma.refreshToken.update({
-      where: { tokenHash: hash },
+    const revokeResult = await this.prisma.refreshToken.updateMany({
+      where: { tokenHash: hash, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+
+    if (revokeResult.count === 0) {
+      throw new UnauthorizedException('Токен отозван или не найден');
+    }
 
     const user = await this.usersService.findEntityById(payload.sub);
     if (!user) {
@@ -196,18 +192,22 @@ export class AuthService {
       this.configService.get<string>('JWT_ACCESS_EXPIRES_IN') ?? '15m';
     const refreshExpiresIn =
       this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') ?? '7d';
-    const tokenPayload = {
+    const accessTokenPayload = {
       sub: payload.sub,
       login: payload.login,
       accountRole: payload.accountRole,
     };
+    const refreshTokenPayload = {
+      ...accessTokenPayload,
+      tokenId: randomUUID(),
+    };
 
     const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(tokenPayload, {
+      this.jwtService.signAsync(accessTokenPayload, {
         secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
         expiresIn: accessExpiresIn as StringValue,
       }),
-      this.jwtService.signAsync(tokenPayload, {
+      this.jwtService.signAsync(refreshTokenPayload, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
         expiresIn: refreshExpiresIn as StringValue,
       }),

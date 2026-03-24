@@ -31,6 +31,8 @@ const project: Project = {
 
 const mockProjectRepository = {
   findByTeams: jest.fn().mockResolvedValue([project]),
+  findByIds: jest.fn().mockResolvedValue([]),
+  findIdsByTeams: jest.fn().mockResolvedValue([]),
 };
 
 const mockProjectMemberRepository = {
@@ -70,8 +72,8 @@ describe('ProjectAccessService', () => {
       { id: 1, userId: 1, teamId: 1, teamRole: TeamRole.OWNER },
       { id: 2, userId: 1, teamId: 2, teamRole: TeamRole.OBSERVER },
     ]);
-    mockProjectRepository.findByTeams.mockResolvedValueOnce([
-      project,
+    mockProjectRepository.findIdsByTeams.mockResolvedValueOnce([project.id]);
+    mockProjectRepository.findByIds.mockResolvedValueOnce([
       { ...project, id: 11, teamId: 2 },
     ]);
     mockProjectMemberRepository.findByUser.mockResolvedValueOnce([
@@ -157,5 +159,20 @@ describe('ProjectAccessService', () => {
     await expect(
       service.assertTeamOwnerOrAdmin(3, 1, AccountRole.MEMBER),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('allows team-level administration for admin without membership', async () => {
+    await expect(
+      service.assertTeamOwnerOrAdmin(3, 1, AccountRole.ADMIN),
+    ).resolves.not.toThrow();
+    expect(mockTeamMemberRepository.findByUserAndTeam).not.toHaveBeenCalled();
+  });
+
+  it('allows project management for admin without membership checks', async () => {
+    await expect(
+      service.assertCanManageProject(project, 3, AccountRole.ADMIN),
+    ).resolves.not.toThrow();
+    expect(mockTeamMemberRepository.findByUserAndTeam).not.toHaveBeenCalled();
+    expect(mockProjectMemberRepository.findByUserAndProject).not.toHaveBeenCalled();
   });
 });

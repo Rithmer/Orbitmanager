@@ -110,6 +110,24 @@ const mockAuditService = {
   log: jest.fn().mockResolvedValue(undefined),
 };
 
+const mockPrismaTx = {
+  task: {
+    create: jest.fn(),
+  },
+  auditLog: {
+    create: jest.fn(),
+  },
+  taskAssignee: {
+    createMany: jest.fn(),
+  },
+};
+
+const mockPrismaService = {
+  $transaction: jest.fn(
+    (fn: (tx: typeof mockPrismaTx) => Promise<unknown>) => fn(mockPrismaTx),
+  ),
+};
+
 const mockProjectAccessService = {
   getVisibleProjectIds: jest.fn().mockResolvedValue([]),
   assertProjectVisibility: jest.fn().mockResolvedValue(undefined),
@@ -143,23 +161,7 @@ describe('TasksService', () => {
         },
         {
           provide: PrismaService,
-          useValue: {
-            $transaction: jest.fn((fn: (tx: unknown) => Promise<unknown>) =>
-              fn({
-                task: {
-                  create: jest.fn().mockResolvedValue({
-                    ...mockTask,
-                    deadline: new Date(mockTask.deadline),
-                    createdAt: new Date(mockTask.createdAt),
-                    updatedAt: new Date(mockTask.updatedAt),
-                    assignees: [],
-                  }),
-                },
-                auditLog: { create: jest.fn().mockResolvedValue({}) },
-                taskAssignee: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
-              }),
-            ),
-          },
+          useValue: mockPrismaService,
         },
       ],
     }).compile();
@@ -176,6 +178,18 @@ describe('TasksService', () => {
     );
     mockProjectAccessService.hasTeamOwnershipOrProjectLead.mockResolvedValue(
       false,
+    );
+    mockPrismaTx.task.create.mockResolvedValue({
+      ...mockTask,
+      deadline: new Date(mockTask.deadline),
+      createdAt: new Date(mockTask.createdAt),
+      updatedAt: new Date(mockTask.updatedAt),
+      assignees: [],
+    });
+    mockPrismaTx.auditLog.create.mockResolvedValue({});
+    mockPrismaTx.taskAssignee.createMany.mockResolvedValue({ count: 0 });
+    mockPrismaService.$transaction.mockImplementation(
+      (fn: (tx: typeof mockPrismaTx) => Promise<unknown>) => fn(mockPrismaTx),
     );
   });
 
@@ -237,7 +251,7 @@ describe('TasksService', () => {
       assigneeIds: undefined,
     };
 
-    it('creates task when access is allowed', async () => {
+    it('creates task in transaction when Prisma is available', async () => {
       const result = await service.create(
         createDto,
         OWNER_ID,
@@ -247,7 +261,9 @@ describe('TasksService', () => {
       expect(
         mockProjectAccessService.assertTeamOwnerOrProjectLead,
       ).toHaveBeenCalled();
-      expect(mockAuditService.log).toHaveBeenCalled();
+      expect(mockPrismaService.$transaction).toHaveBeenCalled();
+      expect(mockPrismaTx.auditLog.create).toHaveBeenCalled();
+      expect(mockAuditService.log).not.toHaveBeenCalled();
     });
 
     it('throws ForbiddenException when access service blocks creation', async () => {

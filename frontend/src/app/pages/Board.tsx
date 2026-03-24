@@ -81,6 +81,25 @@ export function Board() {
   const [projectPickerSearch, setProjectPickerSearch] = useState('')
 
   const projectPickerQuery = useBoardProjectPickerQuery(hasProjectId)
+  const {
+    pendingTaskActions,
+    createTaskMutation,
+    updateTaskMutation,
+    deleteTaskMutation,
+    changeTaskStatusMutation,
+  } = useBoardMutations({
+    projectId,
+    hasProjectId,
+    onCreateSuccess: () => {
+      setIsTaskFormOpen(false)
+      resetTaskForm()
+    },
+    onUpdateSuccess: () => {
+      setIsTaskFormOpen(false)
+      setSelectedTaskForEditing(null)
+      resetTaskForm()
+    },
+  })
 
   const pickerProjectsAll = useMemo(
     () => projectPickerQuery.data?.items ?? [],
@@ -339,26 +358,6 @@ export function Board() {
     setTaskFormStatus(TaskStatus.NEW)
     setTaskFormError('')
   }
-
-  const {
-    pendingTaskActions,
-    createTaskMutation,
-    updateTaskMutation,
-    deleteTaskMutation,
-    changeTaskStatusMutation,
-  } = useBoardMutations({
-    projectId,
-    hasProjectId,
-    onCreateSuccess: () => {
-      setIsTaskFormOpen(false)
-      resetTaskForm()
-    },
-    onUpdateSuccess: () => {
-      setIsTaskFormOpen(false)
-      setSelectedTaskForEditing(null)
-      resetTaskForm()
-    },
-  })
 
   return (
     <PageShell

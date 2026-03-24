@@ -21,6 +21,8 @@ import {
 import { ApiAuth } from '@/common/decorators/api-auth.decorator';
 import { TeamsService } from './teams.service';
 import { AddTeamMemberDto, UpdateTeamMemberDto } from './dto';
+import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
+import { Roles } from '@/common/decorators/roles.decorator';
 import { TeamRolesGuard } from '@/common/guards/team-roles.guard';
 import { TeamRoles } from '@/common/decorators/team-roles.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
@@ -113,6 +115,18 @@ export class TeamMembersController {
     return this.teamsService.updateMember(id, dto, userId, userRole);
   }
 
+  @Patch('team-members/:id')
+  @UseGuards(AccountRolesGuard)
+  @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
+  legacyUpdateMember(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateTeamMemberDto,
+    @CurrentUser('id') userId: number,
+    @CurrentUser('accountRole') userRole: AccountRole,
+  ) {
+    return this.teamsService.updateMember(id, dto, userId, userRole);
+  }
+
   @Delete('teams/:teamId/members/:id')
   @UseGuards(TeamRolesGuard)
   @TeamRoles(TeamRole.OWNER)
@@ -123,6 +137,18 @@ export class TeamMembersController {
   @ApiResponse({ status: 404, description: 'Участник не найден' })
   removeMember(
     @Param('teamId', ParseIntPipe) _teamId: number,
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser('id') userId: number,
+    @CurrentUser('accountRole') userRole: AccountRole,
+  ) {
+    return this.teamsService.removeMember(id, userId, userRole);
+  }
+
+  @Delete('team-members/:id')
+  @UseGuards(AccountRolesGuard)
+  @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  legacyRemoveMember(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('id') userId: number,
     @CurrentUser('accountRole') userRole: AccountRole,

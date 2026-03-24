@@ -223,6 +223,17 @@ describe('TeamsService', () => {
         service.update(1, { name: 'Hack' }, 20, AccountRole.MEMBER),
       ).rejects.toThrow(ForbiddenException);
     });
+
+    it('should allow admin to update team without owner membership', async () => {
+      const result = await service.update(
+        1,
+        { name: 'Updated by admin' },
+        99,
+        AccountRole.ADMIN,
+      );
+      expect(result.name).toBe('Updated by admin');
+      expect(mockTeamMemberRepository.findByUserAndTeam).not.toHaveBeenCalled();
+    });
   });
 
   describe('updateMember', () => {

@@ -433,8 +433,12 @@ export class TeamsService {
   private async assertOwnerOrAdmin(
     userId: number,
     teamId: number,
-    _accountRole: AccountRole,
+    accountRole: AccountRole,
   ): Promise<void> {
+    if (accountRole === AccountRole.ADMIN) {
+      return;
+    }
+
     const membership = await this.teamMemberRepository.findByUserAndTeam(
       userId,
       teamId,
@@ -592,4 +596,3 @@ function mapTeamRecord(team: {
     createdById: team.createdById,
   };
 }
-

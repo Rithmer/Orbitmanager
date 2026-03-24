@@ -130,6 +130,17 @@ export class ProjectMembersController {
     return this.projectsService.updateMember(id, dto, userId, userRole);
   }
 
+  @Patch('project-members/:id')
+  @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
+  legacyUpdateMember(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateProjectMemberDto,
+    @CurrentUser('id') userId: number,
+    @CurrentUser('accountRole') userRole: AccountRole,
+  ) {
+    return this.projectsService.updateMember(id, dto, userId, userRole);
+  }
+
   @Delete('projects/:projectId/members/:id')
   @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -141,6 +152,17 @@ export class ProjectMembersController {
   @ApiResponse({ status: 404, description: 'Участник не найден' })
   removeMember(
     @Param('projectId', ParseIntPipe) _projectId: number,
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser('id') userId: number,
+    @CurrentUser('accountRole') userRole: AccountRole,
+  ) {
+    return this.projectsService.removeMember(id, userId, userRole);
+  }
+
+  @Delete('project-members/:id')
+  @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  legacyRemoveMember(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('id') userId: number,
     @CurrentUser('accountRole') userRole: AccountRole,

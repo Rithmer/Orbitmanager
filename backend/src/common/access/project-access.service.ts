@@ -117,8 +117,12 @@ export class ProjectAccessService {
   async assertTeamOwnerOrAdmin(
     userId: number,
     teamId: number,
-    _accountRole: AccountRole,
+    accountRole: AccountRole,
   ): Promise<void> {
+    if (accountRole === AccountRole.ADMIN) {
+      return;
+    }
+
     const membership = await this.teamMemberRepository.findByUserAndTeam(
       userId,
       teamId,
@@ -168,8 +172,12 @@ export class ProjectAccessService {
     userId: number,
     teamId: number,
     projectId: number,
-    _accountRole: AccountRole,
+    accountRole: AccountRole,
   ): Promise<boolean> {
+    if (accountRole === AccountRole.ADMIN) {
+      return true;
+    }
+
     const teamMembership = await this.teamMemberRepository.findByUserAndTeam(
       userId,
       teamId,

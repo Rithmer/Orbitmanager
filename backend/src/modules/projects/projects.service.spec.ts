@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ProjectAccessService } from '@/common/access/project-access.service';
+import { InMemoryCacheService } from '@/common/cache/in-memory-cache.service';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { ProjectRole } from '@/common/enums/project-role.enum';
 import { ProjectStatus } from '@/common/enums/project-status.enum';
@@ -133,6 +134,10 @@ const mockAuditService = {
   log: jest.fn().mockResolvedValue(undefined),
 };
 
+const mockCache = {
+  invalidateByPrefix: jest.fn(),
+};
+
 const mockProjectAccessService = {
   getVisibleProjects: jest.fn().mockResolvedValue([mockProject]),
   getVisibleProjectIds: jest.fn().mockResolvedValue([mockProject.id]),
@@ -163,6 +168,7 @@ describe('ProjectsService', () => {
           provide: ProjectAccessService,
           useValue: mockProjectAccessService,
         },
+        { provide: InMemoryCacheService, useValue: mockCache },
       ],
     }).compile();
 

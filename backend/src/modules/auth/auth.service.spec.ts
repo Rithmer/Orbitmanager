@@ -105,6 +105,8 @@ describe('AuthService', () => {
       };
       return map[key];
     });
+    mockPrismaService.refreshToken.create.mockResolvedValue({ id: 1 });
+    mockPrismaService.refreshToken.updateMany.mockResolvedValue({ count: 1 });
   });
 
   describe('register', () => {
@@ -166,6 +168,44 @@ describe('AuthService', () => {
         'user',
         1,
         expect.any(String),
+      );
+    });
+
+    it('adds a unique token id to the refresh token payload', async () => {
+      const realHash = await argon2.hash('correctpassword');
+      mockUsersService.findByLogin.mockResolvedValueOnce({
+        ...mockUser,
+        password: realHash,
+      });
+      mockJwtService.signAsync.mockResolvedValue('mock-token');
+
+      await service.login({
+        login: 'testuser',
+        password: 'correctpassword',
+      });
+
+      expect(mockJwtService.signAsync).toHaveBeenNthCalledWith(
+        1,
+        {
+          sub: mockUser.id,
+          login: mockUser.login,
+          accountRole: mockUser.accountRole,
+        },
+        expect.objectContaining({
+          secret: 'access-secret',
+        }),
+      );
+      expect(mockJwtService.signAsync).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          sub: mockUser.id,
+          login: mockUser.login,
+          accountRole: mockUser.accountRole,
+          tokenId: expect.any(String),
+        }),
+        expect.objectContaining({
+          secret: 'refresh-secret',
+        }),
       );
     });
 
@@ -266,6 +306,14 @@ describe('AuthService', () => {
       mockJwtService.verifyAsync.mockRejectedValueOnce(new Error('invalid'));
 
       await expect(service.refresh('bad-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+
+    it('throws UnauthorizedException for revoked token', async () => {
+      mockPrismaService.refreshToken.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await expect(service.refresh('valid-refresh-token')).rejects.toThrow(
         UnauthorizedException,
       );
     });
