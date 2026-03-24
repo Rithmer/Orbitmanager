@@ -36,6 +36,26 @@ import {
   readLastBoardProjectId,
 } from '../utils/lastBoardProjectStorage'
 
+type TaskFormState = {
+  name: string
+  description: string
+  deadline: string
+  difficulty: string
+  assigneeIds: number[]
+  status: TaskStatus
+  error: string
+}
+
+const INITIAL_TASK_FORM_STATE: TaskFormState = {
+  name: '',
+  description: '',
+  deadline: '',
+  difficulty: '3',
+  assigneeIds: [],
+  status: TaskStatus.NEW,
+  error: '',
+}
+
 export function Board() {
   const { isDark } = useTheme()
   const { user } = useAuth()
@@ -70,13 +90,7 @@ export function Board() {
     title: string
     tasks: ProjectBoardTask[]
   } | null>(null)
-  const [taskFormName, setTaskFormName] = useState('')
-  const [taskFormDescription, setTaskFormDescription] = useState('')
-  const [taskFormDeadline, setTaskFormDeadline] = useState('')
-  const [taskFormDifficulty, setTaskFormDifficulty] = useState('3')
-  const [taskFormAssigneeIds, setTaskFormAssigneeIds] = useState<number[]>([])
-  const [taskFormStatus, setTaskFormStatus] = useState<TaskStatus>(TaskStatus.NEW)
-  const [taskFormError, setTaskFormError] = useState('')
+  const [taskFormState, setTaskFormState] = useState<TaskFormState>(INITIAL_TASK_FORM_STATE)
   const [viewMode, setViewMode] = useState<'board' | 'list'>('board')
   const [projectPickerSearch, setProjectPickerSearch] = useState('')
 
@@ -273,31 +287,37 @@ export function Board() {
   const openTaskCreation = () => {
     setSelectedTaskForEditing(null)
     resetTaskForm()
-    setTaskFormStatus(TaskStatus.NEW)
     const defaultDeadline = new Date()
     defaultDeadline.setDate(defaultDeadline.getDate() + 7)
-    setTaskFormDeadline(formatLocalDateInput(defaultDeadline))
+    setTaskFormState((prev) => ({
+      ...prev,
+      status: TaskStatus.NEW,
+      deadline: formatLocalDateInput(defaultDeadline),
+    }))
     setIsTaskFormOpen(true)
   }
 
   const openTaskEditing = (task: ProjectBoardTask) => {
     setSelectedTaskForEditing(task)
     setSelectedTaskForDetails(null)
-    setTaskFormName(task.name)
-    setTaskFormDescription(task.description)
-    setTaskFormDeadline(formatLocalDateInput(task.deadline))
-    setTaskFormDifficulty(String(task.difficulty))
-    setTaskFormAssigneeIds(
+    const assigneeIds =
       task.assigneeIds && task.assigneeIds.length > 0
         ? task.assigneeIds
         : typeof task.assigneeId === 'number' && task.assigneeId > 0
           ? [task.assigneeId]
           : task.assignee
             ? [task.assignee.id]
-            : [],
-    )
-    setTaskFormStatus(task.status)
-    setTaskFormError('')
+            : []
+
+    setTaskFormState({
+      name: task.name,
+      description: task.description,
+      deadline: formatLocalDateInput(task.deadline),
+      difficulty: String(task.difficulty),
+      assigneeIds,
+      status: task.status,
+      error: '',
+    })
     setIsTaskFormOpen(true)
   }
 
@@ -317,18 +337,18 @@ export function Board() {
   }
 
   async function submitTaskForm() {
-    setTaskFormError('')
+    setTaskFormState((prev) => ({ ...prev, error: '' }))
 
     try {
       if (selectedTaskForEditing) {
         await updateTaskMutation.mutateAsync({
           taskId: selectedTaskForEditing.id,
-          name: taskFormName,
-          description: taskFormDescription,
-          deadline: taskFormDeadline,
-          difficulty: taskFormDifficulty,
-          status: taskFormStatus,
-          assigneeIds: taskFormAssigneeIds,
+          name: taskFormState.name,
+          description: taskFormState.description,
+          deadline: taskFormState.deadline,
+          difficulty: taskFormState.difficulty,
+          status: taskFormState.status,
+          assigneeIds: taskFormState.assigneeIds,
         })
         return
       }
@@ -339,25 +359,22 @@ export function Board() {
 
       await createTaskMutation.mutateAsync({
         projectId,
-        name: taskFormName,
-        description: taskFormDescription,
-        deadline: taskFormDeadline,
-        difficulty: taskFormDifficulty,
-        assigneeIds: taskFormAssigneeIds,
+        name: taskFormState.name,
+        description: taskFormState.description,
+        deadline: taskFormState.deadline,
+        difficulty: taskFormState.difficulty,
+        assigneeIds: taskFormState.assigneeIds,
       })
     } catch (error) {
-      setTaskFormError(error instanceof Error ? error.message : 'Ошибка сохранения задачи')
+      setTaskFormState((prev) => ({
+        ...prev,
+        error: error instanceof Error ? error.message : 'Ошибка сохранения задачи',
+      }))
     }
   }
 
   function resetTaskForm() {
-    setTaskFormName('')
-    setTaskFormDescription('')
-    setTaskFormDeadline('')
-    setTaskFormDifficulty('3')
-    setTaskFormAssigneeIds([])
-    setTaskFormStatus(TaskStatus.NEW)
-    setTaskFormError('')
+    setTaskFormState(INITIAL_TASK_FORM_STATE)
   }
 
   return (
@@ -499,19 +516,34 @@ export function Board() {
           resetTaskForm()
         }}
         title={selectedTaskForEditing ? 'Редактировать задачу' : 'Новая задача'}
-        taskFormError={taskFormError}
-        taskFormName={taskFormName}
-        onTaskFormNameChange={setTaskFormName}
-        taskFormDescription={taskFormDescription}
-        onTaskFormDescriptionChange={setTaskFormDescription}
-        taskFormDeadline={taskFormDeadline}
-        onTaskFormDeadlineChange={setTaskFormDeadline}
-        taskFormDifficulty={taskFormDifficulty}
-        onTaskFormDifficultyChange={setTaskFormDifficulty}
-        taskFormAssigneeIds={taskFormAssigneeIds}
-        onSetTaskFormAssigneeIds={setTaskFormAssigneeIds}
-        taskFormStatus={taskFormStatus}
-        onTaskFormStatusChange={setTaskFormStatus}
+        taskFormError={taskFormState.error}
+        taskFormName={taskFormState.name}
+        onTaskFormNameChange={(value) =>
+          setTaskFormState((prev) => ({ ...prev, name: value }))
+        }
+        taskFormDescription={taskFormState.description}
+        onTaskFormDescriptionChange={(value) =>
+          setTaskFormState((prev) => ({ ...prev, description: value }))
+        }
+        taskFormDeadline={taskFormState.deadline}
+        onTaskFormDeadlineChange={(value) =>
+          setTaskFormState((prev) => ({ ...prev, deadline: value }))
+        }
+        taskFormDifficulty={taskFormState.difficulty}
+        onTaskFormDifficultyChange={(value) =>
+          setTaskFormState((prev) => ({ ...prev, difficulty: value }))
+        }
+        taskFormAssigneeIds={taskFormState.assigneeIds}
+        onSetTaskFormAssigneeIds={(value) =>
+          setTaskFormState((prev) => ({
+            ...prev,
+            assigneeIds: typeof value === 'function' ? value(prev.assigneeIds) : value,
+          }))
+        }
+        taskFormStatus={taskFormState.status}
+        onTaskFormStatusChange={(value) =>
+          setTaskFormState((prev) => ({ ...prev, status: value }))
+        }
         projectMembers={projectMembers}
         isDark={isDark}
         textSecondary={textSecondary}
