@@ -7,6 +7,7 @@ import {
   Users,
   CalendarDays,
   PieChart,
+  TriangleAlert,
   Settings2,
   Menu,
   ShieldCheck,
@@ -16,6 +17,7 @@ import { useTheme } from '../context/useTheme'
 import { useAuth } from '../context/useAuth'
 import { useAnalyticsSectionAccess } from '../hooks/useAnalyticsSectionAccess'
 import { useProjectsSectionAccess } from '../hooks/useProjectsSectionAccess'
+import { useRisksSectionAccess } from '../hooks/useRisksSectionAccess'
 import { AccountRole, ACCOUNT_ROLE_LABELS } from '../types'
 import {
   readLastBoardProjectId,
@@ -32,6 +34,7 @@ export function Layout() {
   const location = useLocation()
   const { allowed: canSeeProjectsNav, isLoading: projectsNavLoading } = useProjectsSectionAccess()
   const { allowed: canSeeAnalyticsNav, isLoading: analyticsNavLoading } = useAnalyticsSectionAccess()
+  const { allowed: canSeeRisksNav, isLoading: risksNavLoading } = useRisksSectionAccess()
 
   const [boardNavPath, setBoardNavPath] = useState(
     () => `/board/${readLastBoardProjectId() ?? 0}`,
@@ -83,6 +86,9 @@ export function Layout() {
     { path: '/calendar', label: 'Календарь', icon: CalendarDays, end: false },
     ...(isAdmin || (!analyticsNavLoading && canSeeAnalyticsNav)
       ? [{ path: '/reports', label: 'Аналитика', icon: PieChart, end: false }]
+      : []),
+    ...(isAdmin || (!risksNavLoading && canSeeRisksNav)
+      ? [{ path: '/risks', label: 'Риски', icon: TriangleAlert, end: false }]
       : []),
     { path: '/settings', label: 'Настройки', icon: Settings2, end: false },
     ...(isAdmin
