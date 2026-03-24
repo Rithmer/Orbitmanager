@@ -235,6 +235,10 @@ export class ProjectAccessService {
       .map((project) => project.id);
   }
 
+  invalidateVisibleProjects(userId: number): void {
+    this.cache.invalidate(`visible_projects:${userId}`);
+  }
+
   private dedupeProjects(projects: Project[]): Project[] {
     const seen = new Set<number>();
 

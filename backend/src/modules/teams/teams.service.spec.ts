@@ -17,6 +17,7 @@ import { ProjectRole } from '@/common/enums/project-role.enum';
 import { Team } from '@/domain/models/team.model';
 import { TeamMember } from '@/domain/models/team-member.model';
 import { AuditService } from '../audit-logs/audit.service';
+import { TtlCacheService } from '@/common/cache/ttl-cache.service';
 
 const mockTeam: Team = {
   id: 1,
@@ -137,6 +138,14 @@ const mockTaskRepository = {
 const mockAuditService = {
   log: jest.fn().mockResolvedValue(undefined),
   logMany: jest.fn().mockResolvedValue(undefined),
+};
+
+const mockTtlCacheService = {
+  invalidate: jest.fn(),
+  get: jest.fn().mockReturnValue(undefined),
+  set: jest.fn(),
+  getOrSet: jest.fn(),
+  invalidateByPrefix: jest.fn(),
 };
 
 describe('TeamsService', () => {

@@ -1,6 +1,7 @@
 import {
   Injectable,
   Inject,
+  Logger,
   Optional,
   NotFoundException,
   ConflictException,
@@ -39,6 +40,8 @@ import { auditLogCreateInput } from '@/common/helpers/audit-log-prisma.helper';
 
 @Injectable()
 export class ProjectsService {
+  private readonly logger = new Logger(ProjectsService.name);
+
   constructor(
     @Inject(PROJECT_REPOSITORY)
     private readonly projectRepository: IProjectRepository,
@@ -326,6 +329,9 @@ export class ProjectsService {
       `Пользователь #${dto.userId} добавлен в проект #${projectId} с ролью ${dto.role}`,
     );
 
+    // B-03: invalidate stale visible-projects cache for the newly added user
+    this.projectAccessService.invalidateVisibleProjects(dto.userId);
+
     return member;
   }
 
@@ -350,6 +356,12 @@ export class ProjectsService {
     );
     if (teamMembership) {
       this.validateProjectRole(teamMembership.teamRole, dto.role);
+    } else {
+      // B-07: user has a project membership but no team membership — inconsistent state
+      this.logger.warn(
+        `User #${member.userId} has no team membership in team #${project.teamId} ` +
+          `while updating project member #${memberId}. Role validation skipped.`,
+      );
     }
 
     const updated = await this.projectMemberRepository.update(memberId, {
@@ -388,22 +400,24 @@ export class ProjectsService {
 
     if (this.prisma) {
       await this.removeMemberWithTransaction(member, userId);
-      return;
+    } else {
+      await this.taskRepository.clearAssigneeByUserAndProjects(member.userId, [
+        member.projectId,
+      ]);
+
+      await this.projectMemberRepository.delete(memberId);
+
+      await this.auditService.log(
+        userId,
+        AuditAction.DELETE,
+        'project_member',
+        memberId,
+        `Участник #${member.userId} удалён из проекта #${member.projectId}`,
+      );
     }
 
-    await this.taskRepository.clearAssigneeByUserAndProjects(member.userId, [
-      member.projectId,
-    ]);
-
-    await this.projectMemberRepository.delete(memberId);
-
-    await this.auditService.log(
-      userId,
-      AuditAction.DELETE,
-      'project_member',
-      memberId,
-      `Участник #${member.userId} удалён из проекта #${member.projectId}`,
-    );
+    // B-03: invalidate stale visible-projects cache for the removed user
+    this.projectAccessService.invalidateVisibleProjects(member.userId);
   }
 
   private async findMemberById(id: number): Promise<ProjectMember> {

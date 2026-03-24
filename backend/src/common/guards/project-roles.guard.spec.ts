@@ -128,7 +128,7 @@ describe('ProjectRolesGuard', () => {
     });
     const ctx = makeMockContext(
       { id: USER_ID, accountRole: AccountRole.MEMBER },
-      { projectId: String(PROJECT_ID) },
+      { id: String(PROJECT_ID) },
     );
     await expect(guard.canActivate(ctx)).resolves.toBe(true);
   });

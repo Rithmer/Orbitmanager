@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   UnauthorizedException,
   ConflictException,
   NotFoundException,
@@ -35,6 +36,8 @@ const PASSWORD_CHANGE_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
@@ -128,6 +131,13 @@ export class AuthService {
             HttpStatus.TOO_MANY_REQUESTS,
           );
         }
+      } else {
+        // B-05: lastPasswordChangedAt exists but is not a valid date string —
+        // cooldown check is skipped; log so the data corruption is detectable
+        this.logger.warn(
+          `User #${userId} has an invalid lastPasswordChangedAt value: ` +
+            `"${user.lastPasswordChangedAt}". Password change cooldown check skipped.`,
+        );
       }
     }
 
