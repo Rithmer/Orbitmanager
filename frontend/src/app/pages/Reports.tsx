@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   BarChart,
   Bar,
@@ -134,10 +134,33 @@ export function Reports() {
   const [selectedProjectId, setSelectedProjectId] = useState<number | undefined>(undefined)
   const projectsQuery = useReportsProjectsQuery({ enabled: reportsApiEnabled })
 
-  const projects = useMemo(() => projectsQuery.data ?? [], [projectsQuery.data])
-  const summaryProjectId = selectedProjectId ?? projects[0]?.id
+  const projects = useMemo(
+    () =>
+      [...(projectsQuery.data ?? [])].sort((left, right) =>
+        left.name.localeCompare(right.name, 'ru'),
+      ),
+    [projectsQuery.data],
+  )
 
-  const summaryQuery = useReportsSummaryQuery(summaryProjectId, { enabled: reportsApiEnabled })
+  useEffect(() => {
+    if (projects.length === 0) {
+      if (selectedProjectId !== undefined) setSelectedProjectId(undefined)
+      return
+    }
+
+    const hasSelectedProject = selectedProjectId !== undefined
+      && projects.some((project) => project.id === selectedProjectId)
+
+    if (!hasSelectedProject) {
+      setSelectedProjectId(projects[0].id)
+    }
+  }, [projects, selectedProjectId])
+
+  const summaryProjectId = selectedProjectId
+
+  const summaryQuery = useReportsSummaryQuery(summaryProjectId, {
+    enabled: reportsApiEnabled && summaryProjectId !== undefined,
+  })
   const summary = summaryQuery.data
   const waitingForReportsAccess = !isAdmin && reportsAccessLoading
   const isInitialLoading =
@@ -268,14 +291,13 @@ export function Reports() {
             </div>
           ) : projects.length > 0 ? (
             <select
-              value={summaryProjectId !== undefined ? String(summaryProjectId) : ''}
+              value={selectedProjectId !== undefined ? String(selectedProjectId) : ''}
               onChange={(e) => {
                 const next = e.target.value ? Number(e.target.value) : undefined
                 setSelectedProjectId(next)
               }}
               className={`px-3 py-2 rounded-lg border text-sm ${isDark ? 'bg-[#1c2534] border-[#313d4f] text-[#f4f3f2]' : 'bg-white border-[#e8e8e8] text-[#202224]'}`}
             >
-              <option value="">Все доступные проекты</option>
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}

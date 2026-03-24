@@ -23,6 +23,7 @@ const BoardPage = lazyRoute(() => import('./pages/Board'), 'Board')
 const TeamsPage = lazyRoute(() => import('./pages/Teams'), 'Teams')
 const CalendarPage = lazyRoute(() => import('./pages/Calendar'), 'Calendar')
 const ReportsPage = lazyRoute(() => import('./pages/Reports'), 'Reports')
+const RisksPage = lazyRoute(() => import('./pages/Risks'), 'Risks')
 const SettingsPage = lazyRoute(() => import('./pages/Settings'), 'Settings')
 const AdminPage = lazyRoute(() => import('./pages/Admin'), 'Admin')
 
@@ -48,6 +49,7 @@ export const router = createBrowserRouter([
           { path: 'teams', element: renderLazyRoute(TeamsPage) },
           { path: 'calendar', element: renderLazyRoute(CalendarPage) },
           { path: 'reports', element: renderLazyRoute(ReportsPage) },
+          { path: 'risks', element: renderLazyRoute(RisksPage) },
           { path: 'settings', element: renderLazyRoute(SettingsPage) },
           { path: 'admin', element: renderLazyRoute(AdminPage) },
         ],

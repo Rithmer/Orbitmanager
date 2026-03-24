@@ -183,6 +183,26 @@ export function Board() {
     !hasProjectId && projectPickerQuery.isPending && !projectPickerQuery.data,
   )
 
+  const {
+    pendingTaskActions,
+    createTaskMutation,
+    updateTaskMutation,
+    deleteTaskMutation,
+    changeTaskStatusMutation,
+  } = useBoardMutations({
+    projectId,
+    hasProjectId,
+    onCreateSuccess: () => {
+      setIsTaskFormOpen(false)
+      resetTaskForm()
+    },
+    onUpdateSuccess: () => {
+      setIsTaskFormOpen(false)
+      setSelectedTaskForEditing(null)
+      resetTaskForm()
+    },
+  })
+
   if (showInitialSkeleton) {
     return (
       <PageShell
