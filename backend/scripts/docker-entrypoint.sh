@@ -7,7 +7,7 @@ if [ -z "$DATABASE_URL" ]; then
 fi
 
 echo "Applying database migrations..."
-npx prisma migrate deploy --config ./prisma/prisma.config.ts
+npx prisma migrate deploy --config ./prisma.config.ts
 echo "Migrations applied."
 
 SEED_COMMAND=${SEED_COMMAND:-npm run seed}
