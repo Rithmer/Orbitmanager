@@ -4,6 +4,7 @@ import { Moon, Sun, Lock, User, Shield, ChevronRight, LogOut } from 'lucide-reac
 import { useTheme } from '../context/useTheme'
 import { useAuth } from '../context/useAuth'
 import { usersApi } from '../api/users'
+import { authApi } from '../api/auth'
 import { ErrorMessage } from '../components/Modal'
 import { ACCOUNT_ROLE_LABELS, AccountRole } from '../types'
 
@@ -42,6 +43,13 @@ export function Settings() {
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [avatarUploadError, setAvatarUploadError] = useState('')
   const [avatarUploadSuccess, setAvatarUploadSuccess] = useState('')
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmNewPassword, setConfirmNewPassword] = useState('')
+  const [changePasswordLoading, setChangePasswordLoading] = useState(false)
+  const [changePasswordError, setChangePasswordError] = useState('')
+  const [changePasswordSuccess, setChangePasswordSuccess] = useState('')
 
   useEffect(() => {
     setAvatarUrlPreview(user?.avatarUrl ?? null)
@@ -83,6 +91,49 @@ export function Settings() {
   const handleLogout = () => {
     logout()
     navigate('/login', { replace: true })
+  }
+
+  const handleChangePassword = async () => {
+    setChangePasswordError('')
+    setChangePasswordSuccess('')
+
+    if (!currentPassword.trim()) {
+      setChangePasswordError('Введите текущий пароль')
+      return
+    }
+
+    if (!newPassword.trim()) {
+      setChangePasswordError('Введите новый пароль')
+      return
+    }
+
+    if (newPassword.length < 8) {
+      setChangePasswordError('Новый пароль должен быть не менее 8 символов')
+      return
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setChangePasswordError('Подтверждение пароля не совпадает')
+      return
+    }
+
+    setChangePasswordLoading(true)
+    try {
+      await authApi.changePassword({
+        currentPassword,
+        newPassword,
+      })
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmNewPassword('')
+      setChangePasswordSuccess('Пароль успешно изменён')
+      setTimeout(() => setChangePasswordSuccess(''), 3000)
+      setIsChangePasswordOpen(false)
+    } catch (err) {
+      setChangePasswordError(err instanceof Error ? err.message : 'Не удалось сменить пароль')
+    } finally {
+      setChangePasswordLoading(false)
+    }
   }
 
   const abbreviateFullName = (name?: string | null) => {
@@ -320,7 +371,14 @@ export function Settings() {
             <h2 className={`font-bold ${textPrimary}`}>Безопасность</h2>
           </div>
           <div className="p-6 space-y-2">
-            <button className={`w-full flex items-center justify-between py-3 px-1 transition-colors rounded-lg hover:bg-[#4880ff]/5`}>
+            <button
+              onClick={() => {
+                setIsChangePasswordOpen((prev) => !prev)
+                setChangePasswordError('')
+                setChangePasswordSuccess('')
+              }}
+              className={`w-full flex items-center justify-between py-3 px-1 transition-colors rounded-lg hover:bg-[#4880ff]/5`}
+            >
               <div className="flex items-center gap-3">
                 <div className={`w-8 h-8 ${sectionIconBg} rounded-lg flex items-center justify-center shrink-0`}>
                   <Lock className="w-4 h-4 text-[#4880ff]" />
@@ -332,6 +390,65 @@ export function Settings() {
               </div>
               <ChevronRight className={`w-4 h-4 ${textSecondary}`} />
             </button>
+            {isChangePasswordOpen ? (
+              <div className={`mt-2 rounded-xl border ${cardBorder} p-4 ${isDark ? 'bg-[#1c2534]' : 'bg-white'}`}>
+                <div className="space-y-3">
+                  <div>
+                    <label className={`block text-sm font-semibold mb-1.5 ${textSecondary}`}>
+                      Текущий пароль
+                    </label>
+                    <input
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      className={`w-full px-3 py-2 rounded-lg border text-sm transition-colors focus:outline-none focus:border-[#4880ff] ${inputBg} ${inputText}`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-semibold mb-1.5 ${textSecondary}`}>
+                      Новый пароль
+                    </label>
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className={`w-full px-3 py-2 rounded-lg border text-sm transition-colors focus:outline-none focus:border-[#4880ff] ${inputBg} ${inputText}`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-semibold mb-1.5 ${textSecondary}`}>
+                      Подтвердите новый пароль
+                    </label>
+                    <input
+                      type="password"
+                      value={confirmNewPassword}
+                      onChange={(e) => setConfirmNewPassword(e.target.value)}
+                      className={`w-full px-3 py-2 rounded-lg border text-sm transition-colors focus:outline-none focus:border-[#4880ff] ${inputBg} ${inputText}`}
+                    />
+                  </div>
+                </div>
+                {changePasswordError ? (
+                  <div className="mt-3">
+                    <ErrorMessage message={changePasswordError} />
+                  </div>
+                ) : null}
+                {changePasswordSuccess ? (
+                  <div className="mt-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3">
+                    <p className="text-sm text-emerald-500">{changePasswordSuccess}</p>
+                  </div>
+                ) : null}
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => void handleChangePassword()}
+                    disabled={changePasswordLoading}
+                    className="bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
+                  >
+                    {changePasswordLoading ? 'Сохранение...' : 'Сменить пароль'}
+                  </button>
+                </div>
+              </div>
+            ) : null}
             <button
               onClick={handleLogout}
               className="w-full flex items-center justify-between py-3 px-1 transition-colors rounded-lg hover:bg-red-500/5"
