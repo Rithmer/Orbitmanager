@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import {
   BarChart,
   Bar,
@@ -57,7 +57,7 @@ type PieSliceProps = {
   payload?: ReportsStatusDistributionItem
 }
 
-const NEON_DIM = 0.82 * 0.9
+const NEON_DIM = 0.35
 
 function NeonStatusPieSlice(
   props: PieSliceProps & {
@@ -131,7 +131,7 @@ export function Reports() {
   const { allowed: canUseReports, isLoading: reportsAccessLoading } = useAnalyticsSectionAccess()
   const reportsApiEnabled = isAdmin || (!reportsAccessLoading && canUseReports)
 
-  const [selectedProjectId, setSelectedProjectId] = useState<number | undefined>(undefined)
+  const [preferredProjectId, setPreferredProjectId] = useState<number | undefined>(undefined)
   const projectsQuery = useReportsProjectsQuery({ enabled: reportsApiEnabled })
 
   const projects = useMemo(
@@ -142,19 +142,14 @@ export function Reports() {
     [projectsQuery.data],
   )
 
-  useEffect(() => {
+  const selectedProjectId = useMemo(() => {
     if (projects.length === 0) {
-      if (selectedProjectId !== undefined) setSelectedProjectId(undefined)
-      return
+      return undefined
     }
-
-    const hasSelectedProject = selectedProjectId !== undefined
-      && projects.some((project) => project.id === selectedProjectId)
-
-    if (!hasSelectedProject) {
-      setSelectedProjectId(projects[0].id)
-    }
-  }, [projects, selectedProjectId])
+    const hasPreferredProject = preferredProjectId !== undefined
+      && projects.some((project) => project.id === preferredProjectId)
+    return hasPreferredProject ? preferredProjectId : projects[0].id
+  }, [projects, preferredProjectId])
 
   const summaryProjectId = selectedProjectId
 
@@ -294,7 +289,7 @@ export function Reports() {
               value={selectedProjectId !== undefined ? String(selectedProjectId) : ''}
               onChange={(e) => {
                 const next = e.target.value ? Number(e.target.value) : undefined
-                setSelectedProjectId(next)
+                setPreferredProjectId(next)
               }}
               className={`px-3 py-2 rounded-lg border text-sm ${isDark ? 'bg-[#1c2534] border-[#313d4f] text-[#f4f3f2]' : 'bg-white border-[#e8e8e8] text-[#202224]'}`}
             >
