@@ -15,8 +15,8 @@ const mockPrisma = {
   },
   project: {
     findMany: jest.fn().mockResolvedValue([
-      { id: 1, name: 'Project 1' },
-      { id: 2, name: 'Project 2' },
+      { id: 1, name: 'Project 1', teamId: 1 },
+      { id: 2, name: 'Project 2', teamId: 2 },
     ]),
   },
   task: {
@@ -68,5 +68,23 @@ describe('ReportsService', () => {
     expect(result.statusDistribution.some((s) => s.label === 'Тестирование')).toBe(true);
     expect(result.statusDistribution.length).toBeGreaterThanOrEqual(4);
     expect(result.projectTaskBreakdown.length).toBeGreaterThan(0);
+  });
+
+  it('returns accessible projects with team ids', async () => {
+    const module = await Test.createTestingModule({
+      providers: [
+        ReportsService,
+        InMemoryCacheService,
+        { provide: PrismaService, useValue: mockPrisma },
+      ],
+    }).compile();
+
+    const service = module.get(ReportsService);
+    const result = await service.getAccessibleProjects(1, AccountRole.MEMBER);
+
+    expect(result).toEqual([
+      { id: 1, name: 'Project 1', teamId: 1 },
+      { id: 2, name: 'Project 2', teamId: 2 },
+    ]);
   });
 });

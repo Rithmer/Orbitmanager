@@ -8,6 +8,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { TtlCacheService } from '@/common/cache/ttl-cache.service';
+import { InMemoryCacheService } from '@/common/cache/in-memory-cache.service';
 import type { ITeamRepository } from '@/domain/repositories/team.repository';
 import { TEAM_REPOSITORY } from '@/domain/repositories/team.repository';
 import type { ITeamMemberRepository } from '@/domain/repositories/team-member.repository';
@@ -57,6 +58,7 @@ export class TeamsService {
     private readonly taskRepository: ITaskRepository,
     private readonly auditService: AuditService,
     private readonly ttlCache: TtlCacheService,
+    private readonly summaryCache: InMemoryCacheService,
     @Optional() private readonly prisma?: PrismaService,
   ) {}
 
@@ -247,7 +249,7 @@ export class TeamsService {
     );
 
     // B-03: a new team member (especially OWNER) gains visibility of team projects
-    this.ttlCache.invalidate(`visible_projects:${dto.userId}`);
+    this.invalidateAffectedUserAccessCaches(dto.userId);
 
     return member;
   }
@@ -289,7 +291,7 @@ export class TeamsService {
     );
 
     // B-03: OWNER↔non-OWNER transition changes which projects are visible to this user
-    this.ttlCache.invalidate(`visible_projects:${member.userId}`);
+    this.invalidateAffectedUserAccessCaches(member.userId);
 
     return updated;
   }
@@ -332,7 +334,7 @@ export class TeamsService {
     }
 
     // B-03: removed member loses visibility of all team projects
-    this.ttlCache.invalidate(`visible_projects:${member.userId}`);
+    this.invalidateAffectedUserAccessCaches(member.userId);
   }
 
   private async findMemberById(id: number): Promise<TeamMember> {
@@ -570,6 +572,12 @@ export class TeamsService {
   private async getTeamProjectIds(teamId: number): Promise<number[]> {
     const teamProjects = await this.projectRepository.findByTeam(teamId);
     return teamProjects.map((project) => project.id);
+  }
+
+  private invalidateAffectedUserAccessCaches(userId: number): void {
+    this.ttlCache.invalidate(`visible_projects:${userId}`);
+    this.summaryCache.invalidateByPrefix(`dashboard:summary:${userId}:`);
+    this.summaryCache.invalidateByPrefix(`reports:summary:${userId}:`);
   }
 }
 

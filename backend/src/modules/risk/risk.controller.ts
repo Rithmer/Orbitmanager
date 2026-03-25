@@ -36,6 +36,8 @@ import type { IRiskAssessmentService } from '@/domain/services/risk-assessment.i
 import { RISK_ASSESSMENT_SERVICE } from '@/domain/services/risk-assessment.interface';
 import { ReadModelResponseFactory } from '@/common/read-models/read-model-response.factory';
 import { ProjectRiskOutputDto, TaskRiskOutputDto } from './dto';
+import { MlClientService } from './ml-client.service';
+import { ConfigService } from '@nestjs/config';
 import { buildTaskRiskInput } from './helpers/build-task-risk-input';
 
 @ApiTags('Risk Assessment')
@@ -54,6 +56,8 @@ export class RiskController {
     private readonly auditLogRepository: IAuditLogRepository,
     private readonly projectAccessService: ProjectAccessService,
     private readonly readModelResponseFactory: ReadModelResponseFactory,
+    private readonly mlClient: MlClientService,
+    private readonly configService: ConfigService,
   ) {}
 
   @Get('tasks/:id/risk')
@@ -257,10 +261,39 @@ export class RiskController {
 
   @Post('risk/retrain')
   @Roles(AccountRole.ADMIN)
-  @ApiOperation({ summary: 'Переобучение ML-модели (заглушка)' })
+  @ApiOperation({ summary: 'Переобучение ML-модели рисков' })
   @ApiResponse({ status: 200, description: 'Статус переобучения' })
-  retrain() {
-    return { message: 'Retraining not implemented yet' };
+  @ApiResponse({ status: 502, description: 'ML-сервис недоступен' })
+  async retrain(): Promise<{ status: string; message: string; metrics?: Record<string, unknown> | null }> {
+    const result = await this.mlClient.retrain();
+    if (!result) {
+      return { status: 'error', message: 'ML service is unavailable' };
+    }
+    return result;
+  }
+
+  @Get('risk/ml-status')
+  @Roles(AccountRole.ADMIN)
+  @ApiOperation({ summary: 'Статус ML-сервиса и информация о модели' })
+  @ApiResponse({ status: 200, description: 'Статус ML-сервиса' })
+  async getMlStatus(): Promise<{
+    provider: string;
+    health: { status: string; model_loaded: boolean; version: string } | null;
+    modelInfo: {
+      model_type: string;
+      version: string;
+      trained_at: string | null;
+      sample_size: number | null;
+      features: string[];
+      metrics: Record<string, unknown> | null;
+    } | null;
+  }> {
+    const provider = this.configService.get<string>('RISK_PROVIDER') ?? 'stub';
+    const [health, modelInfo] = await Promise.all([
+      this.mlClient.health(),
+      this.mlClient.modelInfo(),
+    ]);
+    return { provider, health, modelInfo };
   }
 }
 

@@ -12,6 +12,7 @@ const REPORTS_CACHE_TTL_MS = 60_000;
 export interface ProjectNameRow {
   id: number;
   name: string;
+  teamId: number;
 }
 
 /**
@@ -178,7 +179,7 @@ export class ReportsService {
     });
 
     const projectNameById = new Map(
-      projectNames.map((project: ProjectNameRow) => [project.id, project.name]),
+      projectNames.map((project) => [project.id, project.name]),
     );
 
     const statusDistribution = [
@@ -256,7 +257,7 @@ export class ReportsService {
 
     return this.prisma.project.findMany({
       where: { id: { in: projectIds } },
-      select: { id: true, name: true },
+      select: { id: true, name: true, teamId: true },
       orderBy: { id: 'asc' },
     });
   }

@@ -1,5 +1,6 @@
 import {
   IsEnum,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -10,6 +11,8 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { StrongPasswordConstraint } from '@/common/validators/strong-password';
+
+const WRITABLE_ACCOUNT_STATUSES = ['active', 'blocked'] as const;
 
 export class CreateUserDto {
   @ApiProperty({
@@ -47,15 +50,19 @@ export class CreateUserDto {
   @MaxLength(100)
   fullName!: string;
 
-  @ApiProperty({ example: 'Backend Developer', description: 'Профессия' })
+  @ApiPropertyOptional({ example: 'Backend Developer', description: 'Профессия' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(100)
   profession?: string;
 
-  @ApiPropertyOptional({ default: 'active', description: 'Статус аккаунта' })
-  @IsString()
+  @ApiPropertyOptional({
+    enum: WRITABLE_ACCOUNT_STATUSES,
+    default: 'active',
+    description: 'Статус аккаунта',
+  })
   @IsOptional()
+  @IsIn(WRITABLE_ACCOUNT_STATUSES)
   accountStatus?: 'active' | 'blocked';
 
   @ApiPropertyOptional({ enum: AccountRole, default: AccountRole.MEMBER })

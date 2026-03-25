@@ -46,5 +46,6 @@ export const appQueryKeys = {
   admin: {
     users: (params?: Record<string, unknown>) => ['admin', 'users', params ?? null] as const,
     audit: (params?: Record<string, unknown>) => ['admin', 'audit', params ?? null] as const,
+    mlStatus: ['admin', 'ml-status'] as const,
   },
 } as const

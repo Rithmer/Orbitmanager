@@ -3,7 +3,7 @@ import type { RiskLevel } from '../../types'
 export interface RiskProjectOption {
   id: number
   name: string
-  teamId?: number
+  teamId: number
 }
 
 export interface RiskFactor {

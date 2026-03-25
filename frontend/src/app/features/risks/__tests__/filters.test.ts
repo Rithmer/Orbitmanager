@@ -72,4 +72,17 @@ describe('risks filters', () => {
       ).map((project) => project.id),
     ).toEqual([11])
   })
+
+  it('filters owner projects by the selected team id', () => {
+    expect(
+      resolveRoleScopedProjects(
+        AccountRole.MEMBER,
+        7,
+        projects,
+        1,
+        teamMembersByTeam,
+        projectMembersByProject,
+      ).map((project) => project.id),
+    ).toEqual([11, 12])
+  })
 })

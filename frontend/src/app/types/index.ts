@@ -55,12 +55,14 @@ export const ALLOWED_TASK_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   [TaskStatus.CANCELLED]: [TaskStatus.NEW],
 }
 
+export type UserAccountStatus = 'active' | 'blocked'
+
 export interface User {
   id: number
   login: string
   fullName: string
   profession?: string
-  accountStatus: 'active' | 'blocked'
+  accountStatus: UserAccountStatus
   accountRole: AccountRole
   avatarUrl?: string | null
   createdAt: string

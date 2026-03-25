@@ -1,5 +1,5 @@
 import { useDeferredValue, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Users,
   Search,
@@ -10,13 +10,19 @@ import {
   ChevronRight,
   FileText,
   Clock,
+  Brain,
+  RefreshCw,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
 } from 'lucide-react'
 import { Navigate } from 'react-router'
 import { useTheme } from '../context/useTheme'
 import { useAuth } from '../context/useAuth'
 import { usersApi } from '../api/users'
+import { riskAdminApi, type MlStatusResponse } from '../api/risk-admin'
 import { Modal, InputField, SelectField, SubmitButton, ErrorMessage } from '../components/Modal'
-import type { User } from '../types'
+import type { User, UserAccountStatus } from '../types'
 import { AccountRole, ACCOUNT_ROLE_LABELS, AuditAction } from '../types'
 import { appQueryKeys } from '../query'
 import {
@@ -28,7 +34,7 @@ import {
 import { useSmoothPageSkeleton } from '../hooks/useSmoothPageSkeleton'
 import { PASSWORD_POLICY_HINT, validatePasswordPolicy } from '../utils/passwordPolicy'
 
-type Tab = 'users' | 'audit'
+type Tab = 'users' | 'audit' | 'ml-model'
 
 const USERS_PAGE_SIZE = 15
 const AUDIT_PAGE_SIZE = 20
@@ -50,13 +56,14 @@ export function Admin() {
     <div className={`${pageBg} min-h-full p-4 md:p-8 page-load-stagger`}>
       <div className="mb-6">
         <h1 className={`text-xl md:text-2xl font-bold ${textPrimary}`}>Админ-панель</h1>
-        <p className={`mt-1 text-sm ${textSecondary}`}>Управление пользователями и аудит</p>
+        <p className={`mt-1 text-sm ${textSecondary}`}>Управление пользователями, аудит и ML-модель</p>
       </div>
 
       <div className="flex gap-2 mb-6 flex-wrap">
         {[
           { key: 'users' as Tab, label: 'Пользователи', icon: Users },
           { key: 'audit' as Tab, label: 'Журнал аудита', icon: FileText },
+          { key: 'ml-model' as Tab, label: 'ML Модель', icon: Brain },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -71,6 +78,7 @@ export function Admin() {
 
       {activeTab === 'users' && <UsersPanel />}
       {activeTab === 'audit' && <AuditPanel />}
+      {activeTab === 'ml-model' && <MlModelPanel />}
     </div>
   )
 }
@@ -91,7 +99,7 @@ function UsersPanel() {
   const [formFullName, setFormFullName] = useState('')
   const [formProfession, setFormProfession] = useState('')
   const [formRole, setFormRole] = useState(AccountRole.MEMBER)
-  const [formStatus, setFormStatus] = useState('active')
+  const [formStatus, setFormStatus] = useState<UserAccountStatus>('active')
   const [formLoading, setFormLoading] = useState(false)
   const [formError, setFormError] = useState('')
 
@@ -196,10 +204,9 @@ function UsersPanel() {
     [AccountRole.GUEST]: isDark ? 'text-[#94a3b8] bg-[#94a3b8]/10' : 'text-gray-500 bg-gray-100',
   }
 
-  const statusColors: Record<string, string> = {
+  const statusColors: Record<UserAccountStatus, string> = {
     active: 'text-emerald-500 bg-emerald-500/10',
     blocked: 'text-red-500 bg-red-500/10',
-    inactive: isDark ? 'text-[#94a3b8] bg-[#94a3b8]/10' : 'text-gray-500 bg-gray-100',
   }
 
   return (
@@ -288,12 +295,10 @@ function UsersPanel() {
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColors[user.accountStatus] || ''}`}>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColors[user.accountStatus]}`}>
                             {user.accountStatus === 'active'
                               ? 'Активен'
-                              : user.accountStatus === 'blocked'
-                                ? 'Заблокирован'
-                                : 'Неактивен'}
+                              : 'Заблокирован'}
                           </span>
                         </td>
                         <td className="px-4 py-3">
@@ -433,11 +438,10 @@ function UsersPanel() {
           <SelectField
             label="Статус"
             value={formStatus}
-            onChange={setFormStatus}
+            onChange={(value) => setFormStatus(value as UserAccountStatus)}
             options={[
               { value: 'active', label: 'Активен' },
               { value: 'blocked', label: 'Заблокирован' },
-              { value: 'inactive', label: 'Неактивен' },
             ]}
           />
           <div className="flex justify-end gap-3 pt-2">
@@ -666,6 +670,217 @@ function AuditPanel() {
         )}
       </div>
     </>
+  )
+}
+
+function MlModelPanel() {
+  const { isDark } = useTheme()
+  const queryClient = useQueryClient()
+
+  const cardBg = isDark ? 'bg-[#273142]' : 'bg-white'
+  const cardBorder = isDark ? 'border-[#313d4f]' : 'border-[#e8e8e8]'
+  const textPrimary = isDark ? 'text-[#f4f3f2]' : 'text-[#202224]'
+  const textSecondary = isDark ? 'text-[#94a3b8]' : 'text-[#737373]'
+
+  const [retrainLoading, setRetrainLoading] = useState(false)
+  const [retrainResult, setRetrainResult] = useState<{ status: string; message: string } | null>(null)
+
+  const statusQuery = useQuery({
+    queryKey: appQueryKeys.admin.mlStatus,
+    queryFn: ({ signal }) => riskAdminApi.getMlStatus({ signal }),
+    staleTime: 30_000,
+  })
+
+  const mlStatus: MlStatusResponse | undefined = statusQuery.data
+  const isInitialLoad = statusQuery.isPending && !statusQuery.data
+  const showInitialSkeleton = useSmoothPageSkeleton(isInitialLoad)
+
+  const handleRetrain = async () => {
+    if (retrainLoading) return
+    setRetrainLoading(true)
+    setRetrainResult(null)
+    try {
+      const result = await riskAdminApi.retrain()
+      setRetrainResult({ status: result.status, message: result.message })
+      await queryClient.invalidateQueries({ queryKey: appQueryKeys.admin.mlStatus })
+    } catch (error) {
+      setRetrainResult({ status: 'error', message: error instanceof Error ? error.message : 'Ошибка переобучения' })
+    } finally {
+      setRetrainLoading(false)
+    }
+  }
+
+  if (statusQuery.isError && !statusQuery.data) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <Brain className="w-10 h-10 text-red-500" />
+        <p className={`text-lg font-bold ${textPrimary}`}>Ошибка загрузки</p>
+        <p className={`text-sm ${textSecondary} text-center max-w-md`}>
+          Не удалось получить статус ML-сервиса.
+        </p>
+        <button
+          onClick={() => statusQuery.refetch()}
+          className="bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2.5 rounded-lg text-sm font-semibold"
+        >
+          Повторить
+        </button>
+      </div>
+    )
+  }
+
+  if (showInitialSkeleton) {
+    return <MlModelSkeleton />
+  }
+
+  const provider = mlStatus?.provider ?? 'unknown'
+  const health = mlStatus?.health
+  const modelInfo = mlStatus?.modelInfo
+  const isOnline = health?.status === 'ok' && health?.model_loaded
+
+  const providerLabel = provider === 'ml' ? 'ML-модель' : provider === 'stub' ? 'Правила (stub)' : provider
+  const providerColor = provider === 'ml'
+    ? 'text-[#4880ff] bg-[#4880ff]/10'
+    : 'text-amber-500 bg-amber-500/10'
+
+  return (
+    <div className="space-y-4 page-load-stagger">
+      {/* Status cards row */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Provider card */}
+        <div className={`${cardBg} border ${cardBorder} rounded-xl p-4`}>
+          <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${textSecondary}`}>Активный провайдер</p>
+          <span className={`text-sm font-semibold px-2.5 py-1 rounded-full ${providerColor}`}>
+            {providerLabel}
+          </span>
+        </div>
+
+        {/* Health card */}
+        <div className={`${cardBg} border ${cardBorder} rounded-xl p-4`}>
+          <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${textSecondary}`}>ML-сервис</p>
+          {health ? (
+            <div className="flex items-center gap-2">
+              {isOnline ? (
+                <CheckCircle className="w-4 h-4 text-emerald-500" />
+              ) : (
+                <AlertTriangle className="w-4 h-4 text-amber-500" />
+              )}
+              <span className={`text-sm font-semibold ${isOnline ? 'text-emerald-500' : 'text-amber-500'}`}>
+                {isOnline ? 'Онлайн' : 'Модель не загружена'}
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <XCircle className="w-4 h-4 text-red-500" />
+              <span className="text-sm font-semibold text-red-500">Недоступен</span>
+            </div>
+          )}
+        </div>
+
+        {/* Version card */}
+        <div className={`${cardBg} border ${cardBorder} rounded-xl p-4`}>
+          <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${textSecondary}`}>Версия</p>
+          <span className={`text-sm font-semibold ${textPrimary}`}>
+            {health?.version ?? modelInfo?.version ?? '—'}
+          </span>
+        </div>
+      </div>
+
+      {/* Model info */}
+      {modelInfo && (
+        <div className={`${cardBg} border ${cardBorder} rounded-xl p-5`}>
+          <h3 className={`text-sm font-bold mb-4 ${textPrimary}`}>Информация о модели</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <InfoRow isDark={isDark} label="Тип модели" value={modelInfo.model_type} />
+            <InfoRow isDark={isDark} label="Обучена" value={modelInfo.trained_at ? new Date(modelInfo.trained_at).toLocaleString('ru-RU') : '—'} />
+            <InfoRow isDark={isDark} label="Размер выборки" value={modelInfo.sample_size?.toLocaleString('ru-RU') ?? '—'} />
+            <InfoRow isDark={isDark} label="Признаков" value={String(modelInfo.features.length)} />
+          </div>
+
+          {modelInfo.metrics && Object.keys(modelInfo.metrics).length > 0 && (
+            <div className="mt-4">
+              <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-[#94a3b8]' : 'text-[#737373]'}`}>Метрики</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {Object.entries(modelInfo.metrics).map(([key, value]) => (
+                  <InfoRow key={key} isDark={isDark} label={key} value={typeof value === 'number' ? value.toFixed(4) : String(value)} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {modelInfo.features.length > 0 && (
+            <div className="mt-4">
+              <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-[#94a3b8]' : 'text-[#737373]'}`}>Признаки модели</p>
+              <div className="flex flex-wrap gap-1.5">
+                {modelInfo.features.map((f) => (
+                  <span key={f} className={`text-xs px-2 py-0.5 rounded-full ${isDark ? 'bg-[#1c2534] text-[#94a3b8]' : 'bg-gray-100 text-gray-600'}`}>
+                    {f}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Retrain section */}
+      <div className={`${cardBg} border ${cardBorder} rounded-xl p-5`}>
+        <h3 className={`text-sm font-bold mb-3 ${textPrimary}`}>Переобучение модели</h3>
+        <p className={`text-xs mb-4 ${textSecondary}`}>
+          Запуск переобучения ML-модели на синтетических данных. Процесс может занять несколько секунд.
+        </p>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => void handleRetrain()}
+            disabled={retrainLoading}
+            className="flex items-center gap-2 bg-[#4880ff] hover:bg-[#3a6fe0] disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200"
+          >
+            <RefreshCw className={`w-4 h-4 ${retrainLoading ? 'animate-spin' : ''}`} />
+            {retrainLoading ? 'Обучение...' : 'Переобучить модель'}
+          </button>
+
+          {statusQuery.isFetching && !statusQuery.isPending && (
+            <span className={`text-xs ${textSecondary}`}>Обновление статуса...</span>
+          )}
+        </div>
+
+        {retrainResult && (
+          <div className={`mt-3 flex items-start gap-2 text-sm ${retrainResult.status === 'error' ? 'text-red-500' : 'text-emerald-500'}`}>
+            {retrainResult.status === 'error' ? (
+              <XCircle className="w-4 h-4 mt-0.5 shrink-0" />
+            ) : (
+              <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" />
+            )}
+            <span>{retrainResult.message}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function InfoRow({ isDark, label, value }: { isDark: boolean; label: string; value: string }) {
+  const textSecondary = isDark ? 'text-[#94a3b8]' : 'text-[#737373]'
+  const textPrimary = isDark ? 'text-[#f4f3f2]' : 'text-[#202224]'
+  return (
+    <div className="flex items-baseline justify-between gap-2">
+      <span className={`text-xs ${textSecondary}`}>{label}</span>
+      <span className={`text-sm font-semibold ${textPrimary}`}>{value}</span>
+    </div>
+  )
+}
+
+function MlModelSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="h-20 rounded-xl bg-gray-200/80 skeleton-shimmer" />
+        ))}
+      </div>
+      <div className="h-48 rounded-xl bg-gray-200/80 skeleton-shimmer" />
+      <div className="h-24 rounded-xl bg-gray-200/80 skeleton-shimmer" />
+    </div>
   )
 }
 

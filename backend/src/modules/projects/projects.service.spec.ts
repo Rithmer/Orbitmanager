@@ -144,6 +144,7 @@ const mockProjectAccessService = {
   assertProjectVisibility: jest.fn().mockResolvedValue(undefined),
   assertTeamOwnerOrAdmin: jest.fn().mockResolvedValue(undefined),
   assertCanManageProject: jest.fn().mockResolvedValue(undefined),
+  invalidateVisibleProjects: jest.fn(),
 };
 
 describe('ProjectsService', () => {
@@ -322,6 +323,29 @@ describe('ProjectsService', () => {
   });
 
   describe('addMember', () => {
+    it('invalidates access and summary caches for the added user', async () => {
+      mockProjectMemberRepository.findByUserAndProject.mockResolvedValueOnce(
+        null,
+      );
+
+      await service.addMember(
+        1,
+        { userId: 99, role: ProjectRole.DEVELOPER },
+        10,
+        AccountRole.MEMBER,
+      );
+
+      expect(
+        mockProjectAccessService.invalidateVisibleProjects,
+      ).toHaveBeenCalledWith(99);
+      expect(mockCache.invalidateByPrefix).toHaveBeenCalledWith(
+        'dashboard:summary:99:',
+      );
+      expect(mockCache.invalidateByPrefix).toHaveBeenCalledWith(
+        'reports:summary:99:',
+      );
+    });
+
     it('throws ConflictException if user already a project member', async () => {
       await expect(
         service.addMember(
@@ -361,6 +385,15 @@ describe('ProjectsService', () => {
       ]);
       expect(mockProjectMemberRepository.delete).toHaveBeenCalledWith(
         mockProjectMember.id,
+      );
+      expect(
+        mockProjectAccessService.invalidateVisibleProjects,
+      ).toHaveBeenCalledWith(mockProjectMember.userId);
+      expect(mockCache.invalidateByPrefix).toHaveBeenCalledWith(
+        `dashboard:summary:${mockProjectMember.userId}:`,
+      );
+      expect(mockCache.invalidateByPrefix).toHaveBeenCalledWith(
+        `reports:summary:${mockProjectMember.userId}:`,
       );
     });
   });

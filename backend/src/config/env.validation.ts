@@ -29,4 +29,7 @@ export const envValidationSchema = Joi.object({
   LOG_LEVEL: Joi.string()
     .valid('error', 'warn', 'info', 'debug')
     .default('info'),
+
+  RISK_PROVIDER: Joi.string().valid('stub', 'ml').default('stub'),
+  ML_SERVICE_URL: Joi.string().default('http://ml-service:8000'),
 });

@@ -18,6 +18,7 @@ import { Team } from '@/domain/models/team.model';
 import { TeamMember } from '@/domain/models/team-member.model';
 import { AuditService } from '../audit-logs/audit.service';
 import { TtlCacheService } from '@/common/cache/ttl-cache.service';
+import { InMemoryCacheService } from '@/common/cache/in-memory-cache.service';
 
 const mockTeam: Team = {
   id: 1,
@@ -145,6 +146,9 @@ const mockTtlCacheService = {
   get: jest.fn().mockReturnValue(undefined),
   set: jest.fn(),
   getOrSet: jest.fn(),
+};
+
+const mockSummaryCache = {
   invalidateByPrefix: jest.fn(),
 };
 
@@ -165,6 +169,8 @@ describe('TeamsService', () => {
         },
         { provide: TASK_REPOSITORY, useValue: mockTaskRepository },
         { provide: AuditService, useValue: mockAuditService },
+        { provide: TtlCacheService, useValue: mockTtlCacheService },
+        { provide: InMemoryCacheService, useValue: mockSummaryCache },
       ],
     }).compile();
 
@@ -285,6 +291,15 @@ describe('TeamsService', () => {
           }),
         ]),
       );
+      expect(mockTtlCacheService.invalidate).toHaveBeenCalledWith(
+        `visible_projects:${mockMember.userId}`,
+      );
+      expect(mockSummaryCache.invalidateByPrefix).toHaveBeenCalledWith(
+        `dashboard:summary:${mockMember.userId}:`,
+      );
+      expect(mockSummaryCache.invalidateByPrefix).toHaveBeenCalledWith(
+        `reports:summary:${mockMember.userId}:`,
+      );
     });
   });
 
@@ -347,10 +362,42 @@ describe('TeamsService', () => {
       expect(mockTeamMemberRepository.delete).toHaveBeenCalledWith(
         mockMember.id,
       );
+      expect(mockTtlCacheService.invalidate).toHaveBeenCalledWith(
+        `visible_projects:${mockMember.userId}`,
+      );
+      expect(mockSummaryCache.invalidateByPrefix).toHaveBeenCalledWith(
+        `dashboard:summary:${mockMember.userId}:`,
+      );
+      expect(mockSummaryCache.invalidateByPrefix).toHaveBeenCalledWith(
+        `reports:summary:${mockMember.userId}:`,
+      );
     });
   });
 
   describe('addMember', () => {
+    it('should invalidate access and summary caches for a newly added member', async () => {
+      mockTeamMemberRepository.findByUserAndTeam
+        .mockResolvedValueOnce(mockOwner)
+        .mockResolvedValueOnce(null);
+
+      await service.addMember(
+        1,
+        { userId: 20, teamRole: TeamRole.MEMBER },
+        10,
+        AccountRole.MEMBER,
+      );
+
+      expect(mockTtlCacheService.invalidate).toHaveBeenCalledWith(
+        'visible_projects:20',
+      );
+      expect(mockSummaryCache.invalidateByPrefix).toHaveBeenCalledWith(
+        'dashboard:summary:20:',
+      );
+      expect(mockSummaryCache.invalidateByPrefix).toHaveBeenCalledWith(
+        'reports:summary:20:',
+      );
+    });
+
     it('should throw ConflictException if user already a member', async () => {
       mockTeamMemberRepository.findByUserAndTeam.mockResolvedValueOnce(
         mockOwner,

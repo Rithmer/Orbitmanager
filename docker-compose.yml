@@ -18,6 +18,26 @@ services:
       timeout: 5s
       retries: 10
 
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      MODELS_DIR: /app/models
+    volumes:
+      - ./models:/app/models
+    ports:
+      - "${ML_SERVICE_PORT:-8000}:8000"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
   backend:
     build:
       context: ./backend
@@ -26,8 +46,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      ml-service:
+        condition: service_healthy
     environment:
-      PORT: ${PORT:-3000}
+      PORT: 3000
       NODE_ENV: ${NODE_ENV:-production}
       DATABASE_URL: postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-task_manager}
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-change_me_access_secret_min_32_chars}
@@ -44,7 +66,9 @@ services:
       DB_POOL_IDLE_TIMEOUT: ${DB_POOL_IDLE_TIMEOUT:-30000}
       DB_POOL_CONNECTION_TIMEOUT: ${DB_POOL_CONNECTION_TIMEOUT:-5000}
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      AUTO_SEED: ${AUTO_SEED:-true}
+      AUTO_SEED: ${AUTO_SEED:-false}
+      RISK_PROVIDER: ${RISK_PROVIDER:-ml}
+      ML_SERVICE_URL: ${ML_SERVICE_URL:-http://ml-service:8000}
     ports:
       - "${PORT:-3000}:3000"  
     volumes:
@@ -118,7 +142,7 @@ services:
       DB_POOL_MAX: ${DB_POOL_MAX:-10}
       CORS_ORIGIN: ${E2E_CORS_ORIGIN:-http://localhost:5174,http://localhost:3001}
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      AUTO_SEED: ${E2E_AUTO_SEED:-true}
+      AUTO_SEED: ${E2E_AUTO_SEED:-false}
       SEED_COMMAND: ${E2E_SEED_COMMAND:-npm run db:seed:e2e}
     ports:
       - "${E2E_BACKEND_PORT:-3001}:3000"

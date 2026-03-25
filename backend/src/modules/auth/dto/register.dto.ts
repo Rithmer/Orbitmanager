@@ -1,11 +1,12 @@
 import {
   IsNotEmpty,
+  IsOptional,
   IsString,
   Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { StrongPasswordConstraint } from '@/common/validators/strong-password';
 
 export class RegisterDto {
@@ -40,9 +41,9 @@ export class RegisterDto {
   @MaxLength(100)
   fullName!: string;
 
-  @ApiProperty({ example: 'Backend Developer' })
+  @ApiPropertyOptional({ example: 'Backend Developer' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(100)
   profession?: string;
 }

@@ -202,10 +202,11 @@ describe('Business Processes (e2e)', () => {
     login: string,
     password: string,
     fullName: string,
+    profession?: string,
   ) {
     const res = await server()
       .post('/auth/register')
-      .send({ login, password, fullName, profession: 'Developer' })
+      .send({ login, password, fullName, profession })
       .expect(201);
     const body = res.body as { accessToken: string; refreshToken: string };
     const payload = decodeJwtPayload(body.accessToken);
@@ -221,6 +222,50 @@ describe('Business Processes (e2e)', () => {
     const payload = decodeJwtPayload(body.accessToken);
     return { ...body, userId: payload.sub };
   }
+
+  describe('BP0: contract regression fixes', () => {
+    it('registers a user without profession', async () => {
+      const result = await registerUser(
+        'bp0_noprof',
+        'NoProfPass1!',
+        'No Profession',
+      );
+
+      expect(result.accessToken).toBeDefined();
+      expect(result.refreshToken).toBeDefined();
+    });
+
+    it('rejects inactive accountStatus on admin create and update', async () => {
+      const admin = await loginUser(ADMIN_LOGIN, ADMIN_PASSWORD);
+
+      await server()
+        .post('/users')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({
+          login: 'bp0_inactive_create',
+          password: 'CreatePass1!',
+          fullName: 'Inactive Create',
+          accountStatus: 'inactive',
+        })
+        .expect(400);
+
+      const created = await server()
+        .post('/users')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({
+          login: 'bp0_active_user',
+          password: 'CreatePass2!',
+          fullName: 'Active User',
+        })
+        .expect(201);
+
+      await server()
+        .patch(`/users/${created.body.id}`)
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({ accountStatus: 'inactive' })
+        .expect(400);
+    });
+  });
 
   describe('BP1: register -> login -> team -> project -> assign -> task -> audit', () => {
     let token: string;
@@ -815,6 +860,138 @@ describe('Business Processes (e2e)', () => {
         .expect(200);
 
       expect(updatedTask.body.assigneeIds).toEqual([]);
+    });
+  });
+
+  describe('BP5: membership revoke invalidates cached summaries immediately', () => {
+    let ownerToken: string;
+    let observerToken: string;
+    let observerId: number;
+    let teamId: number;
+    let projectId: number;
+    let projectMemberId: number;
+
+    it('Step 1: register owner and observer', async () => {
+      const owner = await registerUser(
+        'bp5_owner',
+        'Owner5Pass!',
+        'BP5 Owner',
+        'Owner',
+      );
+      ownerToken = owner.accessToken;
+
+      const observer = await registerUser(
+        'bp5_observer',
+        'Observer5Pass!',
+        'BP5 Observer',
+        'Observer',
+      );
+      observerToken = observer.accessToken;
+      observerId = observer.userId;
+    });
+
+    it('Step 2: create team, project and attach observer to the project', async () => {
+      const teamRes = await server()
+        .post('/teams')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ name: 'BP5 Team' })
+        .expect(201);
+      teamId = teamRes.body.id;
+
+      await server()
+        .post(`/teams/${teamId}/members`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ userId: observerId, teamRole: 'observer' })
+        .expect(201);
+
+      const projectRes = await server()
+        .post('/projects')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ teamId, name: 'BP5 Project' })
+        .expect(201);
+      projectId = projectRes.body.id;
+
+      const projectMemberRes = await server()
+        .post(`/projects/${projectId}/members`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ userId: observerId, role: 'observer' })
+        .expect(201);
+      projectMemberId = projectMemberRes.body.id;
+    });
+
+    it('Step 3: create a task and warm cached summaries', async () => {
+      const deadline = new Date();
+      deadline.setDate(deadline.getDate() + 5);
+
+      await server()
+        .post('/tasks')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({
+          projectId,
+          name: 'BP5 Cached Task',
+          deadline: deadline.toISOString(),
+          difficulty: 2,
+        })
+        .expect(201);
+
+      const projectsRes = await server()
+        .get('/reports/projects')
+        .set('Authorization', `Bearer ${observerToken}`)
+        .expect(200);
+
+      expect(projectsRes.body).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: projectId,
+            name: 'BP5 Project',
+            teamId,
+          }),
+        ]),
+      );
+
+      const dashboardRes = await server()
+        .get('/dashboard/summary')
+        .set('Authorization', `Bearer ${observerToken}`)
+        .expect(200);
+      expect(dashboardRes.body.overview.projectCount).toBe(1);
+      expect(dashboardRes.body.overview.totalTasks).toBe(1);
+
+      const reportsRes = await server()
+        .get('/reports/summary')
+        .set('Authorization', `Bearer ${observerToken}`)
+        .expect(200);
+      expect(reportsRes.body.overview.projectCount).toBe(1);
+      expect(reportsRes.body.overview.totalTasks).toBe(1);
+    });
+
+    it('Step 4: removes project access and invalidates cached summaries immediately', async () => {
+      await server()
+        .delete(`/projects/${projectId}/members/${projectMemberId}`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(204);
+
+      const projectsRes = await server()
+        .get('/projects')
+        .set('Authorization', `Bearer ${observerToken}`)
+        .expect(200);
+      expect(projectsRes.body.items).toEqual([]);
+
+      const dashboardRes = await server()
+        .get('/dashboard/summary')
+        .set('Authorization', `Bearer ${observerToken}`)
+        .expect(200);
+      expect(dashboardRes.body.overview.projectCount).toBe(0);
+      expect(dashboardRes.body.overview.totalTasks).toBe(0);
+
+      await server()
+        .get('/reports/projects')
+        .set('Authorization', `Bearer ${observerToken}`)
+        .expect(403);
+
+      await server()
+        .get('/reports/summary')
+        .set('Authorization', `Bearer ${observerToken}`)
+        .expect(403);
     });
   });
 });

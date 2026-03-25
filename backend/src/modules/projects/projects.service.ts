@@ -329,8 +329,8 @@ export class ProjectsService {
       `Пользователь #${dto.userId} добавлен в проект #${projectId} с ролью ${dto.role}`,
     );
 
-    // B-03: invalidate stale visible-projects cache for the newly added user
-    this.projectAccessService.invalidateVisibleProjects(dto.userId);
+    // B-03: invalidate access and summary caches for the newly added user
+    this.invalidateAffectedUserAccessCaches(dto.userId);
 
     return member;
   }
@@ -416,8 +416,8 @@ export class ProjectsService {
       );
     }
 
-    // B-03: invalidate stale visible-projects cache for the removed user
-    this.projectAccessService.invalidateVisibleProjects(member.userId);
+    // B-03: invalidate access and summary caches for the removed user
+    this.invalidateAffectedUserAccessCaches(member.userId);
   }
 
   private async findMemberById(id: number): Promise<ProjectMember> {
@@ -432,6 +432,11 @@ export class ProjectsService {
   private invalidateUserCaches(userId: number): void {
     this.cache.invalidateByPrefix(`dashboard:summary:${userId}:`);
     this.cache.invalidateByPrefix(`reports:summary:${userId}:`);
+  }
+
+  private invalidateAffectedUserAccessCaches(userId: number): void {
+    this.projectAccessService.invalidateVisibleProjects(userId);
+    this.invalidateUserCaches(userId);
   }
 
   private async createWithTransaction(

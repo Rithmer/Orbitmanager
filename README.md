@@ -5,7 +5,8 @@ Fullstack-курсовой проект для управления команд
 ## Стек
 
 - Backend: NestJS, Prisma, PostgreSQL, JWT, Swagger, Jest
-- Frontend: React, TypeScript, Vite
+- Frontend: React, TypeScript, Vite, TanStack React Query
+- ML Service: Python, FastAPI, scikit-learn, joblib
 - Infra: Docker, Docker Compose, Nginx
 
 ## Что реализовано
@@ -15,7 +16,9 @@ Fullstack-курсовой проект для управления команд
 - Канбан-доска проекта
 - Календарь событий и дедлайнов
 - Аудит действий
-- Risk API с rule-based/stub логикой
+- Risk API с ML-моделью (GradientBoosting) и fallback на rule-based логику
+- ML-микросервис для оценки рисков задач (FastAPI, отдельный контейнер)
+- Админ-панель: управление пользователями, аудит, мониторинг и переобучение ML-модели
 - Docker-окружение для локального запуска
 
 ## Быстрый старт
@@ -47,6 +50,7 @@ docker compose up -d --build
 - Frontend: `http://localhost:5173`
 - Backend API: `http://localhost:3000`
 - Swagger: `http://localhost:5173/api/docs`
+- ML Service: `http://localhost:8000`
 - PostgreSQL: `localhost:5433`
 
 ## Переменные окружения
@@ -68,6 +72,9 @@ Root [.env.example](.env.example) используется `docker compose` и �
 - `THROTTLE_TTL`, `THROTTLE_LIMIT`
 - `DB_POOL_MAX`, `DB_POOL_IDLE_TIMEOUT`, `DB_POOL_CONNECTION_TIMEOUT`
 - `AUTO_SEED`
+- `RISK_PROVIDER` - провайдер оценки рисков: `stub` (по умолчанию, rule-based) или `ml` (ML-модель)
+- `ML_SERVICE_URL` - адрес ML-сервиса (по умолчанию `http://ml-service:8000`)
+- `ML_SERVICE_PORT` - внешний порт ML-сервиса (по умолчанию `8000`)
 
 Файл [backend/.env.example](backend/.env.example) нужен для локального запуска backend-команд вне Docker.
 
@@ -89,6 +96,15 @@ Frontend:
 cd frontend
 npm run dev
 npm run build
+npm run test
+```
+
+ML Service (внутри контейнера или при наличии Python 3.10+):
+
+```bash
+cd ml-service
+pip install -r requirements.txt
+python -m pytest tests/
 ```
 
 ## Docker Compose
@@ -124,9 +140,29 @@ docker compose -p taskmanager-e2e down -v
 
 - [backend](backend) - NestJS API, Prisma, тесты и скрипты
 - [frontend](frontend) - React/Vite клиент
+- [ml-service](ml-service) - Python FastAPI ML-микросервис для оценки рисков
 - [docker-compose.yml](docker-compose.yml) - единый docker-compose файл с обычным стеком и профилем `e2e`
+
+## ML-модуль оценки рисков
+
+Система оценки рисков поддерживает два режима работы, переключаемых через переменную `RISK_PROVIDER`:
+
+- **`stub`** (по умолчанию) - детерминированная rule-based логика, не требует ML-сервиса
+- **`ml`** - GradientBoosting-модель, обученная на синтетических данных; при недоступности ML-сервиса автоматически переключается на stub
+
+ML-сервис запускается как отдельный Docker-контейнер. Модель обучается при первом запуске и сохраняется в volume `./models`. Переобучение доступно из админ-панели (вкладка "ML Модель") или через `POST /risk/retrain`.
+
+### API ML-сервиса
+
+| Метод | Путь | Описание |
+|---|---|---|
+| GET | `/health` | Проверка доступности |
+| GET | `/model/info` | Информация о модели (версия, метрики, признаки) |
+| POST | `/predict` | Оценка риска одной задачи |
+| POST | `/predict/batch` | Пакетная оценка рисков (до 1000 задач) |
+| POST | `/retrain` | Переобучение модели |
 
 ## Ограничения
 
-- Модуль оценки рисков пока использует stub/rule-based реализацию, а не production ML.
-- UI уже рабочий, но остаётся учебным и продолжает дорабатываться.
+- ML-модель обучается на синтетических данных; для production-качества необходимы реальные исторические данные.
+- UI рабочий, но остаётся учебным и продолжает дорабатываться.

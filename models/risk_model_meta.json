@@ -1,0 +1,24 @@
+{
+  "trained_at": "2026-03-25T08:11:00.810101",
+  "sample_size": 5000,
+  "metrics": {
+    "cv_rmse_mean": 0.0374,
+    "cv_rmse_std": 0.0005,
+    "n_samples": 5000,
+    "n_features": 11,
+    "feature_names": [
+      "difficulty",
+      "assignee_count",
+      "assignee_load",
+      "status_changes_count",
+      "days_since_creation",
+      "days_until_deadline",
+      "deadline_passed",
+      "deadline_critical",
+      "is_unassigned",
+      "high_difficulty_high_load",
+      "difficulty_deadline_ratio"
+    ]
+  },
+  "version": "1.0.0"
+}
