@@ -97,8 +97,9 @@ export class CalendarController {
   create(
     @Body() dto: CreateCalendarEventDto,
     @CurrentUser('id') userId: number,
+    @CurrentUser('accountRole') userRole: AccountRole,
   ) {
-    return this.calendarService.create(dto, userId);
+    return this.calendarService.create(dto, userId, userRole);
   }
 
   @Patch(':id')

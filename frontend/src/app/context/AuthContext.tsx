@@ -34,7 +34,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     const rt = api.getRefreshToken()
     if (rt) {
-      authApi.logout(rt).catch(() => {})
+      authApi.logout(rt).catch((err) => {
+        console.warn('Logout API call failed, local session cleared:', err)
+      })
     }
     api.clearTokens()
     clearLastBoardProjectId()
@@ -76,15 +78,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (dto: LoginDto) => {
     const tokens = await authApi.login(dto)
     api.setTokens(tokens.accessToken, tokens.refreshToken)
-    const me = await authApi.me()
-    setUser(me)
+    try {
+      const me = await authApi.me()
+      setUser(me)
+    } catch (err) {
+      api.clearTokens()
+      throw err
+    }
   }, [])
 
   const register = useCallback(async (dto: RegisterDto) => {
     const tokens = await authApi.register(dto)
     api.setTokens(tokens.accessToken, tokens.refreshToken)
-    const me = await authApi.me()
-    setUser(me)
+    try {
+      const me = await authApi.me()
+      setUser(me)
+    } catch (err) {
+      api.clearTokens()
+      throw err
+    }
   }, [])
 
   const refreshUser = async () => {

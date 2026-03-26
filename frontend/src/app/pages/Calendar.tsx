@@ -75,11 +75,13 @@ const DURATION_OPTIONS = [
   { value: '480', label: '8 часов (весь день)' },
 ]
 
-function getCalendarFallbackErrorMessage(source: 'projects' | 'events'): string {
+function getCalendarFallbackErrorMessage(source: 'projects' | 'events' | 'tasks'): string {
   if (source === 'projects') {
     return 'Список проектов временно недоступен. Доступны задачи и события.'
   }
-
+  if (source === 'tasks') {
+    return 'Список задач временно недоступен. Доступны проекты и события.'
+  }
   return 'Список событий временно недоступен. Проверьте соединение и попробуйте снова.'
 }
 
@@ -143,7 +145,10 @@ export function Calendar() {
   const loadStaticData = useCallback(async () => {
     try {
       const [tasksRes, projectsRes] = await Promise.all([
-        tasksApi.list({ limit: 500 }),
+        tasksApi.list({ limit: 500 }).catch(() => {
+          setError(getCalendarFallbackErrorMessage('tasks'))
+          return { items: [] as Task[], total: 0, page: 1, limit: 500, totalPages: 0 }
+        }),
         projectsApi.list({ limit: 100 }).catch(() => {
           setError(getCalendarFallbackErrorMessage('projects'))
           return { items: [] as Project[], total: 0, page: 1, limit: 100, totalPages: 0 }
