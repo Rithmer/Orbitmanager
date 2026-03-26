@@ -3,8 +3,6 @@ import { AlertCircle, RefreshCw, ShieldAlert, Users } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { useTheme } from '../context/useTheme'
 import { useAuth } from '../context/useAuth'
-import { teamsApi } from '../api/teams'
-import { projectsApi } from '../api/projects'
 import { ApiErrorBanner } from '../components/ApiErrorBanner'
 import {
   PageRefreshOverlay,
@@ -19,11 +17,12 @@ import { useSmoothPageSkeleton } from '../hooks/useSmoothPageSkeleton'
 import {
   resolveRoleScopedProjects,
   resolveRoleScopedTeams,
-  type RiskAssigneeContribution,
   useRisksProjectsQuery,
   useRisksSummaryQuery,
 } from '../features/risks'
-import { AccountRole, ProjectRole, PROJECT_ROLE_LABELS, RISK_LEVEL_LABELS, type RiskLevel } from '../types'
+import { teamsApi } from '../api/teams'
+import { AccountRole, RISK_LEVEL_LABELS, type RiskLevel } from '../types'
+import { ApiError } from '../api/client'
 
 const RISK_BADGE_STYLES: Record<RiskLevel, string> = {
   low: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300',
@@ -50,6 +49,11 @@ function formatImpactLabel(value: number): { label: string; className: string } 
     return { label: 'Снижает шанс выполнения', className: 'text-amber-500' }
   }
   return { label: 'Сильно снижает шанс выполнения', className: 'text-red-500' }
+}
+
+function isMlUnavailableError(error: unknown): boolean {
+  if (error instanceof ApiError && error.status === 503) return true
+  return false
 }
 
 export function Risks() {
@@ -140,54 +144,6 @@ export function Risks() {
     ? selectedCard?.taskInsights.find((task) => task.taskId === selectedTaskId)
     : selectedCard?.taskInsights[0]
 
-  const projectMembersQuery = useQuery({
-    queryKey: ['risks', 'project-members', selectedCard?.projectId ?? null] as const,
-    queryFn: ({ signal }) =>
-      selectedCard?.projectId
-        ? projectsApi.getMembers(selectedCard.projectId, { signal })
-        : Promise.resolve([]),
-    staleTime: 60_000,
-    enabled: Boolean(selectedCard?.projectId) && risksApiEnabled,
-  })
-
-  const recommendedAssignees = useMemo(() => {
-    if (!selectedTask) return []
-
-    const memberRows = projectMembersQuery.data ?? []
-    const breakdownByUserId = new Map<number, RiskAssigneeContribution>()
-    for (const item of selectedTask.assigneeBreakdown) {
-      breakdownByUserId.set(item.userId, item)
-    }
-
-    const roleWeight: Record<ProjectRole, number> = {
-      [ProjectRole.TEAM_LEAD]: 0.2,
-      [ProjectRole.DEVELOPER]: 0.3,
-      [ProjectRole.OBSERVER]: -0.1,
-    }
-
-    return memberRows
-      .map((member) => {
-        const breakdown = breakdownByUserId.get(member.userId)
-        const impact = breakdown?.impactScore ?? 0
-        const confidence = breakdown?.confidence ?? 0.45
-        const score = Number((impact * 0.65 + confidence * 0.35 + roleWeight[member.role]).toFixed(3))
-        return {
-          userId: member.userId,
-          fullName: member.user?.fullName ?? `Пользователь #${member.userId}`,
-          profession: member.user?.profession ?? 'Специальность не указана',
-          role: member.role,
-          score,
-          reason:
-            breakdown?.note ??
-            (member.role === ProjectRole.DEVELOPER
-              ? 'Подходит по проектной роли для исполнения задачи.'
-              : 'Можно привлечь как дополнительного участника по задаче.'),
-        }
-      })
-      .sort((left, right) => right.score - left.score)
-      .slice(0, 5)
-  }, [projectMembersQuery.data, selectedTask])
-
   const waitingForAccess = !isAdmin && risksAccessLoading
   const isInitialLoading =
     risksApiEnabled && (projectsQuery.isPending || teamsQuery.isPending || risksSummaryQuery.isPending)
@@ -200,8 +156,10 @@ export function Risks() {
   const panelMuted = isDark ? 'bg-[#1f2a3b]' : 'bg-[#f8fafc]'
   const selectClassName = `px-3 py-2 rounded-lg border text-sm ${isDark ? 'bg-[#1c2534] border-[#313d4f] text-[#f4f3f2]' : 'bg-white border-[#e8e8e8] text-[#202224]'}`
 
-  const errorMessage =
-    risksSummaryQuery.error instanceof Error
+  const isMlDown = isMlUnavailableError(risksSummaryQuery.error)
+  const errorMessage = isMlDown
+    ? 'ML-сервис оценки рисков недоступен. Попробуйте обновить позже.'
+    : risksSummaryQuery.error instanceof Error
       ? risksSummaryQuery.error.message
       : 'Не удалось загрузить риски. Попробуйте обновить страницу.'
 
@@ -300,10 +258,16 @@ export function Risks() {
       <ApiErrorBanner />
 
       {risksSummaryQuery.error && cards.length === 0 ? (
-        <PageSection title="Ошибка загрузки">
+        <PageSection title={isMlDown ? 'ML-сервис недоступен' : 'Ошибка загрузки'}>
           <div className="flex flex-col items-center justify-center gap-4 py-14 text-center">
-            <AlertCircle className="w-10 h-10 text-red-500" />
+            <AlertCircle className={`w-10 h-10 ${isMlDown ? 'text-amber-500' : 'text-red-500'}`} />
             <p className={`text-sm ${textSecondary} max-w-md`}>{errorMessage}</p>
+            <button
+              onClick={() => void risksSummaryQuery.refetch()}
+              className="bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors"
+            >
+              Повторить
+            </button>
           </div>
         </PageSection>
       ) : (
@@ -372,11 +336,9 @@ export function Risks() {
                           Риск из-за координации команды: {selectedTask.coordinationPenalty}%
                         </p>
                       </div>
-                      {projectMembersQuery.isPending ? (
-                        <p className={`text-sm ${textSecondary}`}>Загрузка исполнителей проекта...</p>
-                      ) : recommendedAssignees.length > 0 ? (
+                      {selectedTask.recommendedAssignees.length > 0 ? (
                         <div className="space-y-2">
-                          {recommendedAssignees.map((assignee, index) => (
+                          {selectedTask.recommendedAssignees.map((assignee, index) => (
                             <div
                               key={`${selectedTask.taskId}-${assignee.userId}`}
                               className={`rounded-lg border ${cardBorder} px-3 py-2`}
@@ -386,11 +348,11 @@ export function Risks() {
                                   {index + 1}. {assignee.fullName}
                                 </span>
                                 <span className="text-xs text-[#4880ff] font-semibold">
-                                  Рекомендация: {formatFitScore(assignee.score)}
+                                  Рекомендация: {formatFitScore(assignee.fitScore)}
                                 </span>
                               </div>
                               <p className={`text-xs mt-1 ${textSecondary}`}>
-                                {PROJECT_ROLE_LABELS[assignee.role]} - {assignee.profession}
+                                {assignee.role} - {assignee.profession}
                               </p>
                               <p className={`text-xs mt-1 ${textSecondary}`}>{assignee.reason}</p>
                             </div>
@@ -401,19 +363,21 @@ export function Risks() {
                       )}
                     </div>
                   ) : null}
-                  <div className={`rounded-xl ${panelMuted} p-3`}>
-                    <p className={`text-xs uppercase tracking-wide ${textSecondary}`}>Текущий вклад назначенных</p>
-                    <div className="mt-2 space-y-2">
-                      {(selectedTask?.assigneeBreakdown ?? []).map((assignee) => (
-                        <div key={`${selectedTask?.taskId}-${assignee.userId}`} className="flex items-center justify-between text-sm">
-                          <span className="truncate pr-3">{assignee.userName}</span>
-                          <span className={formatImpactLabel(assignee.impactScore).className}>
-                            {formatImpactLabel(assignee.impactScore).label}
-                          </span>
-                        </div>
-                      ))}
+                  {selectedTask && selectedTask.assigneeBreakdown.length > 0 ? (
+                    <div className={`rounded-xl ${panelMuted} p-3`}>
+                      <p className={`text-xs uppercase tracking-wide ${textSecondary}`}>Текущий вклад назначенных</p>
+                      <div className="mt-2 space-y-2">
+                        {selectedTask.assigneeBreakdown.map((assignee) => (
+                          <div key={`${selectedTask.taskId}-${assignee.userId}`} className="flex items-center justify-between text-sm">
+                            <span className="truncate pr-3">{assignee.userName}</span>
+                            <span className={formatImpactLabel(assignee.impactScore).className}>
+                              {formatImpactLabel(assignee.impactScore).label}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  ) : null}
                 </div>
               ) : (
                 <p className={`text-sm ${textSecondary}`}>Нет задач для выбора в текущем срезе.</p>
@@ -433,7 +397,7 @@ export function Risks() {
                       className={`rounded-xl ${panelMuted} p-3 border ${cardBorder}`}
                     >
                       <div className="flex items-start gap-2">
-                        {recommendation.type === 'swap_members' ? (
+                        {recommendation.type === 'swap_members' || recommendation.type === 'rebalance_load' ? (
                           <Users className="h-4 w-4 text-amber-500 mt-0.5" />
                         ) : (
                           <ShieldAlert className="h-4 w-4 text-[#4880ff] mt-0.5" />

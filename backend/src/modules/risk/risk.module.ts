@@ -6,6 +6,9 @@ import { RiskController } from './risk.controller';
 import { RiskStubService } from './risk-stub.service';
 import { RiskMlService } from './risk-ml.service';
 import { MlClientService } from './ml-client.service';
+import { RiskPageReadModelService } from './risk-page-read-model.service';
+import { RiskPageProjectionService } from './risk-page-projection.service';
+import { RiskAssigneeScoringService } from './risk-assignee-scoring.service';
 import { RISK_ASSESSMENT_SERVICE } from '@/domain/services/risk-assessment.interface';
 
 @Module({
@@ -15,6 +18,9 @@ import { RISK_ASSESSMENT_SERVICE } from '@/domain/services/risk-assessment.inter
     AccountRolesGuard,
     RiskStubService,
     MlClientService,
+    RiskPageReadModelService,
+    RiskPageProjectionService,
+    RiskAssigneeScoringService,
     {
       provide: RISK_ASSESSMENT_SERVICE,
       useFactory: (
