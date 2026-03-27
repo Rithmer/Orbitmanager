@@ -1,5 +1,5 @@
-import { api, buildQuery, type ApiRequestOptions } from './client'
-import type { User, PaginatedResult, QueryParams, UserAccountStatus } from '../types'
+import { api, buildQuery, type ApiRequestOptions } from '@/app/api/client'
+import type { User, PaginatedResult, QueryParams, UserAccountStatus } from '@/app/types'
 
 export const usersApi = {
   list(params: QueryParams = {}, options: ApiRequestOptions = {}): Promise<PaginatedResult<User>> {

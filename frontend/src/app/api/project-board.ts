@@ -1,5 +1,5 @@
-import { api, type ApiRequestOptions } from './client'
-import type { ProjectBoardView } from '../features/board'
+import { api, type ApiRequestOptions } from '@/app/api/client'
+import type { ProjectBoardView } from '@/app/features/board'
 
 export const projectBoardApi = {
   getBoardView(

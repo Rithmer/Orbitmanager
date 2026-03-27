@@ -1,4 +1,4 @@
-import { api, type ApiRequestOptions } from './client'
+import { api, type ApiRequestOptions } from '@/app/api/client'
 
 export interface MlHealthStatus {
   status: string

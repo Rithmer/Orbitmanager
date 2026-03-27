@@ -1,5 +1,5 @@
-import { api, type ApiRequestOptions } from './client'
-import type { TaskRiskOutput, ProjectRiskOutput } from '../types'
+import { api, type ApiRequestOptions } from '@/app/api/client'
+import type { TaskRiskOutput, ProjectRiskOutput } from '@/app/types'
 
 export const riskApi = {
   getProjectRisk(projectId: number, options: ApiRequestOptions = {}): Promise<ProjectRiskOutput> {
