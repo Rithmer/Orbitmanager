@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { X } from 'lucide-react'
-import { APP_API_ERROR_EVENT } from '../api/api-error-dispatch'
+import { APP_API_ERROR_EVENT } from '@/app/api/api-error-dispatch'
 
 type ApiErrorDetail = { message: string }
 
