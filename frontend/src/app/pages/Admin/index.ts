@@ -1,0 +1,1 @@
+export { Admin } from '@/app/pages/Admin/Admin'

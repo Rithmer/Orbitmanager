@@ -6,7 +6,7 @@ import {
   isSameLocalDate,
   toLocalDateTimeIso,
   toLocalEndOfDayIso,
-} from '../dateTime'
+} from '@/app/utils/dateTime'
 
 describe('dateTime utils', () => {
   it('builds datetime iso in UTC without local offset shift', () => {
