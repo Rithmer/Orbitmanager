@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
-import { projectsApi } from '../api/projects'
-import { teamsApi } from '../api/teams'
-import { useAuth } from '../context/useAuth'
-import { appQueryKeys } from '../query/query-keys'
+import { projectsApi } from '@/app/api/projects'
+import { teamsApi } from '@/app/api/teams'
+import { useAuth } from '@/app/context/useAuth'
+import { appQueryKeys } from '@/app/query/query-keys'
 
 export const NAV_MEMBERSHIP_BATCH_STALE_MS = 60_000
 

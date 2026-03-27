@@ -1,5 +1,5 @@
 import { useLayoutEffect, useState, type ReactNode } from 'react'
-import { ThemeContext, type Theme } from './theme-context'
+import { ThemeContext, type Theme } from '@/app/context/theme-context'
 
 const THEME_STORAGE_KEY = 'orbit-manager-theme'
 
