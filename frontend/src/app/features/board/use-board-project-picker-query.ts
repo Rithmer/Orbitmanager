@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { projectsListViewApi } from '../../api/projects-list-view'
-import { appQueryKeys } from '../../query'
+import { projectsListViewApi } from '@/app/api/projects-list-view'
+import { appQueryKeys } from '@/app/query'
 
 export function useBoardProjectPickerQuery(hasProjectId: boolean) {
   return useQuery({

@@ -1,4 +1,4 @@
-import { TaskStatus } from '../../types'
+import { TaskStatus } from '@/app/types'
 
 export interface CalendarViewProject {
   id: number

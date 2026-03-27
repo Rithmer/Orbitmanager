@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { teamsListViewApi } from '../../api/teams-list-view'
-import { appQueryKeys } from '../../query'
-import type { TeamsListViewQueryParams } from './types'
+import { teamsListViewApi } from '@/app/api/teams-list-view'
+import { appQueryKeys } from '@/app/query'
+import type { TeamsListViewQueryParams } from '@/app/features/teams/types'
 
 function buildRequestParams(params: TeamsListViewQueryParams) {
   const search = params.search?.trim()

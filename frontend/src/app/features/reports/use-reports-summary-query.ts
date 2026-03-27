@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { appQueryKeys } from '../../query'
-import { reportsApi } from '../../api/reports'
+import { appQueryKeys } from '@/app/query'
+import { reportsApi } from '@/app/api/reports'
 
 export function useReportsSummaryQuery(
   projectId?: number,

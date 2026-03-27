@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { projectsListViewApi } from '../../api/projects-list-view'
-import { appQueryKeys } from '../../query'
-import type { ProjectsListViewQueryParams } from './types'
+import { projectsListViewApi } from '@/app/api/projects-list-view'
+import { appQueryKeys } from '@/app/query'
+import type { ProjectsListViewQueryParams } from '@/app/features/projects/types'
 
 function buildRequestParams(params: ProjectsListViewQueryParams) {
   const search = params.search?.trim()

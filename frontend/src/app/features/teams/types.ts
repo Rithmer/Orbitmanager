@@ -1,4 +1,4 @@
-import type { TeamRole, PaginatedResult } from '../../types'
+import type { TeamRole, PaginatedResult } from '@/app/types'
 
 export interface TeamsListViewUserSummary {
   id: number

@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
-import { risksApi } from '../../api/risks'
-import { appQueryKeys } from '../../query'
-import { adaptProjectRisksPayload } from './adapters'
-import type { RisksProjectCard } from './types'
+import { risksApi } from '@/app/api/risks'
+import { appQueryKeys } from '@/app/query'
+import { adaptProjectRisksPayload } from '@/app/features/risks/adapters'
+import type { RisksProjectCard } from '@/app/features/risks/types'
 
 export function useRisksSummaryQuery(
   projectIds: number[],

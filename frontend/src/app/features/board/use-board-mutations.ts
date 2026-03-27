@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { tasksApi } from '../../api/tasks'
-import { appQueryKeys } from '../../query'
-import { TaskStatus } from '../../types'
-import { toLocalEndOfDayIso } from '../../utils/dateTime'
+import { tasksApi } from '@/app/api/tasks'
+import { appQueryKeys } from '@/app/query'
+import { TaskStatus } from '@/app/types'
+import { toLocalEndOfDayIso } from '@/app/utils/dateTime'
 
 type TaskPendingAction = 'status' | 'delete'
 
@@ -71,7 +71,7 @@ export function useBoardMutations({
         queryKey: appQueryKeys.projects.boardView(projectId),
       }),
       queryClient.invalidateQueries({
-        queryKey: ['calendar', 'month-view'],
+        queryKey: appQueryKeys.calendar.monthView(),
       }),
     ])
   }

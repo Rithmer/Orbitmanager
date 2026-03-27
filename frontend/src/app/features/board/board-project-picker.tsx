@@ -1,18 +1,18 @@
 import type { UseQueryResult } from '@tanstack/react-query'
 import { AlertTriangle, BarChart2, Calendar, Search, Users } from 'lucide-react'
-import { ErrorMessage } from '../../components/Modal'
+import { ErrorMessage } from '@/app/components/Modal'
 import {
   PageCardGridSkeleton,
   PageRefreshOverlay,
   PageShell,
   PageToolbarSkeleton,
   RefreshBadge,
-} from '../../components/PageShell'
-import type { PaginatedResult } from '../../types'
-import { PROJECT_STATUS_LABELS, ProjectStatus, RiskLevel } from '../../types'
-import type { ProjectsListViewItem } from '../projects'
-import { BOARD_PROJECT_CARD_COLORS, getRiskBadgeClasses } from './board-view.constants'
-import { formatBoardShortDate } from './board-page-formatters'
+} from '@/app/components/PageShell'
+import type { PaginatedResult } from '@/app/types'
+import { PROJECT_STATUS_LABELS, ProjectStatus, RiskLevel } from '@/app/types'
+import type { ProjectsListViewItem } from '@/app/features/projects'
+import { BOARD_PROJECT_CARD_COLORS, getRiskBadgeClasses } from '@/app/features/board/board-view.constants'
+import { formatBoardShortDate } from '@/app/features/board/board-page-formatters'
 
 export function BoardPickerSkeleton({
   pageBg,
@@ -156,7 +156,9 @@ export function BoardProjectPicker({
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 page-load-stagger">
               {pickerProjects.map((project, index) => {
                 const colorIndex = index % BOARD_PROJECT_CARD_COLORS.length
-                const statusStyle = statusClassMap[project.status]
+                const normalizedStatus =
+                  project.status === ProjectStatus.ARCHIVED ? ProjectStatus.COMPLETED : project.status
+                const statusStyle = statusClassMap[normalizedStatus]
                 const isHighRisk = project.riskSummary.riskLevel === RiskLevel.HIGH
                 const riskBadgeClasses = getRiskBadgeClasses(project.riskSummary.riskLevel)
 
@@ -192,7 +194,7 @@ export function BoardProjectPicker({
                             <span
                               className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusStyle.bg} ${statusStyle.text}`}
                             >
-                              {PROJECT_STATUS_LABELS[project.status] || project.status}
+                              {PROJECT_STATUS_LABELS[normalizedStatus] || normalizedStatus}
                             </span>
                             {project.riskSummary.riskLevel !== RiskLevel.LOW ? (
                               <span

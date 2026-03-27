@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { adaptProjectRisksPayload } from '../adapters'
-import { RiskLevel } from '../../../types'
+import { adaptProjectRisksPayload } from '@/app/features/risks/adapters'
+import { RiskLevel } from '@/app/types'
 
 describe('risk adapters', () => {
   it('adapts backend payload to frontend cards with all server-provided fields', () => {
@@ -98,7 +98,6 @@ describe('risk adapters', () => {
       },
       { 1: 'P1' },
     )
-    // Server says 60; adapter must NOT recalculate as 100 - riskScore
     expect(data[0].successProbability).toBe(60)
   })
 
@@ -131,7 +130,6 @@ describe('risk adapters', () => {
       },
       { 1: 'P' },
     )
-    // Even with high risk tasks, adapter must NOT inject its own recommendations
     expect(data[0].recommendations).toHaveLength(0)
   })
 })

@@ -1,11 +1,8 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { auditApi } from '../../api/audit'
-import { usersApi } from '../../api/users'
-import { appQueryKeys } from '../../query'
-import { AuditAction } from '../../types'
-
-export const adminUsersQueryPrefix = ['admin', 'users'] as const
-export const adminAuditQueryPrefix = ['admin', 'audit'] as const
+import { auditApi } from '@/app/api/audit'
+import { usersApi } from '@/app/api/users'
+import { appQueryKeys } from '@/app/query'
+import { AuditAction } from '@/app/types'
 
 export interface AdminUsersQueryParams {
   searchTerm: string
