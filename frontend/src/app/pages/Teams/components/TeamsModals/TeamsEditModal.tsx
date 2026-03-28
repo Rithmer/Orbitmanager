@@ -1,7 +1,8 @@
 import { ErrorMessage, InputField, Modal, SubmitButton } from '@/app/components/Modal'
 import type { TeamsEditModalProps } from '@/app/pages/Teams/types'
 
-export function TeamsEditModal({ vm }: TeamsEditModalProps) {
+export function TeamsEditModal({ model }: TeamsEditModalProps) {
+  const { teamForm, handlers, ui } = model
   const {
     showEditModal,
     setShowEditModal,
@@ -11,9 +12,8 @@ export function TeamsEditModal({ vm }: TeamsEditModalProps) {
     formDesc,
     setFormDesc,
     formLoading,
-    handleEdit,
-    tokens,
-  } = vm
+  } = teamForm
+  const { handleEdit } = handlers
 
   return (
     <Modal open={showEditModal} onClose={() => setShowEditModal(false)} title="Редактировать команду">
@@ -31,7 +31,7 @@ export function TeamsEditModal({ vm }: TeamsEditModalProps) {
           <button
             type="button"
             onClick={() => setShowEditModal(false)}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold ${tokens.textSecondary}`}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold ${ui.textSecondary}`}
           >
             Отмена
           </button>
