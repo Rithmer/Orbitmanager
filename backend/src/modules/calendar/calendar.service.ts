@@ -7,13 +7,14 @@ import {
 } from '@nestjs/common';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { AuditAction } from '@/common/enums/audit-action.enum';
-import {
-  PaginatedResult,
-  QueryParams,
-} from '@/common/helpers/query.helper';
+import { PaginatedResult, QueryParams } from '@/common/helpers/query.helper';
 import { CalendarEvent } from '@/domain/models/calendar-event.model';
 import type { ICalendarEventRepository } from '@/domain/repositories/calendar-event.repository';
 import { CALENDAR_EVENT_REPOSITORY } from '@/domain/repositories/calendar-event.repository';
+import type { IProjectRepository } from '@/domain/repositories/project.repository';
+import { PROJECT_REPOSITORY } from '@/domain/repositories/project.repository';
+import type { ITaskRepository } from '@/domain/repositories/task.repository';
+import { TASK_REPOSITORY } from '@/domain/repositories/task.repository';
 import { AuditService } from '../audit-logs/audit.service';
 import { CreateCalendarEventDto } from './dto/create-calendar-event.dto';
 import { UpdateCalendarEventDto } from './dto/update-calendar-event.dto';
@@ -23,8 +24,36 @@ export class CalendarService {
   constructor(
     @Inject(CALENDAR_EVENT_REPOSITORY)
     private readonly calendarEventRepository: ICalendarEventRepository,
+    @Inject(PROJECT_REPOSITORY)
+    private readonly projectRepository: IProjectRepository,
+    @Inject(TASK_REPOSITORY)
+    private readonly taskRepository: ITaskRepository,
     private readonly auditService: AuditService,
   ) {}
+
+  private async validateLinkedResources(
+    dto: CreateCalendarEventDto,
+  ): Promise<void> {
+    if (dto.projectId) {
+      const project = await this.projectRepository.findById(dto.projectId);
+      if (!project) {
+        throw new NotFoundException(`Проект #${dto.projectId} не найден`);
+      }
+    }
+
+    if (dto.taskId) {
+      const task = await this.taskRepository.findById(dto.taskId);
+      if (!task) {
+        throw new NotFoundException(`Задача #${dto.taskId} не найдена`);
+      }
+
+      if (task.projectId && dto.projectId && task.projectId !== dto.projectId) {
+        throw new BadRequestException(
+          'Задача не принадлежит указанному проекту',
+        );
+      }
+    }
+  }
 
   async findAll(
     params: QueryParams,
@@ -112,7 +141,10 @@ export class CalendarService {
   async create(
     dto: CreateCalendarEventDto,
     userId: number,
+    _userRole: AccountRole,
   ): Promise<CalendarEvent> {
+    await this.validateLinkedResources(dto);
+
     if (new Date(dto.endDate) <= new Date(dto.startDate)) {
       throw new BadRequestException(
         'Дата окончания должна быть позже даты начала',
@@ -249,5 +281,10 @@ function applyInMemoryPagination<T>(
   limit: number,
 ): PaginatedResult<T> {
   const offset = (page - 1) * limit;
-  return toPaginatedResult(items.slice(offset, offset + limit), items.length, page, limit);
+  return toPaginatedResult(
+    items.slice(offset, offset + limit),
+    items.length,
+    page,
+    limit,
+  );
 }

@@ -6,7 +6,11 @@ import type {
 } from '@/domain/repositories/user.repository';
 import { User } from '@/domain/models/user.model';
 import type { User as PrismaUser } from '@prisma/client';
-import { buildOrderBy, buildStringSearch, getPagination } from './prisma-query.utils';
+import {
+  buildOrderBy,
+  buildStringSearch,
+  getPagination,
+} from './prisma-query.utils';
 
 @Injectable()
 export class UsersPrismaRepository implements IUserRepository {
@@ -63,7 +67,7 @@ export class UsersPrismaRepository implements IUserRepository {
     return row ? this.toDomain(row) : null;
   }
 
-  async create(user: Omit<User, 'id' | 'discriminator'>): Promise<User> {
+  async create(user: Omit<User, 'id'>): Promise<User> {
     const row = await this.prisma.user.create({
       data: {
         login: user.login,
@@ -116,7 +120,7 @@ export class UsersPrismaRepository implements IUserRepository {
       accountStatus: row.accountStatus as User['accountStatus'],
       accountRole: row.accountRole as User['accountRole'],
       avatarUrl: row.avatarUrl ?? null,
-      discriminator: String(row.id % 10000).padStart(4, '0'),
+      lastPasswordChangedAt: row.lastPasswordChangedAt?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };

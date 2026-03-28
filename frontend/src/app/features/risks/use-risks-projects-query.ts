@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { risksApi } from '../../api/risks'
-import { appQueryKeys } from '../../query'
+import { risksApi } from '@/app/api/risks'
+import { appQueryKeys } from '@/app/query'
 
 export function useRisksProjectsQuery(options: { enabled?: boolean } = {}) {
   const { enabled = true } = options

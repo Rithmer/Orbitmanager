@@ -3,10 +3,7 @@ import type { IAuditLogRepository } from '@/domain/repositories/audit-log.reposi
 import { AUDIT_LOG_REPOSITORY } from '@/domain/repositories/audit-log.repository';
 import { AuditAction } from '@/common/enums/audit-action.enum';
 import { AuditLog } from '@/domain/models/audit-log.model';
-import {
-  QueryParams,
-  PaginatedResult,
-} from '@/common/helpers/query.helper';
+import { QueryParams, PaginatedResult } from '@/common/helpers/query.helper';
 
 @Injectable()
 export class AuditService {
@@ -49,7 +46,15 @@ export class AuditService {
   ): Promise<void> {
     await Promise.all(
       entries.map((e) =>
-        this.log(e.userId, e.action, e.entityType, e.entityId, e.description, e.oldValue, e.newValue),
+        this.log(
+          e.userId,
+          e.action,
+          e.entityType,
+          e.entityId,
+          e.description,
+          e.oldValue,
+          e.newValue,
+        ),
       ),
     );
   }
@@ -155,5 +160,10 @@ function applyInMemoryPagination<T>(
   limit: number,
 ): PaginatedResult<T> {
   const offset = (page - 1) * limit;
-  return toPaginatedResult(items.slice(offset, offset + limit), items.length, page, limit);
+  return toPaginatedResult(
+    items.slice(offset, offset + limit),
+    items.length,
+    page,
+    limit,
+  );
 }

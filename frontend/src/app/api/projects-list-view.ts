@@ -1,6 +1,6 @@
-import { api, buildQuery, type ApiRequestOptions } from './client'
-import type { PaginatedResult } from '../types'
-import type { ProjectsListViewItem, ProjectsListViewQueryParams } from '../features/projects'
+import { api, buildQuery, type ApiRequestOptions } from '@/app/api/client'
+import type { PaginatedResult } from '@/app/types'
+import type { ProjectsListViewItem, ProjectsListViewQueryParams } from '@/app/features/projects'
 
 export const projectsListViewApi = {
   getListView(

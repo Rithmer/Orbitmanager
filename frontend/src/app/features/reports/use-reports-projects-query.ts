@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { reportsApi } from '../../api/reports'
-import { appQueryKeys } from '../../query'
+import { reportsApi } from '@/app/api/reports'
+import { appQueryKeys } from '@/app/query'
 
 export function useReportsProjectsQuery(options: { enabled?: boolean } = {}) {
   const { enabled = true } = options

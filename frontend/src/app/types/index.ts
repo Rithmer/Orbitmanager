@@ -55,13 +55,14 @@ export const ALLOWED_TASK_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   [TaskStatus.CANCELLED]: [TaskStatus.NEW],
 }
 
+export type UserAccountStatus = 'active' | 'blocked'
+
 export interface User {
   id: number
   login: string
-  discriminator?: string | null
   fullName: string
   profession?: string
-  accountStatus: 'active' | 'blocked'
+  accountStatus: UserAccountStatus
   accountRole: AccountRole
   avatarUrl?: string | null
   createdAt: string
@@ -111,10 +112,8 @@ export interface Task {
   deadline: string
   status: TaskStatus
   difficulty: number
-  // Multi-assignees (new contract)
   assigneeIds?: number[] | null
   assignees?: User[]
-  // Legacy single-assignee (old contract)
   assigneeId?: number | null
   createdById: number
   createdAt: string
@@ -203,7 +202,7 @@ export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
   [ProjectStatus.ACTIVE]: 'Активный',
   [ProjectStatus.ON_HOLD]: 'Приостановлен',
   [ProjectStatus.COMPLETED]: 'Завершён',
-  [ProjectStatus.ARCHIVED]: 'Архив',
+  [ProjectStatus.ARCHIVED]: 'Завершён',
 }
 
 export const ACCOUNT_ROLE_LABELS: Record<AccountRole, string> = {

@@ -1,13 +1,20 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { UnauthorizedException, ConflictException } from '@nestjs/common';
+import {
+  UnauthorizedException,
+  ConflictException,
+  BadRequestException,
+  HttpException,
+} from '@nestjs/common';
+import * as argon2 from 'argon2';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { AuditService } from '../audit-logs/audit.service';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { AccountRole } from '@/common/enums/account-role.enum';
+import { AuditAction } from '@/common/enums/audit-action.enum';
 import { User } from '@/domain/models/user.model';
-import * as argon2 from 'argon2';
 
 const hashedPassword = '$argon2id$v=19$m=65536,t=3,p=4$hash';
 
@@ -20,7 +27,7 @@ const mockUser: User = {
   accountStatus: 'active',
   accountRole: AccountRole.MEMBER,
   avatarUrl: null,
-  discriminator: '0001',
+  lastPasswordChangedAt: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
@@ -28,11 +35,14 @@ const mockUser: User = {
 const mockUsersService = {
   findByLogin: jest.fn(),
   findEntityById: jest.fn(),
+  findById: jest.fn(),
   create: jest.fn().mockResolvedValue({
     id: 1,
     login: 'newuser',
     accountRole: AccountRole.MEMBER,
+    aiHintsEnabled: true,
   }),
+  updatePassword: jest.fn().mockResolvedValue(undefined),
 };
 
 const mockJwtService = {
@@ -60,6 +70,15 @@ const mockAuditService = {
   log: jest.fn().mockResolvedValue(undefined),
 };
 
+const mockPrismaService = {
+  refreshToken: {
+    create: jest.fn().mockResolvedValue({ id: 1 }),
+    findUnique: jest.fn().mockResolvedValue({ id: 1, revokedAt: null }),
+    update: jest.fn().mockResolvedValue({ id: 1 }),
+    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+  },
+};
+
 describe('AuthService', () => {
   let service: AuthService;
 
@@ -71,6 +90,7 @@ describe('AuthService', () => {
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: AuditService, useValue: mockAuditService },
+        { provide: PrismaService, useValue: mockPrismaService },
       ],
     }).compile();
 
@@ -85,10 +105,12 @@ describe('AuthService', () => {
       };
       return map[key];
     });
+    mockPrismaService.refreshToken.create.mockResolvedValue({ id: 1 });
+    mockPrismaService.refreshToken.updateMany.mockResolvedValue({ count: 1 });
   });
 
   describe('register', () => {
-    it('should register a new user and return tokens', async () => {
+    it('registers a new user and returns tokens', async () => {
       mockUsersService.findByLogin.mockResolvedValueOnce(null);
       mockJwtService.signAsync.mockResolvedValue('mock-token');
 
@@ -101,10 +123,16 @@ describe('AuthService', () => {
 
       expect(result.accessToken).toBe('mock-token');
       expect(result.refreshToken).toBe('mock-token');
-      expect(mockUsersService.create).toHaveBeenCalled();
+      expect(mockUsersService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          login: 'newuser',
+          profession: 'Dev',
+          accountRole: AccountRole.MEMBER,
+        }),
+      );
     });
 
-    it('should throw ConflictException if login is taken', async () => {
+    it('throws ConflictException if login is taken', async () => {
       mockUsersService.findByLogin.mockResolvedValueOnce(mockUser);
 
       await expect(
@@ -119,7 +147,7 @@ describe('AuthService', () => {
   });
 
   describe('login', () => {
-    it('should return tokens for valid credentials', async () => {
+    it('returns tokens for valid credentials', async () => {
       const realHash = await argon2.hash('correctpassword');
       mockUsersService.findByLogin.mockResolvedValueOnce({
         ...mockUser,
@@ -134,9 +162,54 @@ describe('AuthService', () => {
 
       expect(result.accessToken).toBe('mock-token');
       expect(result.refreshToken).toBe('mock-token');
+      expect(mockAuditService.log).toHaveBeenCalledWith(
+        1,
+        AuditAction.LOGIN,
+        'user',
+        1,
+        expect.any(String),
+      );
     });
 
-    it('should throw UnauthorizedException for wrong password', async () => {
+    it('adds a unique token id to the refresh token payload', async () => {
+      const realHash = await argon2.hash('correctpassword');
+      mockUsersService.findByLogin.mockResolvedValueOnce({
+        ...mockUser,
+        password: realHash,
+      });
+      mockJwtService.signAsync.mockResolvedValue('mock-token');
+
+      await service.login({
+        login: 'testuser',
+        password: 'correctpassword',
+      });
+
+      expect(mockJwtService.signAsync).toHaveBeenNthCalledWith(
+        1,
+        {
+          sub: mockUser.id,
+          login: mockUser.login,
+          accountRole: mockUser.accountRole,
+        },
+        expect.objectContaining({
+          secret: 'access-secret',
+        }),
+      );
+      expect(mockJwtService.signAsync).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          sub: mockUser.id,
+          login: mockUser.login,
+          accountRole: mockUser.accountRole,
+          tokenId: expect.any(String),
+        }),
+        expect.objectContaining({
+          secret: 'refresh-secret',
+        }),
+      );
+    });
+
+    it('throws UnauthorizedException for wrong password', async () => {
       const realHash = await argon2.hash('correctpassword');
       mockUsersService.findByLogin.mockResolvedValueOnce({
         ...mockUser,
@@ -148,7 +221,7 @@ describe('AuthService', () => {
       ).rejects.toThrow(UnauthorizedException);
     });
 
-    it('should throw UnauthorizedException for non-existent user', async () => {
+    it('throws UnauthorizedException for non-existent user', async () => {
       mockUsersService.findByLogin.mockResolvedValueOnce(null);
 
       await expect(
@@ -156,7 +229,7 @@ describe('AuthService', () => {
       ).rejects.toThrow(UnauthorizedException);
     });
 
-    it('should throw UnauthorizedException for blocked user', async () => {
+    it('throws UnauthorizedException for blocked user', async () => {
       mockUsersService.findByLogin.mockResolvedValueOnce({
         ...mockUser,
         accountStatus: 'blocked',
@@ -166,19 +239,31 @@ describe('AuthService', () => {
         service.login({ login: 'testuser', password: 'pass' }),
       ).rejects.toThrow(UnauthorizedException);
     });
+
+    it('throws UnauthorizedException for inactive user', async () => {
+      mockUsersService.findByLogin.mockResolvedValueOnce({
+        ...mockUser,
+        accountStatus: 'inactive',
+      });
+
+      await expect(
+        service.login({ login: 'testuser', password: 'pass' }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
   });
 
   describe('refresh', () => {
-    it('should return new token pair', async () => {
+    it('returns new token pair', async () => {
       mockUsersService.findEntityById.mockResolvedValueOnce(mockUser);
       mockJwtService.signAsync.mockResolvedValue('new-token');
 
       const result = await service.refresh('valid-refresh-token');
+
       expect(result.accessToken).toBe('new-token');
       expect(result.refreshToken).toBe('new-token');
     });
 
-    it('should use the current role from the database when issuing new tokens', async () => {
+    it('uses the current role from the database when issuing new tokens', async () => {
       mockUsersService.findEntityById.mockResolvedValueOnce({
         ...mockUser,
         accountRole: AccountRole.ADMIN,
@@ -198,7 +283,7 @@ describe('AuthService', () => {
       );
     });
 
-    it('should throw UnauthorizedException for blocked user', async () => {
+    it('throws UnauthorizedException for blocked user', async () => {
       mockUsersService.findEntityById.mockResolvedValueOnce({
         ...mockUser,
         accountStatus: 'blocked',
@@ -209,7 +294,7 @@ describe('AuthService', () => {
       );
     });
 
-    it('should throw UnauthorizedException for deleted user', async () => {
+    it('throws UnauthorizedException for deleted user', async () => {
       mockUsersService.findEntityById.mockResolvedValueOnce(null);
 
       await expect(service.refresh('valid-refresh-token')).rejects.toThrow(
@@ -217,12 +302,95 @@ describe('AuthService', () => {
       );
     });
 
-    it('should throw UnauthorizedException for invalid token', async () => {
+    it('throws UnauthorizedException for invalid token', async () => {
       mockJwtService.verifyAsync.mockRejectedValueOnce(new Error('invalid'));
 
       await expect(service.refresh('bad-token')).rejects.toThrow(
         UnauthorizedException,
       );
+    });
+
+    it('throws UnauthorizedException for revoked token', async () => {
+      mockPrismaService.refreshToken.updateMany.mockResolvedValueOnce({
+        count: 0,
+      });
+
+      await expect(service.refresh('valid-refresh-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+  });
+
+  describe('changePassword', () => {
+    it('changes password when current password is valid', async () => {
+      const realHash = await argon2.hash('CurrentPassword123!');
+      mockUsersService.findEntityById.mockResolvedValueOnce({
+        ...mockUser,
+        password: realHash,
+      });
+
+      await service.changePassword(1, {
+        currentPassword: 'CurrentPassword123!',
+        newPassword: 'NewPassword123!',
+      });
+
+      expect(mockUsersService.updatePassword).toHaveBeenCalledWith(
+        1,
+        'NewPassword123!',
+      );
+      expect(mockAuditService.log).toHaveBeenCalledWith(
+        1,
+        AuditAction.UPDATE,
+        'auth',
+        1,
+        'Пользователь изменил пароль',
+      );
+    });
+
+    it('throws UnauthorizedException when current password is wrong', async () => {
+      const realHash = await argon2.hash('CurrentPassword123!');
+      mockUsersService.findEntityById.mockResolvedValueOnce({
+        ...mockUser,
+        password: realHash,
+      });
+
+      await expect(
+        service.changePassword(1, {
+          currentPassword: 'WrongPassword123!',
+          newPassword: 'NewPassword123!',
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('throws BadRequestException when new password matches current password', async () => {
+      const realHash = await argon2.hash('CurrentPassword123!');
+      mockUsersService.findEntityById.mockResolvedValueOnce({
+        ...mockUser,
+        password: realHash,
+      });
+
+      await expect(
+        service.changePassword(1, {
+          currentPassword: 'CurrentPassword123!',
+          newPassword: 'CurrentPassword123!',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws HttpException 429 when password was changed less than 24 hours ago', async () => {
+      const realHash = await argon2.hash('CurrentPassword123!');
+      mockUsersService.findEntityById.mockResolvedValueOnce({
+        ...mockUser,
+        password: realHash,
+        lastPasswordChangedAt: new Date().toISOString(),
+      });
+
+      await expect(
+        service.changePassword(1, {
+          currentPassword: 'CurrentPassword123!',
+          newPassword: 'NewPassword123!',
+        }),
+      ).rejects.toThrow(HttpException);
     });
   });
 });

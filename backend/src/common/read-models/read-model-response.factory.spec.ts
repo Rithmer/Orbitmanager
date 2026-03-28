@@ -1,19 +1,17 @@
-import { ReadModelResponseFactory } from './read-model-response.factory';
+import {
+  normalizeIds,
+  groupByNumberKey,
+  pickGroupedByIds,
+} from './read-model-response.factory';
 
-describe('ReadModelResponseFactory', () => {
-  let factory: ReadModelResponseFactory;
-
-  beforeEach(() => {
-    factory = new ReadModelResponseFactory();
-  });
-
+describe('read-model-response helpers', () => {
   it('normalizes ids from strings and arrays', () => {
-    expect(factory.normalizeIds('1, 2, 2, 0, abc')).toEqual([1, 2]);
-    expect(factory.normalizeIds(['3', '4,5'])).toEqual([3, 4, 5]);
+    expect(normalizeIds('1, 2, 2, 0, abc')).toEqual([1, 2]);
+    expect(normalizeIds(['3', '4,5'])).toEqual([3, 4, 5]);
   });
 
   it('groups items by numeric key', () => {
-    const grouped = factory.groupByNumberKey(
+    const grouped = groupByNumberKey(
       [
         { id: 1, groupId: 10 },
         { id: 2, groupId: 10 },
@@ -32,7 +30,7 @@ describe('ReadModelResponseFactory', () => {
   });
 
   it('selects requested grouped keys and fills missing ones', () => {
-    const selected = factory.pickGroupedByIds(
+    const selected = pickGroupedByIds(
       {
         1: [{ id: 1 }],
         3: [{ id: 3 }],

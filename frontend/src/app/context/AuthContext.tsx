@@ -1,37 +1,22 @@
-import { createContext, useState, useEffect, useCallback, type ReactNode } from 'react'
-import { api, ApiError } from '../api/client'
-import { authApi } from '../api/auth'
-import type { User, LoginDto, RegisterDto } from '../types'
-import { AccountRole } from '../types'
-import { clearLastBoardProjectId } from '../utils/lastBoardProjectStorage'
-
-export interface AuthContextType {
-  user: User | null
-  loading: boolean
-  isAuthenticated: boolean
-  isAdmin: boolean
-  login: (dto: LoginDto) => Promise<void>
-  register: (dto: RegisterDto) => Promise<void>
-  logout: () => void
-  refreshUser: () => Promise<void>
-}
-
-export const AuthContext = createContext<AuthContextType>({
-  user: null,
-  loading: true,
-  isAuthenticated: false,
-  isAdmin: false,
-  login: async () => {},
-  register: async () => {},
-  logout: () => {},
-  refreshUser: async () => {},
-})
+import { useState, useEffect, useCallback, type ReactNode } from 'react'
+import { api, ApiError } from '@/app/api/client'
+import { authApi } from '@/app/api/auth'
+import type { User, LoginDto, RegisterDto } from '@/app/types'
+import { AccountRole } from '@/app/types'
+import { AuthContext } from '@/app/context/auth-context'
+import { clearLastBoardProjectId } from '@/app/utils/lastBoardProjectStorage'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
   const logout = useCallback(() => {
+    const rt = api.getRefreshToken()
+    if (rt) {
+      authApi.logout(rt).catch((err) => {
+        console.warn('Logout API call failed, local session cleared:', err)
+      })
+    }
     api.clearTokens()
     clearLastBoardProjectId()
     setUser(null)
@@ -69,26 +54,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const login = async (dto: LoginDto) => {
+  const login = useCallback(async (dto: LoginDto) => {
     const tokens = await authApi.login(dto)
     api.setTokens(tokens.accessToken, tokens.refreshToken)
-    const me = await authApi.me()
-    setUser(me)
-  }
+    try {
+      const me = await authApi.me()
+      setUser(me)
+    } catch (err) {
+      api.clearTokens()
+      throw err
+    }
+  }, [])
 
-  const register = async (dto: RegisterDto) => {
+  const register = useCallback(async (dto: RegisterDto) => {
     const tokens = await authApi.register(dto)
     api.setTokens(tokens.accessToken, tokens.refreshToken)
-    const me = await authApi.me()
-    setUser(me)
-  }
+    try {
+      const me = await authApi.me()
+      setUser(me)
+    } catch (err) {
+      api.clearTokens()
+      throw err
+    }
+  }, [])
 
   const refreshUser = async () => {
     try {
       const me = await authApi.me()
       setUser(me)
     } catch {
-      /* ignore */
+      void 0
     }
   }
 

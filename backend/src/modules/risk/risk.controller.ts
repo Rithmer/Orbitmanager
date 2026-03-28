@@ -9,13 +9,8 @@ import {
   Inject,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiQuery,
-  ApiOperation,
-  ApiResponse,
-} from '@nestjs/swagger';
+import { ApiTags, ApiQuery, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiAuth } from '@/common/decorators/api-auth.decorator';
 import { ProjectAccessService } from '@/common/access/project-access.service';
 import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
@@ -24,7 +19,6 @@ import { AccountRole } from '@/common/enums/account-role.enum';
 import { AuditAction } from '@/common/enums/audit-action.enum';
 import { TaskStatus } from '@/common/enums/task-status.enum';
 import type { AuditLog } from '@/domain/models/audit-log.model';
-import type { Project } from '@/domain/models/project.model';
 import type { Task } from '@/domain/models/task.model';
 import type { IAuditLogRepository } from '@/domain/repositories/audit-log.repository';
 import { AUDIT_LOG_REPOSITORY } from '@/domain/repositories/audit-log.repository';
@@ -34,12 +28,17 @@ import type { ITaskRepository } from '@/domain/repositories/task.repository';
 import { TASK_REPOSITORY } from '@/domain/repositories/task.repository';
 import type { IRiskAssessmentService } from '@/domain/services/risk-assessment.interface';
 import { RISK_ASSESSMENT_SERVICE } from '@/domain/services/risk-assessment.interface';
-import { ReadModelResponseFactory } from '@/common/read-models/read-model-response.factory';
+import { normalizeIds } from '@/common/read-models/read-model-response.factory';
 import { ProjectRiskOutputDto, TaskRiskOutputDto } from './dto';
+import type { RiskPageProjectDto, RiskPageTaskDto } from './dto';
+import { MlClientService } from './ml-client.service';
+import { ConfigService } from '@nestjs/config';
 import { buildTaskRiskInput } from './helpers/build-task-risk-input';
+import { RiskPageReadModelService } from './risk-page-read-model.service';
+import { RiskPageProjectionService } from './risk-page-projection.service';
 
 @ApiTags('Risk Assessment')
-@ApiBearerAuth()
+@ApiAuth()
 @UseGuards(AccountRolesGuard)
 @Controller()
 export class RiskController {
@@ -53,7 +52,10 @@ export class RiskController {
     @Inject(AUDIT_LOG_REPOSITORY)
     private readonly auditLogRepository: IAuditLogRepository,
     private readonly projectAccessService: ProjectAccessService,
-    private readonly readModelResponseFactory: ReadModelResponseFactory,
+    private readonly mlClient: MlClientService,
+    private readonly configService: ConfigService,
+    private readonly riskPageReadModel: RiskPageReadModelService,
+    private readonly riskPageProjection: RiskPageProjectionService,
   ) {}
 
   @Get('tasks/:id/risk')
@@ -91,20 +93,21 @@ export class RiskController {
     ]);
 
     const statusChangesCount = auditLogs.filter(
-      (log) => log.action === AuditAction.STATUS_CHANGE,
+      (log: AuditLog) => log.action === AuditAction.STATUS_CHANGE,
     ).length;
 
     const assigneeLoad =
       task.assigneeIds.length > 0
         ? Math.max(
-            ...task.assigneeIds.map((uid) =>
-              allTasks.filter(
-                (candidate) =>
-                  candidate.assigneeIds.includes(uid) &&
-                  candidate.status !== TaskStatus.DONE &&
-                  candidate.status !== TaskStatus.CANCELLED &&
-                  candidate.id !== task.id,
-              ).length,
+            ...task.assigneeIds.map(
+              (uid: number) =>
+                allTasks.filter(
+                  (candidate: Task) =>
+                    candidate.assigneeIds.includes(uid) &&
+                    candidate.status !== TaskStatus.DONE &&
+                    candidate.status !== TaskStatus.CANCELLED &&
+                    candidate.id !== task.id,
+                ).length,
             ),
           )
         : 0;
@@ -143,43 +146,27 @@ export class RiskController {
 
   @Get('projects/:id/tasks-risk')
   @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
-  @ApiOperation({ summary: 'Оценка рисков всех задач проекта (пакетный)' })
+  @ApiOperation({ summary: 'Оценка рисков всех задач проекта (расширенный)' })
   @ApiResponse({ status: 200, description: 'Риски всех задач проекта' })
   @ApiResponse({ status: 404, description: 'Проект не найден' })
+  @ApiResponse({
+    status: 503,
+    description: 'ML-сервис недоступен (strict mode)',
+  })
   async getProjectTasksRisk(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('id') userId: number,
     @CurrentUser('accountRole') userRole: AccountRole,
-  ): Promise<Record<number, TaskRiskOutputDto>> {
-    const project = await this.projectRepository.findById(id);
-    if (!project) {
+  ): Promise<Record<number, RiskPageTaskDto>> {
+    const context = await this.riskPageReadModel.loadContext(userId, userRole, [
+      id,
+    ]);
+
+    if (!context.projectIds.includes(id)) {
       throw new NotFoundException(`Проект #${id} не найден`);
     }
 
-    if (userRole !== AccountRole.ADMIN) {
-      await this.projectAccessService.assertProjectVisibility(project, userId);
-    }
-
-    const allTasks = await this.taskRepository.findByProject(id);
-    if (allTasks.length === 0) return {};
-
-    const taskIds = allTasks.map((t) => t.id);
-    const auditLogs =
-      await this.auditLogRepository.findByEntityIds('task', taskIds);
-    const statusChangesByTaskId = buildStatusChangeMap(auditLogs);
-    const assigneeLoadByTaskId = buildAssigneeLoadMap(allTasks);
-
-    const result: Record<number, TaskRiskOutputDto> = {};
-    for (const task of allTasks) {
-      const input = buildTaskRiskInput(
-        task,
-        statusChangesByTaskId.get(task.id) ?? 0,
-        assigneeLoadByTaskId.get(task.id) ?? 0,
-      );
-      result[task.id] = await this.riskService.assessTask(input);
-    }
-
-    return result;
+    return this.riskPageProjection.buildTasksPage(context, id);
   }
 
   @Get('risks/projects')
@@ -191,216 +178,68 @@ export class RiskController {
     description: 'Comma-separated list of project ids',
   })
   @ApiOperation({
-    summary: 'Оценка рисков всех видимых проектов (пакетный)',
+    summary: 'Оценка рисков всех видимых проектов (расширенный, page-ready)',
   })
   @ApiResponse({ status: 200, description: 'Риски проектов' })
+  @ApiResponse({
+    status: 503,
+    description: 'ML-сервис недоступен (strict mode)',
+  })
   async getAllProjectsRisk(
     @CurrentUser('id') userId: number,
     @CurrentUser('accountRole') userRole: AccountRole,
     @Query('projectIds') projectIdsParam?: string | string[],
     @Query('ids') legacyIds?: string | string[],
-  ): Promise<Record<number, ProjectRiskOutputDto>> {
-    const requestedProjectIds = this.readModelResponseFactory.normalizeIds(
-      projectIdsParam ?? legacyIds,
+  ): Promise<Record<number, RiskPageProjectDto>> {
+    const requestedProjectIds = normalizeIds(projectIdsParam ?? legacyIds);
+
+    const context = await this.riskPageReadModel.loadContext(
+      userId,
+      userRole,
+      requestedProjectIds.length > 0 ? requestedProjectIds : undefined,
     );
-    let projects: Project[];
 
-    if (projectIdsParam === undefined && legacyIds === undefined) {
-      projects =
-        userRole === AccountRole.ADMIN
-          ? await this.projectRepository.findAll()
-          : await this.projectAccessService.getVisibleProjects(userId);
-    } else {
-      if (requestedProjectIds.length === 0) {
-        return {};
-      }
-
-      if (userRole === AccountRole.ADMIN && this.projectRepository.findByIds) {
-        projects = await this.projectRepository.findByIds(requestedProjectIds);
-      } else {
-        const visibleProjects = await this.projectAccessService.getVisibleProjects(
-          userId,
-        );
-        const requestedProjectIdSet = new Set(requestedProjectIds);
-        projects = visibleProjects.filter((project) =>
-          requestedProjectIdSet.has(project.id),
-        );
-      }
-    }
-
-    if (projects.length === 0) {
-      return {};
-    }
-
-    const selectedProjectIds = projects.map((project) => project.id);
-    const tasks = await this.taskRepository.findByProjects(selectedProjectIds);
-    const taskIds = tasks.map((task) => task.id);
-    const auditLogs =
-      taskIds.length > 0
-        ? await this.auditLogRepository.findByEntityIds('task', taskIds)
-        : [];
-
-    const tasksByProjectId = groupTasksByProjectId(tasks);
-    const statusChangesByTaskId = buildStatusChangeMap(auditLogs);
-
-    const result: Record<number, ProjectRiskOutputDto> = {};
-    for (const project of projects) {
-      result[project.id] = await buildProjectRiskOutput(
-        tasksByProjectId.get(project.id) ?? [],
-        statusChangesByTaskId,
-        this.riskService,
-      );
-    }
-
-    return result;
+    return this.riskPageProjection.buildProjectsPage(context);
   }
 
   @Post('risk/retrain')
   @Roles(AccountRole.ADMIN)
-  @ApiOperation({ summary: 'Переобучение ML-модели (заглушка)' })
+  @ApiOperation({ summary: 'Переобучение ML-модели рисков' })
   @ApiResponse({ status: 200, description: 'Статус переобучения' })
-  retrain() {
-    return { message: 'Retraining not implemented yet' };
-  }
-}
-
-function buildStatusChangeMap(auditLogs: AuditLog[]): Map<number, number> {
-  const counts = new Map<number, number>();
-
-  for (const log of auditLogs) {
-    if (log.entityId === null || log.action !== AuditAction.STATUS_CHANGE) {
-      continue;
+  @ApiResponse({ status: 502, description: 'ML-сервис недоступен' })
+  async retrain(): Promise<{
+    status: string;
+    message: string;
+    metrics?: Record<string, unknown> | null;
+  }> {
+    const result = await this.mlClient.retrain();
+    if (!result) {
+      return { status: 'error', message: 'ML service is unavailable' };
     }
-
-    counts.set(log.entityId, (counts.get(log.entityId) ?? 0) + 1);
+    return result;
   }
 
-  return counts;
-}
-
-function buildAssigneeLoadMap(tasks: Task[]): Map<number, number> {
-  const activeCountsByAssignee = new Map<number, number>();
-
-  for (const task of tasks) {
-    if (
-      task.status === TaskStatus.DONE ||
-      task.status === TaskStatus.CANCELLED
-    ) {
-      continue;
-    }
-
-    for (const uid of task.assigneeIds) {
-      activeCountsByAssignee.set(uid, (activeCountsByAssignee.get(uid) ?? 0) + 1);
-    }
+  @Get('risk/ml-status')
+  @Roles(AccountRole.ADMIN)
+  @ApiOperation({ summary: 'Статус ML-сервиса и информация о модели' })
+  @ApiResponse({ status: 200, description: 'Статус ML-сервиса' })
+  async getMlStatus(): Promise<{
+    provider: string;
+    health: { status: string; model_loaded: boolean; version: string } | null;
+    modelInfo: {
+      model_type: string;
+      version: string;
+      trained_at: string | null;
+      sample_size: number | null;
+      features: string[];
+      metrics: Record<string, unknown> | null;
+    } | null;
+  }> {
+    const provider = this.configService.get<string>('RISK_PROVIDER') ?? 'stub';
+    const [health, modelInfo] = await Promise.all([
+      this.mlClient.health(),
+      this.mlClient.modelInfo(),
+    ]);
+    return { provider, health, modelInfo };
   }
-
-  const result = new Map<number, number>();
-  for (const task of tasks) {
-    if (task.assigneeIds.length === 0) {
-      result.set(task.id, 0);
-      continue;
-    }
-
-    const maxLoad = Math.max(
-      ...task.assigneeIds.map((uid) => activeCountsByAssignee.get(uid) ?? 0),
-    );
-    result.set(task.id, Math.max(0, maxLoad - 1));
-  }
-
-  return result;
-}
-
-function groupTasksByProjectId(tasks: Task[]): Map<number, Task[]> {
-  const grouped = new Map<number, Task[]>();
-
-  for (const task of tasks) {
-    const projectTasks = grouped.get(task.projectId) ?? [];
-    projectTasks.push(task);
-    grouped.set(task.projectId, projectTasks);
-  }
-
-  return grouped;
-}
-
-async function buildProjectRiskOutput(
-  tasks: Task[],
-  statusChangesByTaskId: Map<number, number>,
-  riskService: IRiskAssessmentService,
-): Promise<ProjectRiskOutputDto> {
-  const activeTasks = tasks.filter(
-    (task) =>
-      task.status !== TaskStatus.DONE && task.status !== TaskStatus.CANCELLED,
-  );
-
-  if (activeTasks.length === 0) {
-    return {
-      riskScore: 0,
-      riskLevel: 'low',
-      tasksAtRisk: [],
-      summary: 'В проекте нет активных задач. Риски отсутствуют.',
-    };
-  }
-
-  const assigneeLoadByTaskId = buildAssigneeLoadMap(tasks);
-  const tasksAtRisk: ProjectRiskOutputDto['tasksAtRisk'] = [];
-  let totalDelay = 0;
-
-  for (const task of activeTasks) {
-    const taskRisk = await riskService.assessTask(
-      buildTaskRiskInput(
-        task,
-        statusChangesByTaskId.get(task.id) ?? 0,
-        assigneeLoadByTaskId.get(task.id) ?? 0,
-      ),
-    );
-
-    totalDelay += taskRisk.delayProbability;
-    if (taskRisk.delayProbability > 0.3) {
-      tasksAtRisk.push({
-        taskId: task.id,
-        taskName: task.name,
-        delayProbability: taskRisk.delayProbability,
-      });
-    }
-  }
-
-  tasksAtRisk.sort((left, right) => right.delayProbability - left.delayProbability);
-
-  const averageDelay = totalDelay / activeTasks.length;
-  const riskScore = Math.round(averageDelay * 100);
-  const riskLevel =
-    averageDelay > 0.6 ? 'high' : averageDelay > 0.3 ? 'medium' : 'low';
-  const highRiskCount = tasksAtRisk.filter(
-    (task) => task.delayProbability > 0.6,
-  ).length;
-
-  return {
-    riskScore,
-    riskLevel,
-    tasksAtRisk,
-    summary: buildProjectRiskSummary(
-      riskLevel,
-      riskScore,
-      activeTasks.length,
-      tasksAtRisk.length,
-      highRiskCount,
-    ),
-  };
-}
-
-function buildProjectRiskSummary(
-  riskLevel: 'low' | 'medium' | 'high',
-  riskScore: number,
-  totalActive: number,
-  atRiskCount: number,
-  highRiskCount: number,
-): string {
-  if (riskLevel === 'low') {
-    return `Проект в зелёной зоне (${riskScore}/100). Из ${totalActive} активных задач нет задач с высоким риском.`;
-  }
-  if (riskLevel === 'medium') {
-    return `Проект имеет средний уровень риска (${riskScore}/100). ${atRiskCount} из ${totalActive} активных задач требуют внимания.`;
-  }
-
-  return `Проект имеет высокий риск срыва сроков (${riskScore}/100): ${highRiskCount} задач с вероятностью задержки > 60%.`;
 }

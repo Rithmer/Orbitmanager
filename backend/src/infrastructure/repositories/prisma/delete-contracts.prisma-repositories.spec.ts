@@ -6,13 +6,14 @@ import { TeamMembersPrismaRepository } from './team-members.prisma.repository';
 import { ProjectMembersPrismaRepository } from './project-members.prisma.repository';
 
 type DeleteMock = jest.Mock<Promise<void>, [{ where: { id: number } }]>;
+type DeletePrismaShape = Record<string, { delete: DeleteMock }>;
 
 function createDeleteCase<T>(
-  RepositoryClass: new (prisma: any) => T,
+  RepositoryClass: new (prisma: DeletePrismaShape) => T,
   prismaKey: string,
 ) {
   const deleteMock = jest.fn<Promise<void>, [{ where: { id: number } }]>();
-  const prisma = {
+  const prisma: DeletePrismaShape = {
     [prismaKey]: {
       delete: deleteMock,
     },

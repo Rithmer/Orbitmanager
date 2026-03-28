@@ -3,22 +3,37 @@ import { AccountRole } from '@/common/enums/account-role.enum';
 import { ProjectRole } from '@/common/enums/project-role.enum';
 import { TeamRole } from '@/common/enums/team-role.enum';
 import { TaskStatus } from '@/common/enums/task-status.enum';
-import { InMemoryCacheService } from '@/common/cache/in-memory-cache.service';
+import { TtlCacheService } from '@/common/cache/ttl-cache.service';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { ReportsSummaryResponseDto } from './dto/reports-summary-response.dto';
 
 const REPORTS_CACHE_TTL_MS = 60_000;
+const DONE_TASK_STATUSES = new Set<string>([TaskStatus.DONE]);
+const OWNER_TEAM_ROLES = new Set<string>([TeamRole.OWNER]);
 
 export interface ProjectNameRow {
   id: number;
   name: string;
+  teamId: number;
 }
 
+/**
+ * @architecture CQRS Query Service
+ *
+ * Сервис агрегированного чтения данных. Использует PrismaService напрямую —
+ * намеренное архитектурное решение: запросы включают сложные агрегации
+ * (count, groupBy, многотабличные JOIN), которые не выражаются через
+ * CRUD-репозитории без значительного усложнения их интерфейсов.
+ *
+ * Паттерн: CQRS-light — command-сервисы (TasksService, ProjectsService и др.)
+ * работают через репозитории; query-сервисы (этот класс) обращаются к БД
+ * напрямую для оптимальных read-path запросов.
+ */
 @Injectable()
 export class ReportsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly cache: InMemoryCacheService,
+    private readonly cache: TtlCacheService,
   ) {}
 
   async getSummary(
@@ -30,10 +45,10 @@ export class ReportsService {
       projectId ?? 'all'
     }`;
 
-    return this.cache.remember(
+    return this.cache.getOrSet(
       cacheKey,
-      async () => this.buildSummary(userId, accountRole, projectId),
-      { ttlMs: REPORTS_CACHE_TTL_MS },
+      () => this.buildSummary(userId, accountRole, projectId),
+      REPORTS_CACHE_TTL_MS,
     );
   }
 
@@ -52,14 +67,9 @@ export class ReportsService {
     }
 
     const targetProjectIds =
-      projectId !== undefined
-        ? [projectId]
-        : accessibleProjectIds;
+      projectId !== undefined ? [projectId] : accessibleProjectIds;
 
-    if (
-      projectId !== undefined &&
-      !accessibleProjectIds.includes(projectId)
-    ) {
+    if (projectId !== undefined && !accessibleProjectIds.includes(projectId)) {
       throw new ForbiddenException('Нет прав на выбранный проект');
     }
 
@@ -132,16 +142,18 @@ export class ReportsService {
       }),
     ]);
 
-    const projectTaskSummary = new Map<number, { taskCount: number; completedTaskCount: number }>();
+    const projectTaskSummary = new Map<
+      number,
+      { taskCount: number; completedTaskCount: number }
+    >();
     for (const group of projectTaskGroups) {
-      const summary =
-        projectTaskSummary.get(group.projectId) ?? {
-          taskCount: 0,
-          completedTaskCount: 0,
-        };
+      const summary = projectTaskSummary.get(group.projectId) ?? {
+        taskCount: 0,
+        completedTaskCount: 0,
+      };
 
       summary.taskCount += group._count._all;
-      if (group.status === TaskStatus.DONE) {
+      if (DONE_TASK_STATUSES.has(group.status)) {
         summary.completedTaskCount += group._count._all;
       }
 
@@ -166,7 +178,7 @@ export class ReportsService {
     });
 
     const projectNameById = new Map(
-      projectNames.map((project: ProjectNameRow) => [project.id, project.name]),
+      projectNames.map((project) => [project.id, project.name]),
     );
 
     const statusDistribution = [
@@ -197,23 +209,28 @@ export class ReportsService {
       },
     ].filter((item) => item.value > 0);
 
-    const projectTaskBreakdown = topProjectEntries.map(([projectId, summary]) => ({
-      projectId,
-      projectName: projectNameById.get(projectId) ?? `Проект #${projectId}`,
-      taskCount: summary.taskCount,
-      completedTaskCount: summary.completedTaskCount,
-    }));
+    const projectTaskBreakdown = topProjectEntries.map(
+      ([projectId, summary]) => ({
+        projectId,
+        projectName: projectNameById.get(projectId) ?? `Проект #${projectId}`,
+        taskCount: summary.taskCount,
+        completedTaskCount: summary.completedTaskCount,
+      }),
+    );
 
-    const difficultyDistribution = [1, 2, 3, 4, 5].map((difficulty) => {
-      const count =
-        difficultyGroups.find((group) => group.difficulty === difficulty)?._count._all ?? 0;
+    const difficultyDistribution = [1, 2, 3, 4, 5]
+      .map((difficulty) => {
+        const count =
+          difficultyGroups.find((group) => group.difficulty === difficulty)
+            ?._count._all ?? 0;
 
-      return {
-        difficulty,
-        label: `Сложность ${difficulty}`,
-        value: count,
-      };
-    }).filter((item) => item.value > 0);
+        return {
+          difficulty,
+          label: `Сложность ${difficulty}`,
+          value: count,
+        };
+      })
+      .filter((item) => item.value > 0);
 
     return {
       overview: {
@@ -223,7 +240,8 @@ export class ReportsService {
         newTasks,
         overdueTasks,
         totalTasks,
-        efficiency: totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0,
+        efficiency:
+          totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0,
         projectCount: targetProjectIds.length,
       },
       statusDistribution,
@@ -244,7 +262,7 @@ export class ReportsService {
 
     return this.prisma.project.findMany({
       where: { id: { in: projectIds } },
-      select: { id: true, name: true },
+      select: { id: true, name: true, teamId: true },
       orderBy: { id: 'asc' },
     });
   }
@@ -269,7 +287,7 @@ export class ReportsService {
     const ownerTeamIds = [
       ...new Set(
         teamMemberships
-          .filter((m) => m.teamRole === TeamRole.OWNER)
+          .filter((m) => OWNER_TEAM_ROLES.has(m.teamRole))
           .map((m) => m.teamId),
       ),
     ];

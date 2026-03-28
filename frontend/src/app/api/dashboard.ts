@@ -1,5 +1,5 @@
-import { api, type ApiRequestOptions } from './client'
-import type { DashboardSummaryResponse } from '../features/dashboard/types'
+import { api, type ApiRequestOptions } from '@/app/api/client'
+import type { DashboardSummaryResponse } from '@/app/features/dashboard/types'
 
 export const dashboardApi = {
   getSummary(options: ApiRequestOptions = {}): Promise<DashboardSummaryResponse> {

@@ -1,8 +1,8 @@
 import { AlertTriangle, Calendar, Tag, User as UserIcon } from 'lucide-react'
-import { RISK_LEVEL_LABELS, RiskLevel } from '../../types'
-import { getOverdueLabel, getRiskBadgeClasses, PROJECT_BOARD_COLUMNS } from './board-view.constants'
-import { formatBoardDateLabel } from './board-page-formatters'
-import type { ProjectBoardTask, ProjectBoardView } from './types'
+import { RISK_LEVEL_LABELS, RiskLevel } from '@/app/types'
+import { getOverdueLabel, getRiskBadgeClasses, PROJECT_BOARD_COLUMNS } from '@/app/features/board/board-view.constants'
+import { formatBoardDateLabel } from '@/app/features/board/board-page-formatters'
+import type { ProjectBoardTask, ProjectBoardView } from '@/app/features/board/types'
 
 type BoardTaskListViewProps = {
   boardTasks: ProjectBoardTask[]
@@ -33,19 +33,21 @@ export function BoardTaskListView({
         isDark ? 'bg-[#273142]' : 'bg-white'
       }`}
     >
-      <div
-        className={`grid grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.7fr)_minmax(0,0.9fr)] items-center gap-3 border-b px-4 py-3 text-[11px] font-semibold uppercase tracking-wide ${
-          isDark ? 'border-[#313d4f] text-[#94a3b8]' : 'border-gray-100 text-[#737373]'
-        }`}
-      >
-        <span>Задача</span>
-        <span>Статус</span>
-        <span>Дедлайн</span>
-        <span>Сложн.</span>
-        <span>Исполнитель</span>
-      </div>
-      <div className="divide-y divide-gray-100 dark:divide-[#313d4f]">
-        {[...boardTasks]
+      <div className="overflow-x-auto">
+        <div className="min-w-[760px]">
+          <div
+            className={`grid grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.7fr)_minmax(0,0.9fr)] items-center gap-3 border-b px-4 py-3 text-[11px] font-semibold uppercase tracking-wide ${
+              isDark ? 'border-[#313d4f] text-[#94a3b8]' : 'border-gray-100 text-[#737373]'
+            }`}
+          >
+            <span>Задача</span>
+            <span>Статус</span>
+            <span>Дедлайн</span>
+            <span>Сложн.</span>
+            <span>Исполнитель</span>
+          </div>
+          <div className="divide-y divide-gray-100 dark:divide-[#313d4f]">
+            {[...boardTasks]
           .sort((a, b) => {
             const order = PROJECT_BOARD_COLUMNS.map((c) => c.status)
             return order.indexOf(a.status) - order.indexOf(b.status)
@@ -119,6 +121,8 @@ export function BoardTaskListView({
               </button>
             )
           })}
+          </div>
+        </div>
       </div>
     </div>
   )

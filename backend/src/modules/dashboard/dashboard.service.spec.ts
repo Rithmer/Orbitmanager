@@ -3,8 +3,11 @@ import { AccountRole } from '@/common/enums/account-role.enum';
 import { AuditAction } from '@/common/enums/audit-action.enum';
 import { TaskStatus } from '@/common/enums/task-status.enum';
 import { ProjectAccessService } from '@/common/access/project-access.service';
-import { InMemoryCacheService } from '@/common/cache/in-memory-cache.service';
-import { RISK_ASSESSMENT_SERVICE, type IRiskAssessmentService } from '@/domain/services/risk-assessment.interface';
+import { TtlCacheService } from '@/common/cache/ttl-cache.service';
+import {
+  RISK_ASSESSMENT_SERVICE,
+  type IRiskAssessmentService,
+} from '@/domain/services/risk-assessment.interface';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { DashboardService } from './dashboard.service';
 
@@ -14,16 +17,34 @@ const mockPrisma = {
     findMany: jest.fn().mockResolvedValue([{ id: 1 }, { id: 2 }]),
   },
   task: {
-    count: jest
+    count: jest.fn().mockResolvedValue(1),
+    groupBy: jest.fn().mockResolvedValue([
+      { status: TaskStatus.NEW, _count: 1 },
+      { status: TaskStatus.DONE, _count: 1 },
+      { status: TaskStatus.IN_PROGRESS, _count: 1 },
+    ]),
+    findMany: jest
       .fn()
-      .mockImplementation(async ({ where }: { where?: Record<string, unknown> }) => {
-        const status = where?.['status'];
-        if (status === TaskStatus.DONE) return 1;
-        if (status === TaskStatus.IN_PROGRESS) return 1;
-        return 2;
-      }),
-    findMany: jest.fn().mockImplementation(async ({ take }: { take?: number }) => {
-      if (take === 6) {
+      .mockImplementation(async ({ take }: { take?: number }) => {
+        if (take === 6) {
+          return [
+            {
+              id: 10,
+              projectId: 1,
+              name: 'Task 10',
+              description: '',
+              deadline: new Date(Date.now() + 86_400_000),
+              status: TaskStatus.NEW,
+              difficulty: 3,
+              createdById: 1,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              project: { name: 'Project 1' },
+              assignees: [{ userId: 20, user: { fullName: 'User 20' } }],
+            },
+          ];
+        }
+
         return [
           {
             id: 10,
@@ -37,31 +58,15 @@ const mockPrisma = {
             createdAt: new Date(),
             updatedAt: new Date(),
             project: { name: 'Project 1' },
-            assignees: [{ userId: 20, user: { fullName: 'User 20' } }],
+            assignees: [{ userId: 20 }],
           },
         ];
-      }
-
-      return [
-        {
-          id: 10,
-          projectId: 1,
-          name: 'Task 10',
-          description: '',
-          deadline: new Date(Date.now() + 86_400_000),
-          status: TaskStatus.NEW,
-          difficulty: 3,
-          createdById: 1,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          project: { name: 'Project 1' },
-          assignees: [{ userId: 20 }],
-        },
-      ];
-    }),
+      }),
   },
   auditLog: {
-    findMany: jest.fn().mockResolvedValue([{ entityId: 10, action: AuditAction.STATUS_CHANGE }]),
+    findMany: jest
+      .fn()
+      .mockResolvedValue([{ entityId: 10, action: AuditAction.STATUS_CHANGE }]),
   },
 };
 
@@ -78,7 +83,6 @@ const mockRiskService: IRiskAssessmentService = {
     recommendation: 'Check',
   }),
   assessProject: jest.fn(),
-  assessProjectsBatch: jest.fn().mockResolvedValue({}),
 };
 
 describe('DashboardService', () => {
@@ -90,7 +94,7 @@ describe('DashboardService', () => {
     const module = await Test.createTestingModule({
       providers: [
         DashboardService,
-        InMemoryCacheService,
+        TtlCacheService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: ProjectAccessService, useValue: mockProjectAccessService },
         { provide: RISK_ASSESSMENT_SERVICE, useValue: mockRiskService },

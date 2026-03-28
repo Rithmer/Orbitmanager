@@ -1,14 +1,21 @@
-import { Controller, Get, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiAuth } from '@/common/decorators/api-auth.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
 import { ProjectBoardService } from './project-board.service';
-import type { ProjectBoardViewResponseDto } from './project-board.types';
+import { ProjectBoardViewResponseDto } from './project-board.types';
 
 @ApiTags('Project Board View')
-@ApiBearerAuth()
+@ApiAuth()
 @UseGuards(AccountRolesGuard)
 @Controller('projects')
 export class ProjectBoardController {
@@ -17,7 +24,11 @@ export class ProjectBoardController {
   @Get(':id/board-view')
   @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
   @ApiOperation({ summary: 'Получить board view проекта' })
-  @ApiResponse({ status: 200, description: 'Board view проекта' })
+  @ApiResponse({
+    status: 200,
+    description: 'Board view проекта',
+    type: ProjectBoardViewResponseDto,
+  })
   @ApiResponse({ status: 404, description: 'Проект не найден' })
   @ApiResponse({ status: 403, description: 'Нет доступа к проекту' })
   getBoardView(
@@ -25,6 +36,10 @@ export class ProjectBoardController {
     @CurrentUser('id') userId: number,
     @CurrentUser('accountRole') accountRole: AccountRole,
   ): Promise<ProjectBoardViewResponseDto> {
-    return this.projectBoardService.getBoardView(projectId, userId, accountRole);
+    return this.projectBoardService.getBoardView(
+      projectId,
+      userId,
+      accountRole,
+    );
   }
 }

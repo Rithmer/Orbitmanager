@@ -14,7 +14,7 @@ export interface TaskListQuery extends RepositoryPageParams {
 
 export interface ITaskRepository {
   findAll(): Promise<Task[]>;
-  findPage?(params: TaskListQuery): Promise<RepositoryPageResult<Task>>;
+  findPage(params: TaskListQuery): Promise<RepositoryPageResult<Task>>;
   findById(id: number): Promise<Task | null>;
   findByProject(projectId: number): Promise<Task[]>;
   findByProjects(projectIds: number[]): Promise<Task[]>;

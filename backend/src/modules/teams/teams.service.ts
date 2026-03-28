@@ -1,11 +1,13 @@
 import {
   Injectable,
   Inject,
+  Logger,
   Optional,
   NotFoundException,
   ForbiddenException,
   ConflictException,
 } from '@nestjs/common';
+import { TtlCacheService } from '@/common/cache/ttl-cache.service';
 import type { ITeamRepository } from '@/domain/repositories/team.repository';
 import { TEAM_REPOSITORY } from '@/domain/repositories/team.repository';
 import type { ITeamMemberRepository } from '@/domain/repositories/team-member.repository';
@@ -27,10 +29,7 @@ import { CreateTeamDto } from './dto/create-team.dto';
 import { UpdateTeamDto } from './dto/update-team.dto';
 import { AddTeamMemberDto } from './dto/add-team-member.dto';
 import { UpdateTeamMemberDto } from './dto/update-team-member.dto';
-import {
-  QueryParams,
-  PaginatedResult,
-} from '@/common/helpers/query.helper';
+import { QueryParams, PaginatedResult } from '@/common/helpers/query.helper';
 import { AuditService } from '@/modules/audit-logs/audit.service';
 import { AuditAction } from '@/common/enums/audit-action.enum';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
@@ -38,6 +37,8 @@ import { auditLogCreateInput } from '@/common/helpers/audit-log-prisma.helper';
 
 @Injectable()
 export class TeamsService {
+  private readonly logger = new Logger(TeamsService.name);
+
   constructor(
     @Inject(TEAM_REPOSITORY)
     private readonly teamRepository: ITeamRepository,
@@ -52,6 +53,7 @@ export class TeamsService {
     @Inject(TASK_REPOSITORY)
     private readonly taskRepository: ITaskRepository,
     private readonly auditService: AuditService,
+    private readonly cache: TtlCacheService,
     @Optional() private readonly prisma?: PrismaService,
   ) {}
 
@@ -118,7 +120,12 @@ export class TeamsService {
       if (team) {
         try {
           await this.teamRepository.delete(team.id);
-        } catch {
+        } catch (cleanupError) {
+          // B-04: log cleanup failure so orphaned team records are visible in logs
+          this.logger.error(
+            `Failed to cleanup orphaned team #${team.id} after member creation failure`,
+            (cleanupError as Error)?.stack,
+          );
         }
       }
 
@@ -236,6 +243,9 @@ export class TeamsService {
       `Пользователь #${dto.userId} добавлен в команду #${teamId} с ролью ${dto.teamRole}`,
     );
 
+    // B-03: a new team member (especially OWNER) gains visibility of team projects
+    this.invalidateAffectedUserAccessCaches(dto.userId);
+
     return member;
   }
 
@@ -275,6 +285,9 @@ export class TeamsService {
       dto.teamRole,
     );
 
+    // B-03: OWNER↔non-OWNER transition changes which projects are visible to this user
+    this.invalidateAffectedUserAccessCaches(member.userId);
+
     return updated;
   }
 
@@ -286,6 +299,7 @@ export class TeamsService {
     const member = await this.findMemberById(memberId);
     await this.assertOwnerOrAdmin(userId, member.teamId, userRole);
 
+    // B-02: quick early check (non-atomic) to avoid entering a transaction unnecessarily
     if (member.teamRole === TeamRole.OWNER) {
       const teamMembers = await this.teamMemberRepository.findByTeam(
         member.teamId,
@@ -300,20 +314,26 @@ export class TeamsService {
 
     if (this.prisma) {
       await this.removeMemberWithTransaction(member, userId);
-      return;
+    } else {
+      await this.detachUserFromTeamProjects(
+        member.userId,
+        member.teamId,
+        userId,
+      );
+
+      await this.teamMemberRepository.delete(memberId);
+
+      await this.auditService.log(
+        userId,
+        AuditAction.DELETE,
+        'team_member',
+        memberId,
+        `Участник #${member.userId} удалён из команды #${member.teamId}`,
+      );
     }
 
-    await this.detachUserFromTeamProjects(member.userId, member.teamId, userId);
-
-    await this.teamMemberRepository.delete(memberId);
-
-    await this.auditService.log(
-      userId,
-      AuditAction.DELETE,
-      'team_member',
-      memberId,
-      `Участник #${member.userId} удалён из команды #${member.teamId}`,
-    );
+    // B-03: removed member loses visibility of all team projects
+    this.invalidateAffectedUserAccessCaches(member.userId);
   }
 
   private async findMemberById(id: number): Promise<TeamMember> {
@@ -370,6 +390,19 @@ export class TeamsService {
     const timestamp = new Date();
 
     await this.prisma!.$transaction(async (tx) => {
+      // B-02: atomic re-check of owner count inside the transaction to prevent
+      // race condition where two concurrent requests both pass the outer check
+      if (member.teamRole === TeamRole.OWNER) {
+        const ownerCount = await tx.teamMember.count({
+          where: { teamId: member.teamId, teamRole: TeamRole.OWNER },
+        });
+        if (ownerCount <= 1) {
+          throw new ForbiddenException(
+            'Нельзя удалить единственного владельца команды',
+          );
+        }
+      }
+
       const projectMemberships =
         teamProjectIds.length === 0
           ? []
@@ -433,8 +466,12 @@ export class TeamsService {
   private async assertOwnerOrAdmin(
     userId: number,
     teamId: number,
-    _accountRole: AccountRole,
+    accountRole: AccountRole,
   ): Promise<void> {
+    if (accountRole === AccountRole.ADMIN) {
+      return;
+    }
+
     const membership = await this.teamMemberRepository.findByUserAndTeam(
       userId,
       teamId,
@@ -535,6 +572,12 @@ export class TeamsService {
     const teamProjects = await this.projectRepository.findByTeam(teamId);
     return teamProjects.map((project) => project.id);
   }
+
+  private invalidateAffectedUserAccessCaches(userId: number): void {
+    this.cache.invalidate(`visible_projects:${userId}`);
+    this.cache.invalidateByPrefix(`dashboard:summary:${userId}:`);
+    this.cache.invalidateByPrefix(`reports:summary:${userId}:`);
+  }
 }
 
 function normalizePage(page: number | undefined): number {
@@ -574,7 +617,12 @@ function applyInMemoryPagination<T>(
   limit: number,
 ): PaginatedResult<T> {
   const offset = (page - 1) * limit;
-  return toPaginatedResult(items.slice(offset, offset + limit), items.length, page, limit);
+  return toPaginatedResult(
+    items.slice(offset, offset + limit),
+    items.length,
+    page,
+    limit,
+  );
 }
 
 function mapTeamRecord(team: {
@@ -592,4 +640,3 @@ function mapTeamRecord(team: {
     createdById: team.createdById,
   };
 }
-

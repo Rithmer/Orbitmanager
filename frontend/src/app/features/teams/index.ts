@@ -4,6 +4,6 @@ export type {
   TeamsListViewQueryParams,
   TeamsListViewResponse,
   TeamsListViewUserSummary,
-} from './types'
-export { useTeamsListViewQuery } from './use-teams-list-view-query'
-export { useTeamMemberUsersQuery } from './use-team-member-users-query'
+} from '@/app/features/teams/types'
+export { useTeamsListViewQuery } from '@/app/features/teams/use-teams-list-view-query'
+export { useTeamMemberUsersQuery } from '@/app/features/teams/use-team-member-users-query'

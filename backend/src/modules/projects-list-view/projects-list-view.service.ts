@@ -2,18 +2,32 @@ import { Inject, Injectable } from '@nestjs/common';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { ProjectStatus } from '@/common/enums/project-status.enum';
 import { TaskStatus } from '@/common/enums/task-status.enum';
-import { buildPaginatedResult, normalizePagination } from '@/common/query/pagination';
+import {
+  buildPaginatedResult,
+  normalizePagination,
+} from '@/common/query/pagination';
 import { ProjectAccessService } from '@/common/access/project-access.service';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { buildOrderBy } from '@/infrastructure/repositories/prisma/prisma-query.utils';
-import { RISK_ASSESSMENT_SERVICE, type IRiskAssessmentService } from '@/domain/services/risk-assessment.interface';
-import type { ProjectRiskOutputDto, TaskRiskOutputDto } from '@/modules/risk/dto';
+import {
+  RISK_ASSESSMENT_SERVICE,
+  type IRiskAssessmentService,
+} from '@/domain/services/risk-assessment.interface';
+import type {
+  ProjectRiskOutputDto,
+  TaskRiskOutputDto,
+} from '@/modules/risk/dto';
 import { buildTaskRiskInput } from '@/modules/risk/helpers/build-task-risk-input';
 import type {
   ProjectListViewItemDto,
   ProjectsListViewQueryParams,
   ProjectsListViewResponseDto,
 } from './projects-list-view.types';
+
+const INACTIVE_TASK_STATUSES = new Set<string>([
+  TaskStatus.DONE,
+  TaskStatus.CANCELLED,
+]);
 
 type ProjectRecord = {
   id: number;
@@ -46,6 +60,18 @@ type TaskRecord = {
   assignees: Array<{ userId: number }>;
 };
 
+/**
+ * @architecture CQRS Query Service
+ *
+ * Сервис агрегированного чтения данных. Использует PrismaService напрямую —
+ * намеренное архитектурное решение: запросы включают сложные агрегации
+ * (count, groupBy, многотабличные JOIN), которые не выражаются через
+ * CRUD-репозитории без значительного усложнения их интерфейсов.
+ *
+ * Паттерн: CQRS-light — command-сервисы (TasksService, ProjectsService и др.)
+ * работают через репозитории; query-сервисы (этот класс) обращаются к БД
+ * напрямую для оптимальных read-path запросов.
+ */
 @Injectable()
 export class ProjectsListViewService {
   constructor(
@@ -60,7 +86,10 @@ export class ProjectsListViewService {
     userId: number,
     userRole: AccountRole,
   ): Promise<ProjectsListViewResponseDto> {
-    const { page, limit, skip } = normalizePagination(params.page, params.limit);
+    const { page, limit, skip } = normalizePagination(
+      params.page,
+      params.limit,
+    );
     const search = params.search?.trim();
     const visibleProjectIds =
       userRole === AccountRole.ADMIN
@@ -71,14 +100,27 @@ export class ProjectsListViewService {
       return buildPaginatedResult([], 0, page, limit);
     }
 
-    const where = buildProjectsWhere(search, params.teamId, params.status, visibleProjectIds);
+    const where = buildProjectsWhere(
+      search,
+      params.teamId,
+      params.status,
+      visibleProjectIds,
+    );
 
     const [records, total] = await Promise.all([
       this.prisma.project.findMany({
         where,
         orderBy: buildOrderBy(
           params.sort,
-          ['id', 'teamId', 'name', 'description', 'status', 'createdAt', 'updatedAt'],
+          [
+            'id',
+            'teamId',
+            'name',
+            'description',
+            'status',
+            'createdAt',
+            'updatedAt',
+          ],
           'id',
         ),
         skip,
@@ -134,7 +176,9 @@ export class ProjectsListViewService {
       },
     });
 
-    const auditLogs = await this.loadTaskStatusChanges(tasks.map((task) => task.id));
+    const auditLogs = await this.loadTaskStatusChanges(
+      tasks.map((task) => task.id),
+    );
 
     const taskRisksByTaskId = await this.buildTaskRiskMap(tasks, auditLogs);
     const tasksByProjectId = groupTasksByProjectId(tasks);
@@ -351,10 +395,7 @@ function buildAssigneeLoadMap(tasks: TaskRecord[]): Map<number, number> {
     const maxLoad = Math.max(
       ...task.assignees.map((a) => activeCountsByAssignee.get(a.userId) ?? 0),
     );
-    assigneeLoadByTaskId.set(
-      task.id,
-      Math.max(0, maxLoad - 1),
-    );
+    assigneeLoadByTaskId.set(task.id, Math.max(0, maxLoad - 1));
   }
 
   return assigneeLoadByTaskId;
@@ -395,7 +436,9 @@ function buildProjectRiskSummary(
     }
   }
 
-  tasksAtRisk.sort((left, right) => right.delayProbability - left.delayProbability);
+  tasksAtRisk.sort(
+    (left, right) => right.delayProbability - left.delayProbability,
+  );
 
   const averageDelay = totalDelay / activeTasks.length;
   const riskScore = Math.round(averageDelay * 100);
@@ -438,5 +481,5 @@ function buildProjectSummaryText(
 }
 
 function isActiveTask(status: string): boolean {
-  return status !== TaskStatus.DONE && status !== TaskStatus.CANCELLED;
+  return !INACTIVE_TASK_STATUSES.has(status);
 }

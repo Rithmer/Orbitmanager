@@ -1,6 +1,6 @@
 import { MutationCache, QueryClient } from '@tanstack/react-query'
-import { ApiError } from '../api/client'
-import { dispatchApiError } from '../api/api-error-dispatch'
+import { ApiError } from '@/app/api/client'
+import { dispatchApiError } from '@/app/api/api-error-dispatch'
 
 function getHttpStatus(error: unknown): number | undefined {
   if (!error || typeof error !== 'object') {
@@ -26,7 +26,7 @@ function getHttpStatus(error: unknown): number | undefined {
 export function shouldRetryQuery(failureCount: number, error: unknown): boolean {
   const status = getHttpStatus(error)
 
-  if (typeof status === 'number' && status < 500) {
+  if (typeof status === 'number' && status < 500 && status !== 429) {
     return false
   }
 

@@ -17,6 +17,7 @@ import { ProjectRole } from '@/common/enums/project-role.enum';
 import { Team } from '@/domain/models/team.model';
 import { TeamMember } from '@/domain/models/team-member.model';
 import { AuditService } from '../audit-logs/audit.service';
+import { TtlCacheService } from '@/common/cache/ttl-cache.service';
 
 const mockTeam: Team = {
   id: 1,
@@ -139,6 +140,14 @@ const mockAuditService = {
   logMany: jest.fn().mockResolvedValue(undefined),
 };
 
+const mockCacheService = {
+  invalidate: jest.fn(),
+  invalidateByPrefix: jest.fn(),
+  get: jest.fn().mockReturnValue(undefined),
+  set: jest.fn(),
+  getOrSet: jest.fn(),
+};
+
 describe('TeamsService', () => {
   let service: TeamsService;
 
@@ -156,6 +165,7 @@ describe('TeamsService', () => {
         },
         { provide: TASK_REPOSITORY, useValue: mockTaskRepository },
         { provide: AuditService, useValue: mockAuditService },
+        { provide: TtlCacheService, useValue: mockCacheService },
       ],
     }).compile();
 
@@ -223,6 +233,17 @@ describe('TeamsService', () => {
         service.update(1, { name: 'Hack' }, 20, AccountRole.MEMBER),
       ).rejects.toThrow(ForbiddenException);
     });
+
+    it('should allow admin to update team without owner membership', async () => {
+      const result = await service.update(
+        1,
+        { name: 'Updated by admin' },
+        99,
+        AccountRole.ADMIN,
+      );
+      expect(result.name).toBe('Updated by admin');
+      expect(mockTeamMemberRepository.findByUserAndTeam).not.toHaveBeenCalled();
+    });
   });
 
   describe('updateMember', () => {
@@ -264,6 +285,15 @@ describe('TeamsService', () => {
             newValue: ProjectRole.OBSERVER,
           }),
         ]),
+      );
+      expect(mockCacheService.invalidate).toHaveBeenCalledWith(
+        `visible_projects:${mockMember.userId}`,
+      );
+      expect(mockCacheService.invalidateByPrefix).toHaveBeenCalledWith(
+        `dashboard:summary:${mockMember.userId}:`,
+      );
+      expect(mockCacheService.invalidateByPrefix).toHaveBeenCalledWith(
+        `reports:summary:${mockMember.userId}:`,
       );
     });
   });
@@ -327,10 +357,42 @@ describe('TeamsService', () => {
       expect(mockTeamMemberRepository.delete).toHaveBeenCalledWith(
         mockMember.id,
       );
+      expect(mockCacheService.invalidate).toHaveBeenCalledWith(
+        `visible_projects:${mockMember.userId}`,
+      );
+      expect(mockCacheService.invalidateByPrefix).toHaveBeenCalledWith(
+        `dashboard:summary:${mockMember.userId}:`,
+      );
+      expect(mockCacheService.invalidateByPrefix).toHaveBeenCalledWith(
+        `reports:summary:${mockMember.userId}:`,
+      );
     });
   });
 
   describe('addMember', () => {
+    it('should invalidate access and summary caches for a newly added member', async () => {
+      mockTeamMemberRepository.findByUserAndTeam
+        .mockResolvedValueOnce(mockOwner)
+        .mockResolvedValueOnce(null);
+
+      await service.addMember(
+        1,
+        { userId: 20, teamRole: TeamRole.MEMBER },
+        10,
+        AccountRole.MEMBER,
+      );
+
+      expect(mockCacheService.invalidate).toHaveBeenCalledWith(
+        'visible_projects:20',
+      );
+      expect(mockCacheService.invalidateByPrefix).toHaveBeenCalledWith(
+        'dashboard:summary:20:',
+      );
+      expect(mockCacheService.invalidateByPrefix).toHaveBeenCalledWith(
+        'reports:summary:20:',
+      );
+    });
+
     it('should throw ConflictException if user already a member', async () => {
       mockTeamMemberRepository.findByUserAndTeam.mockResolvedValueOnce(
         mockOwner,

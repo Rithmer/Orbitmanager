@@ -1,27 +1,24 @@
-import { api, buildQuery, type ApiRequestOptions } from './client'
-import type { RiskProjectOption } from '../features/risks'
-import type { RiskLevel } from '../types'
+import { api, buildQuery, type ApiRequestOptions } from '@/app/api/client'
+import type {
+  RiskProjectOption,
+  RiskFactor,
+  RiskTaskInsight,
+  RiskRecommendation,
+} from '@/app/features/risks'
 
-export type RisksProjectRiskResponse = Record<
-  number,
-  {
-    riskScore: number
-    riskLevel: RiskLevel
-    tasksAtRisk: Array<{ taskId: number; taskName: string; delayProbability: number }>
-    summary: string
-  }
->
+export interface RisksProjectRiskItem {
+  riskScore: number
+  riskLevel: 'low' | 'medium' | 'high'
+  tasksAtRisk: Array<{ taskId: number; taskName: string; delayProbability: number }>
+  summary: string
+  predictionSource: 'ml' | 'stub'
+  successProbability: number
+  riskFactors: RiskFactor[]
+  taskInsights: RiskTaskInsight[]
+  recommendations: RiskRecommendation[]
+}
 
-export type RisksTaskRiskResponse = Record<
-  number,
-  {
-    predictedCompletionDate: string
-    delayProbability: number
-    riskLevel: RiskLevel
-    riskFactors?: string[]
-    recommendation?: string
-  }
->
+export type RisksProjectRiskResponse = Record<number, RisksProjectRiskItem>
 
 export const risksApi = {
   getProjects(
@@ -36,12 +33,5 @@ export const risksApi = {
   ): Promise<RisksProjectRiskResponse> {
     const ids = params.projectIds?.join(',')
     return api.get(`/risks/projects${buildQuery({ projectIds: ids })}`, options)
-  },
-
-  getProjectTaskRisks(
-    projectId: number,
-    options: ApiRequestOptions = {},
-  ): Promise<RisksTaskRiskResponse> {
-    return api.get(`/projects/${projectId}/tasks-risk`, options)
   },
 }

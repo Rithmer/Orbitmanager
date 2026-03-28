@@ -5,6 +5,17 @@ interface CacheEntry<T> {
   expiresAt: number;
 }
 
+/**
+ * Unified in-memory cache with TTL support and background eviction.
+ *
+ * This is the single cache service for the entire application (audit H1).
+ * All consumers should use this service instead of the removed InMemoryCacheService.
+ *
+ * API:
+ * - get/set/getOrSet — core cache-aside pattern
+ * - invalidate / invalidateByPrefix — targeted invalidation
+ * - clear / has — utility methods
+ */
 @Injectable()
 export class TtlCacheService {
   private readonly store = new Map<string, CacheEntry<unknown>>();
@@ -30,7 +41,7 @@ export class TtlCacheService {
 
   async getOrSet<T>(
     key: string,
-    factory: () => Promise<T>,
+    factory: () => T | Promise<T>,
     ttlMs: number,
   ): Promise<T> {
     const cached = this.get<T>(key);
@@ -51,6 +62,14 @@ export class TtlCacheService {
         this.store.delete(key);
       }
     }
+  }
+
+  has(key: string): boolean {
+    return this.get(key) !== undefined;
+  }
+
+  clear(): void {
+    this.store.clear();
   }
 
   private evictExpired(): void {

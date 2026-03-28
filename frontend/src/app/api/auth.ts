@@ -1,5 +1,5 @@
-import { api, type ApiRequestOptions } from './client'
-import type { AuthTokens, LoginDto, RegisterDto, User } from '../types'
+import { api, type ApiRequestOptions } from '@/app/api/client'
+import type { AuthTokens, LoginDto, RegisterDto, User } from '@/app/types'
 
 type ChangePasswordDto = {
   currentPassword: string
@@ -17,6 +17,10 @@ export const authApi = {
 
   refresh(refreshToken: string): Promise<AuthTokens> {
     return api.post<AuthTokens>('/auth/refresh', { refreshToken })
+  },
+
+  logout(refreshToken: string): Promise<void> {
+    return api.post<void>('/auth/logout', { refreshToken })
   },
 
   me(options: ApiRequestOptions = {}): Promise<User> {

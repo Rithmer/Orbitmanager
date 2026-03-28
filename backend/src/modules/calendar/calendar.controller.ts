@@ -11,21 +11,16 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { CalendarService } from './calendar.service';
 import { CreateCalendarEventDto, UpdateCalendarEventDto } from './dto';
+import { ApiAuth } from '@/common/decorators/api-auth.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { parseOptionalInt } from '@/common/helpers/query.helper';
 
 @ApiTags('Calendar Events')
-@ApiBearerAuth()
+@ApiAuth()
 @Controller('calendar-events')
 export class CalendarController {
   constructor(private readonly calendarService: CalendarService) {}
@@ -97,8 +92,9 @@ export class CalendarController {
   create(
     @Body() dto: CreateCalendarEventDto,
     @CurrentUser('id') userId: number,
+    @CurrentUser('accountRole') userRole: AccountRole,
   ) {
-    return this.calendarService.create(dto, userId);
+    return this.calendarService.create(dto, userId, userRole);
   }
 
   @Patch(':id')

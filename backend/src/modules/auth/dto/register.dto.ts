@@ -1,32 +1,33 @@
 import {
-  IsString,
   IsNotEmpty,
   IsOptional,
-  MinLength,
-  MaxLength,
+  IsString,
   Matches,
+  MaxLength,
+  MinLength,
 } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { StrongPasswordConstraint } from '@/common/validators/strong-password';
 
 export class RegisterDto {
   @ApiProperty({
     example: 'john_doe',
-    description: 'Логин (3-50 символов, без спецсимволов)',
+    description:
+      'Р›РѕРіРёРЅ (3-50 СЃРёРјРІРѕР»РѕРІ, Р±РµР· СЃРїРµС†СЃРёРјРІРѕР»РѕРІ)',
   })
   @IsString()
   @IsNotEmpty()
   @MinLength(3)
   @MaxLength(50)
   @Matches(/^[a-zA-Z0-9_]+$/, {
-    message: 'Логин может содержать только буквы, цифры и символ подчёркивания',
+    message:
+      'Р›РѕРіРёРЅ РјРѕР¶РµС‚ СЃРѕРґРµСЂР¶Р°С‚СЊ С‚РѕР»СЊРєРѕ Р±СѓРєРІС‹, С†РёС„СЂС‹ Рё СЃРёРјРІРѕР» РїРѕРґС‡С‘СЂРєРёРІР°РЅРёСЏ',
   })
   login!: string;
 
   @ApiProperty({
-    example: 'SecurePass1!',
-    description:
-      'Пароль: мин. 8 символов, строчные и прописные латинские буквы, цифра и спецсимвол',
+    example: 'secureP@ss1',
+    description: 'Пароль (мин. 8 символов)',
   })
   @IsString()
   @IsNotEmpty()
@@ -34,13 +35,13 @@ export class RegisterDto {
   @StrongPasswordConstraint()
   password!: string;
 
-  @ApiProperty({ example: 'Иванов Иван' })
+  @ApiProperty({ example: 'РРІР°РЅРѕРІ РРІР°РЅ' })
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
   fullName!: string;
 
-  @ApiProperty({ example: 'Backend Developer', required: false })
+  @ApiPropertyOptional({ example: 'Backend Developer' })
   @IsOptional()
   @IsString()
   @MaxLength(100)

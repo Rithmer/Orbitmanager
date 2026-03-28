@@ -18,7 +18,9 @@ export class TeamsListViewController {
   constructor(private readonly teamsListViewService: TeamsListViewService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Получить пагинированный список команд для карточек' })
+  @ApiOperation({
+    summary: 'Получить пагинированный список команд для карточек',
+  })
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })

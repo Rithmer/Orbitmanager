@@ -12,15 +12,10 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { TeamsService } from './teams.service';
 import { CreateTeamDto, UpdateTeamDto } from './dto';
+import { ApiAuth } from '@/common/decorators/api-auth.decorator';
 import { TeamRolesGuard } from '@/common/guards/team-roles.guard';
 import { TeamRoles } from '@/common/decorators/team-roles.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
@@ -29,7 +24,7 @@ import { TeamRole } from '@/common/enums/team-role.enum';
 import { parseOptionalInt } from '@/common/helpers/query.helper';
 
 @ApiTags('Teams')
-@ApiBearerAuth()
+@ApiAuth()
 @Controller('teams')
 export class TeamsController {
   constructor(private readonly teamsService: TeamsService) {}

@@ -12,8 +12,7 @@ import { Request, Response } from 'express';
 export class GlobalExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(GlobalExceptionFilter.name);
 
-  private readonly isProduction =
-    process.env['NODE_ENV'] === 'production';
+  private readonly isProduction = process.env['NODE_ENV'] === 'production';
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();

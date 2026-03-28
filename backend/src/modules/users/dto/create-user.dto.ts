@@ -1,27 +1,32 @@
 import {
-  IsString,
-  IsNotEmpty,
-  MinLength,
-  MaxLength,
   IsEnum,
+  IsIn,
+  IsNotEmpty,
   IsOptional,
+  IsString,
   Matches,
+  MaxLength,
+  MinLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { StrongPasswordConstraint } from '@/common/validators/strong-password';
 
+const WRITABLE_ACCOUNT_STATUSES = ['active', 'blocked'] as const;
+
 export class CreateUserDto {
   @ApiProperty({
     example: 'john_doe',
-    description: 'Уникальный логин (3-50 символов, без спецсимволов)',
+    description:
+      'РЈРЅРёРєР°Р»СЊРЅС‹Р№ Р»РѕРіРёРЅ (3-50 СЃРёРјРІРѕР»РѕРІ, Р±РµР· СЃРїРµС†СЃРёРјРІРѕР»РѕРІ)',
   })
   @IsString()
   @IsNotEmpty()
   @MinLength(3)
   @MaxLength(50)
   @Matches(/^[a-zA-Z0-9_]+$/, {
-    message: 'Логин может содержать только буквы, цифры и символ подчёркивания',
+    message:
+      'Р›РѕРіРёРЅ РјРѕР¶РµС‚ СЃРѕРґРµСЂР¶Р°С‚СЊ С‚РѕР»СЊРєРѕ Р±СѓРєРІС‹, С†РёС„СЂС‹ Рё СЃРёРјРІРѕР» РїРѕРґС‡С‘СЂРєРёРІР°РЅРёСЏ',
   })
   login!: string;
 
@@ -36,26 +41,35 @@ export class CreateUserDto {
   @StrongPasswordConstraint()
   password!: string;
 
-  @ApiProperty({ example: 'Иванов Иван', description: 'Полное имя' })
+  @ApiProperty({
+    example: 'РРІР°РЅРѕРІ РРІР°РЅ',
+    description: 'РџРѕР»РЅРѕРµ РёРјСЏ',
+  })
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
   fullName!: string;
 
-  @ApiPropertyOptional({ example: 'Backend Developer', description: 'Профессия' })
+  @ApiPropertyOptional({
+    example: 'Backend Developer',
+    description: 'Профессия',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(100)
   profession?: string;
 
+  @ApiPropertyOptional({
+    enum: WRITABLE_ACCOUNT_STATUSES,
+    default: 'active',
+    description: 'Статус аккаунта',
+  })
+  @IsOptional()
+  @IsIn(WRITABLE_ACCOUNT_STATUSES)
+  accountStatus?: 'active' | 'blocked';
+
   @ApiPropertyOptional({ enum: AccountRole, default: AccountRole.MEMBER })
   @IsEnum(AccountRole)
   @IsOptional()
   accountRole?: AccountRole;
-
-  @ApiPropertyOptional({ example: 'https://cdn.example.com/avatars/1.png', description: 'URL аватара или Base64' })
-  @IsString()
-  @IsOptional()
-  @MaxLength(5000000)
-  avatarUrl?: string | null;
 }

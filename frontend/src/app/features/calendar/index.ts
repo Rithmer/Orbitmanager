@@ -4,6 +4,6 @@ export type {
   CalendarViewEvent,
   CalendarViewProject,
   CalendarViewTask,
-} from './types'
-export { CalendarMonthViewSkeleton } from './calendar-view'
-export { useCalendarMonthViewQuery } from './use-calendar-month-view-query'
+} from '@/app/features/calendar/types'
+export { CalendarMonthViewSkeleton } from '@/app/features/calendar/calendar-view'
+export { useCalendarMonthViewQuery } from '@/app/features/calendar/use-calendar-month-view-query'

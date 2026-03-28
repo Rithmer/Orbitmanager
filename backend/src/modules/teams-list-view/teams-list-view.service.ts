@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { TeamRole } from '@/common/enums/team-role.enum';
-import { normalizePagination, buildPaginatedResult } from '@/common/query/pagination';
+import {
+  normalizePagination,
+  buildPaginatedResult,
+} from '@/common/query/pagination';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { buildOrderBy } from '@/infrastructure/repositories/prisma/prisma-query.utils';
 import type {
@@ -33,6 +36,18 @@ type TeamRecord = {
   }>;
 };
 
+/**
+ * @architecture CQRS Query Service
+ *
+ * Сервис агрегированного чтения данных. Использует PrismaService напрямую —
+ * намеренное архитектурное решение: запросы включают сложные агрегации
+ * (count, groupBy, многотабличные JOIN), которые не выражаются через
+ * CRUD-репозитории без значительного усложнения их интерфейсов.
+ *
+ * Паттерн: CQRS-light — command-сервисы (TasksService, ProjectsService и др.)
+ * работают через репозитории; query-сервисы (этот класс) обращаются к БД
+ * напрямую для оптимальных read-path запросов.
+ */
 @Injectable()
 export class TeamsListViewService {
   constructor(private readonly prisma: PrismaService) {}
@@ -41,7 +56,10 @@ export class TeamsListViewService {
     params: TeamsListViewQueryParams,
     userId: number,
   ): Promise<TeamsListViewResponseDto> {
-    const { page, limit, skip } = normalizePagination(params.page, params.limit);
+    const { page, limit, skip } = normalizePagination(
+      params.page,
+      params.limit,
+    );
     const search = params.search?.trim();
     const where = buildTeamsWhere(search);
 
@@ -100,7 +118,9 @@ export class TeamsListViewService {
     record: TeamRecord,
     userId: number,
   ): TeamListViewItemDto {
-    const members = record.members.map((member) => this.toTeamListViewMember(member));
+    const members = record.members.map((member) =>
+      this.toTeamListViewMember(member),
+    );
     const currentUserRole =
       members.find((member) => member.userId === userId)?.teamRole ?? null;
 

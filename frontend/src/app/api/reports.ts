@@ -1,5 +1,5 @@
-import { api, buildQuery, type ApiRequestOptions } from './client'
-import type { ReportsAccessibleProject, ReportsSummaryResponse } from '../features/reports/types'
+import { api, buildQuery, type ApiRequestOptions } from '@/app/api/client'
+import type { ReportsAccessibleProject, ReportsSummaryResponse } from '@/app/features/reports/types'
 
 export const reportsApi = {
   getSummary(

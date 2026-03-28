@@ -1,11 +1,6 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { ApiAuth } from '@/common/decorators/api-auth.decorator';
 import { AuditService } from './audit.service';
 import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
@@ -13,7 +8,7 @@ import { AccountRole } from '@/common/enums/account-role.enum';
 import { parseOptionalInt } from '@/common/helpers/query.helper';
 
 @ApiTags('Audit Logs')
-@ApiBearerAuth()
+@ApiAuth()
 @UseGuards(AccountRolesGuard)
 @Controller('audit-logs')
 export class AuditLogsController {

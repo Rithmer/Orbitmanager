@@ -1,6 +1,6 @@
-import { RiskLevel } from '../../types'
-import { TaskStatus } from '../../types'
-import type { ProjectBoardTask } from './types'
+import { RiskLevel } from '@/app/types'
+import { TaskStatus } from '@/app/types'
+import type { ProjectBoardTask } from '@/app/features/board/types'
 
 export const PROJECT_BOARD_COLUMNS = [
   { status: TaskStatus.NEW, title: 'Запланировано', accent: '#4880ff' },
@@ -34,8 +34,8 @@ export function getRiskBadgeClasses(riskLevel?: RiskLevel) {
 export function getOverdueLabel(task: ProjectBoardTask): boolean {
   return (
     new Date(task.deadline).getTime() < Date.now() &&
-    task.status !== 'done' &&
-    task.status !== 'cancelled'
+    task.status !== TaskStatus.DONE &&
+    task.status !== TaskStatus.CANCELLED
   )
 }
 

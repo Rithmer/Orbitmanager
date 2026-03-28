@@ -232,18 +232,25 @@ async function main(): Promise<void> {
 
     const taskAssignees = [owner, lead, dev1, dev2, dev3];
 
-    await prisma.task.createMany({
-      data: taskTemplates.map((template, index) => ({
-        projectId: project.id,
-        name: `${team.name} ${template.suffix}`,
-        description: `Seeded task ${index + 1} for ${team.name}.`,
-        deadline: addDays(now, template.deadlineShiftDays + teamIndex),
-        status: template.status,
-        difficulty: template.difficulty,
-        assigneeId: taskAssignees[index]!.id,
-        createdById: owner.id,
-      })),
-    });
+    const createdTasks = [];
+    for (let i = 0; i < taskTemplates.length; i++) {
+      const template = taskTemplates[i];
+      const task = await prisma.task.create({
+        data: {
+          projectId: project.id,
+          name: `${team.name} ${template.suffix}`,
+          description: `Seeded task ${i + 1} for ${team.name}.`,
+          deadline: addDays(now, template.deadlineShiftDays + teamIndex),
+          status: template.status,
+          difficulty: template.difficulty,
+          createdById: owner.id,
+          assignees: {
+            create: { userId: taskAssignees[i]!.id },
+          },
+        },
+      });
+      createdTasks.push(task);
+    }
 
     await prisma.auditLog.createMany({
       data: [
@@ -261,11 +268,11 @@ async function main(): Promise<void> {
           entityId: project.id,
           description: `Seeded project ${project.name}`,
         },
-        ...taskTemplates.map((template, index) => ({
+        ...createdTasks.map((task, index) => ({
           userId: owner.id,
           action: 'create',
           entityType: 'task',
-          entityId: teamIndex * TASKS_PER_TEAM - (TASKS_PER_TEAM - (index + 1)),
+          entityId: task.id,
           description: `Seeded task ${index + 1} for ${project.name}`,
         })),
       ],

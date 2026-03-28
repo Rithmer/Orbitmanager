@@ -44,6 +44,18 @@ describe('TtlCacheService', () => {
     expect(factory).toHaveBeenCalledTimes(1);
   });
 
+  it('getOrSet calls factory again after expiry', async () => {
+    const nowSpy = jest.spyOn(Date, 'now');
+    nowSpy.mockReturnValue(3_000);
+    const factory = jest.fn().mockResolvedValue('loaded');
+
+    await service.getOrSet('k', factory, 100);
+    nowSpy.mockReturnValue(3_200);
+    await service.getOrSet('k', factory, 100);
+
+    expect(factory).toHaveBeenCalledTimes(2);
+  });
+
   it('invalidate removes a single key', () => {
     service.set('a', 1, 1_000);
     service.invalidate('a');
@@ -61,6 +73,23 @@ describe('TtlCacheService', () => {
     expect(service.get('team:1')).toBeUndefined();
     expect(service.get('team:2')).toBeUndefined();
     expect(service.get('project:1')).toBe('c');
+  });
+
+  it('has returns true for existing key and false for missing', () => {
+    service.set('exists', 42, 1_000);
+
+    expect(service.has('exists')).toBe(true);
+    expect(service.has('missing')).toBe(false);
+  });
+
+  it('clear removes all entries', () => {
+    service.set('a', 1, 1_000);
+    service.set('b', 2, 1_000);
+
+    service.clear();
+
+    expect(service.get('a')).toBeUndefined();
+    expect(service.get('b')).toBeUndefined();
   });
 
   it('clears store on module destroy', () => {

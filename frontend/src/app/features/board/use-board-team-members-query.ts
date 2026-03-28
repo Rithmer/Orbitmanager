@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { teamsApi } from '../../api/teams'
-import { appQueryKeys } from '../../query'
+import { teamsApi } from '@/app/api/teams'
+import { appQueryKeys } from '@/app/query'
 
 export function useBoardTeamMembersQuery(
   teamId: number | null,

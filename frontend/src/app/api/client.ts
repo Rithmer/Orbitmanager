@@ -1,19 +1,15 @@
 const API_BASE = '/api'
-const AUTH_STORAGE_MODE = import.meta.env.VITE_AUTH_STORAGE_MODE ?? 'session'
 
-type AuthStorageMode = 'session' | 'local' | 'memory'
+type AuthStorageMode = 'session' | 'local'
 
-function resolveAuthStorageMode(): AuthStorageMode {
-  if (AUTH_STORAGE_MODE === 'local') {
+export function resolveAuthStorageMode(storageMode: string | undefined): AuthStorageMode {
+  if (storageMode === 'local') {
     return 'local'
-  }
-  if (AUTH_STORAGE_MODE === 'memory') {
-    return 'memory'
   }
   return 'session'
 }
 
-const authStorageMode = resolveAuthStorageMode()
+const authStorageMode = resolveAuthStorageMode(import.meta.env.VITE_AUTH_STORAGE_MODE)
 
 function getStorage(): Storage | null {
   if (typeof window === 'undefined') {
@@ -79,19 +75,21 @@ class ApiClient {
     return this.accessToken
   }
 
+  getRefreshToken() {
+    return this.refreshToken
+  }
+
   isAuthenticated() {
     return !!this.accessToken
   }
 
   private async doRefresh(): Promise<boolean> {
-    const canRefreshWithCookieOnly = authStorageMode === 'memory'
-    if (!this.refreshToken && !canRefreshWithCookieOnly) return false
+    if (!this.refreshToken) return false
     try {
-      const refreshBody = this.refreshToken ? { refreshToken: this.refreshToken } : undefined
       const res = await fetch(`${API_BASE}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: refreshBody ? JSON.stringify(refreshBody) : undefined,
+        body: JSON.stringify({ refreshToken: this.refreshToken }),
         credentials: 'include',
       })
       if (!res.ok) return false

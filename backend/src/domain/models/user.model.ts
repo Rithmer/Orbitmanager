@@ -9,7 +9,7 @@ export interface User {
   accountStatus: 'active' | 'blocked';
   accountRole: AccountRole;
   avatarUrl: string | null;
-  discriminator: string;
+  lastPasswordChangedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

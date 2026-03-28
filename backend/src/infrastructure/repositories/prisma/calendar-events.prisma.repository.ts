@@ -6,7 +6,11 @@ import type {
 } from '@/domain/repositories/calendar-event.repository';
 import { CalendarEvent } from '@/domain/models/calendar-event.model';
 import type { CalendarEvent as PrismaCalendarEvent } from '@prisma/client';
-import { buildOrderBy, buildStringSearch, getPagination } from './prisma-query.utils';
+import {
+  buildOrderBy,
+  buildStringSearch,
+  getPagination,
+} from './prisma-query.utils';
 
 @Injectable()
 export class CalendarEventsPrismaRepository implements ICalendarEventRepository {
@@ -23,7 +27,9 @@ export class CalendarEventsPrismaRepository implements ICalendarEventRepository 
     const { skip, take } = getPagination(params.page, params.limit);
     const where = {
       ...(params.userId !== undefined ? { userId: params.userId } : {}),
-      ...(params.projectId !== undefined ? { projectId: params.projectId } : {}),
+      ...(params.projectId !== undefined
+        ? { projectId: params.projectId }
+        : {}),
       ...(params.from || params.to
         ? {
             startDate: {
@@ -42,7 +48,17 @@ export class CalendarEventsPrismaRepository implements ICalendarEventRepository 
         where,
         orderBy: buildOrderBy(
           params.sort,
-          ['id', 'userId', 'projectId', 'taskId', 'title', 'startDate', 'endDate', 'createdAt', 'updatedAt'],
+          [
+            'id',
+            'userId',
+            'projectId',
+            'taskId',
+            'title',
+            'startDate',
+            'endDate',
+            'createdAt',
+            'updatedAt',
+          ],
           'startDate',
         ),
         skip,

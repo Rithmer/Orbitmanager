@@ -1,21 +1,20 @@
 import {
   Injectable,
   Inject,
+  Logger,
   Optional,
   NotFoundException,
   ConflictException,
   BadRequestException,
 } from '@nestjs/common';
+import { TtlCacheService } from '@/common/cache/ttl-cache.service';
 import { ProjectAccessService } from '@/common/access/project-access.service';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { AuditAction } from '@/common/enums/audit-action.enum';
 import { ProjectRole } from '@/common/enums/project-role.enum';
 import { ProjectStatus } from '@/common/enums/project-status.enum';
 import { TeamRole } from '@/common/enums/team-role.enum';
-import {
-  PaginatedResult,
-  QueryParams,
-} from '@/common/helpers/query.helper';
+import { PaginatedResult, QueryParams } from '@/common/helpers/query.helper';
 import { ProjectMember } from '@/domain/models/project-member.model';
 import { Project } from '@/domain/models/project.model';
 import type { IProjectMemberRepository } from '@/domain/repositories/project-member.repository';
@@ -38,6 +37,8 @@ import { auditLogCreateInput } from '@/common/helpers/audit-log-prisma.helper';
 
 @Injectable()
 export class ProjectsService {
+  private readonly logger = new Logger(ProjectsService.name);
+
   constructor(
     @Inject(PROJECT_REPOSITORY)
     private readonly projectRepository: IProjectRepository,
@@ -51,6 +52,7 @@ export class ProjectsService {
     private readonly teamRepository: ITeamRepository,
     private readonly auditService: AuditService,
     private readonly projectAccessService: ProjectAccessService,
+    private readonly cache: TtlCacheService,
     @Optional() private readonly prisma?: PrismaService,
   ) {}
 
@@ -63,12 +65,9 @@ export class ProjectsService {
     const limit = normalizeLimit(params.limit);
     const teamId =
       typeof params.filters?.['teamId'] === 'number'
-        ? (params.filters['teamId'] as number)
+        ? params.filters['teamId']
         : undefined;
-    const status =
-      typeof params.filters?.['status'] === 'string'
-        ? (params.filters['status'] as string)
-        : undefined;
+    const status = parseProjectStatus(params.filters?.['status']);
 
     if (this.projectRepository.findPage) {
       const projectIds =
@@ -100,7 +99,9 @@ export class ProjectsService {
 
     return applyInMemoryPagination(
       projects
-        .filter((project) => (teamId !== undefined ? project.teamId === teamId : true))
+        .filter((project) =>
+          teamId !== undefined ? project.teamId === teamId : true,
+        )
         .filter((project) => (status ? project.status === status : true))
         .filter((project) => {
           if (!params.search) {
@@ -151,7 +152,9 @@ export class ProjectsService {
     );
 
     if (this.prisma) {
-      return this.createWithTransaction(dto, userId);
+      const project = await this.createWithTransaction(dto, userId);
+      this.invalidateUserCaches(userId);
+      return project;
     }
 
     const now = new Date().toISOString();
@@ -172,6 +175,7 @@ export class ProjectsService {
       `Создан проект "${project.name}"`,
     );
 
+    this.invalidateUserCaches(userId);
     return project;
   }
 
@@ -205,6 +209,7 @@ export class ProjectsService {
       `Обновлён проект "${updated.name}"`,
     );
 
+    this.invalidateUserCaches(userId);
     return updated;
   }
 
@@ -230,6 +235,8 @@ export class ProjectsService {
       id,
       `Удалён проект "${project.name}"`,
     );
+
+    this.invalidateUserCaches(userId);
   }
 
   async findMembers(
@@ -318,6 +325,9 @@ export class ProjectsService {
       `Пользователь #${dto.userId} добавлен в проект #${projectId} с ролью ${dto.role}`,
     );
 
+    // B-03: invalidate access and summary caches for the newly added user
+    this.invalidateAffectedUserAccessCaches(dto.userId);
+
     return member;
   }
 
@@ -342,6 +352,12 @@ export class ProjectsService {
     );
     if (teamMembership) {
       this.validateProjectRole(teamMembership.teamRole, dto.role);
+    } else {
+      // B-07: user has a project membership but no team membership — inconsistent state
+      this.logger.warn(
+        `User #${member.userId} has no team membership in team #${project.teamId} ` +
+          `while updating project member #${memberId}. Role validation skipped.`,
+      );
     }
 
     const updated = await this.projectMemberRepository.update(memberId, {
@@ -380,22 +396,24 @@ export class ProjectsService {
 
     if (this.prisma) {
       await this.removeMemberWithTransaction(member, userId);
-      return;
+    } else {
+      await this.taskRepository.clearAssigneeByUserAndProjects(member.userId, [
+        member.projectId,
+      ]);
+
+      await this.projectMemberRepository.delete(memberId);
+
+      await this.auditService.log(
+        userId,
+        AuditAction.DELETE,
+        'project_member',
+        memberId,
+        `Участник #${member.userId} удалён из проекта #${member.projectId}`,
+      );
     }
 
-    await this.taskRepository.clearAssigneeByUserAndProjects(member.userId, [
-      member.projectId,
-    ]);
-
-    await this.projectMemberRepository.delete(memberId);
-
-    await this.auditService.log(
-      userId,
-      AuditAction.DELETE,
-      'project_member',
-      memberId,
-      `Участник #${member.userId} удалён из проекта #${member.projectId}`,
-    );
+    // B-03: invalidate access and summary caches for the removed user
+    this.invalidateAffectedUserAccessCaches(member.userId);
   }
 
   private async findMemberById(id: number): Promise<ProjectMember> {
@@ -405,6 +423,16 @@ export class ProjectsService {
     }
 
     return member;
+  }
+
+  private invalidateUserCaches(userId: number): void {
+    this.cache.invalidateByPrefix(`dashboard:summary:${userId}:`);
+    this.cache.invalidateByPrefix(`reports:summary:${userId}:`);
+  }
+
+  private invalidateAffectedUserAccessCaches(userId: number): void {
+    this.projectAccessService.invalidateVisibleProjects(userId);
+    this.invalidateUserCaches(userId);
   }
 
   private async createWithTransaction(
@@ -423,30 +451,6 @@ export class ProjectsService {
           updatedAt: timestamp,
         },
       });
-
-      const teamMembers = await tx.teamMember.findMany({
-        where: { teamId: dto.teamId },
-      });
-
-      for (const tm of teamMembers) {
-        let projectRole: ProjectRole;
-        if (tm.teamRole === TeamRole.OWNER) {
-          projectRole = ProjectRole.TEAM_LEAD;
-        } else if (tm.teamRole === TeamRole.OBSERVER) {
-          projectRole = ProjectRole.OBSERVER;
-        } else {
-          projectRole = ProjectRole.DEVELOPER;
-        }
-
-        await tx.projectMember.create({
-          data: {
-            projectId: createdProject.id,
-            userId: tm.userId,
-            role: projectRole,
-            assignedAt: timestamp,
-          },
-        });
-      }
 
       await tx.auditLog.create({
         data: auditLogCreateInput(
@@ -529,6 +533,18 @@ function normalizePage(page: number | undefined): number {
   return Math.max(1, Math.trunc(page as number));
 }
 
+const PROJECT_STATUS_VALUES = new Set<string>(Object.values(ProjectStatus));
+
+function parseProjectStatus(value: unknown): ProjectStatus | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  return PROJECT_STATUS_VALUES.has(value)
+    ? (value as ProjectStatus)
+    : undefined;
+}
+
 function normalizeLimit(limit: number | undefined): number {
   if (!Number.isFinite(limit)) {
     return 20;
@@ -558,7 +574,12 @@ function applyInMemoryPagination<T>(
   limit: number,
 ): PaginatedResult<T> {
   const offset = (page - 1) * limit;
-  return toPaginatedResult(items.slice(offset, offset + limit), items.length, page, limit);
+  return toPaginatedResult(
+    items.slice(offset, offset + limit),
+    items.length,
+    page,
+    limit,
+  );
 }
 
 function mapProjectRecord(project: {
@@ -580,4 +601,3 @@ function mapProjectRecord(project: {
     updatedAt: project.updatedAt.toISOString(),
   };
 }
-

@@ -1,4 +1,4 @@
-import { ApiError } from './client'
+import { ApiError } from '@/app/api/client'
 
 export const APP_API_ERROR_EVENT = 'app-api-error'
 

@@ -55,7 +55,7 @@ async function bootstrap() {
 
   app.use(helmet());
   app.enableCors({
-    origin: process.env['CORS_ORIGIN']?.split(',') ?? [
+    origin: process.env['CORS_ORIGIN']?.split(',').map((s) => s.trim()) ?? [
       'http://localhost:5173',
       'http://localhost:3000',
     ],
@@ -83,7 +83,9 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  SwaggerModule.setup('api/docs', app, document, {
+    swaggerOptions: { persistAuthorization: true },
+  });
 
   const port = process.env['PORT'] ?? 3000;
   await app.listen(port);

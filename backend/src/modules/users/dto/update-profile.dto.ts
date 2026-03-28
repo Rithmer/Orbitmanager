@@ -8,13 +8,19 @@ export class UpdateProfileDto {
   @MaxLength(100)
   fullName?: string;
 
-  @ApiPropertyOptional({ example: 'Backend Developer', description: 'Профессия' })
+  @ApiPropertyOptional({
+    example: 'Backend Developer',
+    description: 'Профессия',
+  })
   @IsString()
   @IsOptional()
   @MaxLength(100)
   profession?: string;
 
-  @ApiPropertyOptional({ example: 'https://cdn.example.com/avatars/1.png', description: 'URL аватара или Base64' })
+  @ApiPropertyOptional({
+    example: 'https://cdn.example.com/avatars/1.png',
+    description: 'URL аватара или Base64',
+  })
   @IsString()
   @IsOptional()
   @MaxLength(5000000)

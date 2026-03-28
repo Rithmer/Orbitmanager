@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { resolveRoleScopedProjects, resolveRoleScopedTeams } from '../filters'
-import { AccountRole, ProjectRole, TeamRole, type ProjectMember, type Team, type TeamMember } from '../../../types'
-import type { RiskProjectOption } from '../types'
+import { resolveRoleScopedProjects, resolveRoleScopedTeams } from '@/app/features/risks/filters'
+import { AccountRole, ProjectRole, TeamRole, type ProjectMember, type Team, type TeamMember } from '@/app/types'
+import type { RiskProjectOption } from '@/app/features/risks/types'
 
 describe('risks filters', () => {
   const teams: Team[] = [
@@ -71,5 +71,18 @@ describe('risks filters', () => {
         projectMembersByProject,
       ).map((project) => project.id),
     ).toEqual([11])
+  })
+
+  it('filters owner projects by the selected team id', () => {
+    expect(
+      resolveRoleScopedProjects(
+        AccountRole.MEMBER,
+        7,
+        projects,
+        1,
+        teamMembersByTeam,
+        projectMembersByProject,
+      ).map((project) => project.id),
+    ).toEqual([11, 12])
   })
 })

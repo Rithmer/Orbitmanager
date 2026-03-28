@@ -1,4 +1,8 @@
-import { ExecutionContext, ForbiddenException } from '@nestjs/common';
+import {
+  ExecutionContext,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProjectRolesGuard } from './project-roles.guard';
@@ -124,7 +128,7 @@ describe('ProjectRolesGuard', () => {
     });
     const ctx = makeMockContext(
       { id: USER_ID, accountRole: AccountRole.MEMBER },
-      { projectId: String(PROJECT_ID) },
+      { id: String(PROJECT_ID) },
     );
     await expect(guard.canActivate(ctx)).resolves.toBe(true);
   });
@@ -157,7 +161,7 @@ describe('ProjectRolesGuard', () => {
     await expect(guard.canActivate(ctx)).rejects.toThrow(ForbiddenException);
   });
 
-  it('should throw ForbiddenException when project is not found', async () => {
+  it('should throw NotFoundException when project is not found', async () => {
     await buildModule([ProjectRole.TEAM_LEAD]);
     projectRepo.findById.mockResolvedValue(null);
     teamMemberRepo.findByUserAndTeam.mockResolvedValue(null);
@@ -165,7 +169,7 @@ describe('ProjectRolesGuard', () => {
       { id: USER_ID, accountRole: AccountRole.MEMBER },
       { id: String(PROJECT_ID) },
     );
-    await expect(guard.canActivate(ctx)).rejects.toThrow(ForbiddenException);
+    await expect(guard.canActivate(ctx)).rejects.toThrow(NotFoundException);
   });
 
   it('should throw ForbiddenException when user is not authenticated', async () => {

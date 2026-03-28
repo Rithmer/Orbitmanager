@@ -3,7 +3,10 @@ import { ProjectAccessService } from '@/common/access/project-access.service';
 import { ProjectStatus } from '@/common/enums/project-status.enum';
 import { TaskStatus } from '@/common/enums/task-status.enum';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
-import { RISK_ASSESSMENT_SERVICE, type IRiskAssessmentService } from '@/domain/services/risk-assessment.interface';
+import {
+  RISK_ASSESSMENT_SERVICE,
+  type IRiskAssessmentService,
+} from '@/domain/services/risk-assessment.interface';
 import { buildTaskRiskInput } from '@/modules/risk/helpers/build-task-risk-input';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import type { TaskRiskOutputDto } from '../risk/dto';
@@ -58,6 +61,18 @@ type ProjectBoardRecord = {
   }>;
 };
 
+/**
+ * @architecture CQRS Query Service
+ *
+ * Сервис агрегированного чтения данных. Использует PrismaService напрямую —
+ * намеренное архитектурное решение: запросы включают сложные агрегации
+ * (count, groupBy, многотабличные JOIN), которые не выражаются через
+ * CRUD-репозитории без значительного усложнения их интерфейсов.
+ *
+ * Паттерн: CQRS-light — command-сервисы (TasksService, ProjectsService и др.)
+ * работают через репозитории; query-сервисы (этот класс) обращаются к БД
+ * напрямую для оптимальных read-path запросов.
+ */
 @Injectable()
 export class ProjectBoardService {
   constructor(
@@ -157,7 +172,7 @@ export class ProjectBoardService {
               name: task.name,
               description: task.description,
               deadline: task.deadline,
-              status: task.status as TaskStatus,
+              status: task.status,
               difficulty: task.difficulty,
               assigneeIds: task.assigneeIds,
               createdById: task.createdById,
@@ -177,9 +192,10 @@ export class ProjectBoardService {
       project: this.toProjectDto(projectRecord),
       members: projectRecord.members.map((member) => this.toMemberDto(member)),
       tasks,
-      riskByTaskId: Object.fromEntries(
-        riskByTaskEntries,
-      ) as Record<number, TaskRiskOutputDto>,
+      riskByTaskId: Object.fromEntries(riskByTaskEntries) as Record<
+        number,
+        TaskRiskOutputDto
+      >,
     };
   }
 
@@ -259,7 +275,9 @@ export class ProjectBoardService {
     };
   }
 
-  private toTaskDto(task: ProjectBoardRecord['tasks'][number]): ProjectBoardTaskDto {
+  private toTaskDto(
+    task: ProjectBoardRecord['tasks'][number],
+  ): ProjectBoardTaskDto {
     const assigneeIds = task.assignees.map((a) => a.userId);
     const assignees = task.assignees.map((a) => this.toUserSummary(a.user));
     return {

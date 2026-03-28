@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validatePasswordPolicy } from '../passwordPolicy'
+import { validatePasswordPolicy } from '@/app/utils/passwordPolicy'
 
 describe('passwordPolicy', () => {
   it('accepts a valid strong password', () => {

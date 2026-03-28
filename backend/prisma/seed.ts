@@ -6,704 +6,1459 @@ import * as argon2 from 'argon2';
 const connectionString =
   process.env['DATABASE_URL'] ??
   'postgresql://postgres:postgres@localhost:5433/task_manager';
+
 const pool = new pg.Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-function days(n: number): number {
-  return n * 24 * 60 * 60 * 1000;
-}
+const ADMIN_PASSWORD = 'Admin123!';
+const DEFAULT_PASSWORD = 'Password123!';
+const TOTAL_USERS = 220;
+const TEAM_SIZES = [
+  5, 6, 8, 9, 11, 13, 15, 18, 20, 22, 25, 28, 31, 34, 37, 40, 43, 46, 49, 52,
+  56, 60,
+] as const;
+const TEAM_OWNER_INDEXES = [
+  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 22, 23,
+] as const;
 
-function randomBetween(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
+const EVENT_COLORS = [
+  '#3b82f6',
+  '#ef4444',
+  '#10b981',
+  '#f59e0b',
+  '#8b5cf6',
+  '#ec4899',
+  '#06b6d4',
+] as const;
 
-function pick<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
+const PROFESSIONS = [
+  'Frontend Developer',
+  'Backend Developer',
+  'Fullstack Developer',
+  'QA Engineer',
+  'DevOps Engineer',
+  'Product Manager',
+  'Data Analyst',
+  'System Analyst',
+  'ML Engineer',
+  'Security Engineer',
+  'UX Designer',
+  'Delivery Manager',
+] as const;
 
-function futureDate(minDays: number, maxDays: number): Date {
-  return new Date(Date.now() + days(randomBetween(minDays, maxDays)));
-}
+const FIRST_NAMES = [
+  'Andrey',
+  'Alexey',
+  'Maria',
+  'Dmitry',
+  'Anna',
+  'Nikita',
+  'Elena',
+  'Artem',
+  'Olga',
+  'Kirill',
+  'Daria',
+  'Pavel',
+  'Victoria',
+  'Roman',
+  'Ivan',
+  'Natalia',
+  'Maxim',
+  'Svetlana',
+] as const;
 
-function pastDate(minDays: number, maxDays: number): Date {
-  return new Date(Date.now() - days(randomBetween(minDays, maxDays)));
-}
+const LAST_NAMES = [
+  'Abramov',
+  'Belova',
+  'Chernov',
+  'Demina',
+  'Ershov',
+  'Filatova',
+  'Gromov',
+  'Karpova',
+  'Loginov',
+  'Mironova',
+  'Tarasov',
+] as const;
 
-const USERS_DATA = [
-  { login: 'admin', fullName: 'Администратор Системы', profession: 'System Administrator', accountRole: 'admin' },
-  { login: 'ivanov', fullName: 'Иванов Алексей Петрович', profession: 'Frontend Developer', accountRole: 'member' },
-  { login: 'petrova', fullName: 'Петрова Мария Сергеевна', profession: 'Backend Developer', accountRole: 'member' },
-  { login: 'sidorov', fullName: 'Сидоров Дмитрий Андреевич', profession: 'Fullstack Developer', accountRole: 'member' },
-  { login: 'kuznetsova', fullName: 'Кузнецова Анна Игоревна', profession: 'UI/UX Designer', accountRole: 'member' },
-  { login: 'volkov', fullName: 'Волков Никита Олегович', profession: 'DevOps Engineer', accountRole: 'member' },
-  { login: 'morozova', fullName: 'Морозова Елена Викторовна', profession: 'QA Engineer', accountRole: 'member' },
-  { login: 'novikov', fullName: 'Новиков Артём Дмитриевич', profession: 'Project Manager', accountRole: 'member' },
-  { login: 'fedorova', fullName: 'Фёдорова Ольга Александровна', profession: 'Data Analyst', accountRole: 'member' },
-  { login: 'sokolov', fullName: 'Соколов Кирилл Максимович', profession: 'Mobile Developer', accountRole: 'member' },
-  { login: 'kozlova', fullName: 'Козлова Дарья Романовна', profession: 'Tech Writer', accountRole: 'member' },
-  { login: 'lebedev', fullName: 'Лебедев Павел Станиславович', profession: 'System Analyst', accountRole: 'member' },
-  { login: 'egorova', fullName: 'Егорова Виктория Николаевна', profession: 'Scrum Master', accountRole: 'member' },
-  { login: 'popov', fullName: 'Попов Роман Юрьевич', profession: 'Backend Developer', accountRole: 'member' },
-  { login: 'vasilev', fullName: 'Васильев Иван Сергеевич', profession: 'Frontend Developer', accountRole: 'member' },
-  { login: 'smirnova', fullName: 'Смирнова Наталья Павловна', profession: 'QA Lead', accountRole: 'member' },
-  { login: 'orlov', fullName: 'Орлов Максим Алексеевич', profession: 'Database Admin', accountRole: 'member' },
-  { login: 'andreeva', fullName: 'Андреева Светлана Вадимовна', profession: 'Product Owner', accountRole: 'member' },
-  { login: 'baranov', fullName: 'Баранов Денис Игоревич', profession: 'Security Engineer', accountRole: 'member' },
-  { login: 'nikolaev', fullName: 'Николаев Егор Константинович', profession: 'ML Engineer', accountRole: 'member' },
-  { login: 'observer1', fullName: 'Зайцев Владимир Петрович', profession: 'Stakeholder', accountRole: 'member' },
-  { login: 'observer2', fullName: 'Белова Ирина Олеговна', profession: 'Investor Relations', accountRole: 'member' },
-  { login: 'guest1', fullName: 'Гостев Тимофей Сергеевич', profession: '', accountRole: 'guest' },
+const HISTORY_TASK_ACTIONS = [
+  'Refactor',
+  'Ship',
+  'Document',
+  'Automate',
+  'Stabilize',
+  'Backfill',
+  'Tune',
+  'Rework',
+  'Optimize',
+  'Validate',
+] as const;
+
+const HISTORY_TASK_OBJECTS = [
+  'access rules',
+  'notification flow',
+  'search indexing',
+  'dashboard widget',
+  'release checklist',
+  'sync pipeline',
+  'report export',
+  'permission matrix',
+  'integration contract',
+  'deployment profile',
+] as const;
+
+const CURRENT_TASK_ACTIONS = [
+  'Prepare',
+  'Implement',
+  'Review',
+  'Stabilize',
+  'Extend',
+  'Verify',
+  'Coordinate',
+  'Rework',
+  'Tune',
+  'Measure',
+] as const;
+
+const CURRENT_TASK_OBJECTS = [
+  'release cut',
+  'monitoring pack',
+  'rollback playbook',
+  'feature flag rollout',
+  'import queue',
+  'data contract',
+  'regression batch',
+  'vendor mapping',
+  'SLA dashboard',
+  'capacity report',
+  'handoff checklist',
+  'priority lane',
+  'notification rules',
+  'audit trail',
+  'status digest',
+] as const;
+
+type SeedUser = {
+  login: string;
+  fullName: string;
+  profession: string;
+  accountRole: 'admin' | 'member';
+};
+
+const CORE_USERS: SeedUser[] = [
+  {
+    login: 'admin',
+    fullName: 'System Administrator',
+    profession: 'Platform Administrator',
+    accountRole: 'admin',
+  },
+  {
+    login: 'ivanov',
+    fullName: 'Alexey Ivanov',
+    profession: 'Frontend Developer',
+    accountRole: 'member',
+  },
+  {
+    login: 'petrova',
+    fullName: 'Maria Petrova',
+    profession: 'Backend Developer',
+    accountRole: 'member',
+  },
+  {
+    login: 'sidorov',
+    fullName: 'Dmitry Sidorov',
+    profession: 'Fullstack Developer',
+    accountRole: 'member',
+  },
+  {
+    login: 'kuznetsova',
+    fullName: 'Anna Kuznetsova',
+    profession: 'UX Designer',
+    accountRole: 'member',
+  },
+  {
+    login: 'volkov',
+    fullName: 'Nikita Volkov',
+    profession: 'DevOps Engineer',
+    accountRole: 'member',
+  },
+  {
+    login: 'morozova',
+    fullName: 'Elena Morozova',
+    profession: 'QA Engineer',
+    accountRole: 'member',
+  },
+  {
+    login: 'novikov',
+    fullName: 'Artem Novikov',
+    profession: 'Project Manager',
+    accountRole: 'member',
+  },
+  {
+    login: 'fedorova',
+    fullName: 'Olga Fedorova',
+    profession: 'Data Analyst',
+    accountRole: 'member',
+  },
+  {
+    login: 'sokolov',
+    fullName: 'Kirill Sokolov',
+    profession: 'Mobile Developer',
+    accountRole: 'member',
+  },
+  {
+    login: 'kozlova',
+    fullName: 'Daria Kozlova',
+    profession: 'Technical Writer',
+    accountRole: 'member',
+  },
+  {
+    login: 'lebedev',
+    fullName: 'Pavel Lebedev',
+    profession: 'System Analyst',
+    accountRole: 'member',
+  },
+  {
+    login: 'egorova',
+    fullName: 'Victoria Egorova',
+    profession: 'Scrum Master',
+    accountRole: 'member',
+  },
+  {
+    login: 'popov',
+    fullName: 'Roman Popov',
+    profession: 'Backend Developer',
+    accountRole: 'member',
+  },
+  {
+    login: 'vasilev',
+    fullName: 'Ivan Vasilev',
+    profession: 'Frontend Developer',
+    accountRole: 'member',
+  },
+  {
+    login: 'smirnova',
+    fullName: 'Natalia Smirnova',
+    profession: 'QA Lead',
+    accountRole: 'member',
+  },
+  {
+    login: 'orlov',
+    fullName: 'Maxim Orlov',
+    profession: 'Database Administrator',
+    accountRole: 'member',
+  },
+  {
+    login: 'andreeva',
+    fullName: 'Svetlana Andreeva',
+    profession: 'Product Owner',
+    accountRole: 'member',
+  },
+  {
+    login: 'baranov',
+    fullName: 'Denis Baranov',
+    profession: 'Security Engineer',
+    accountRole: 'member',
+  },
+  {
+    login: 'nikolaev',
+    fullName: 'Egor Nikolaev',
+    profession: 'ML Engineer',
+    accountRole: 'member',
+  },
+  {
+    login: 'observer1',
+    fullName: 'Vladimir Zaitsev',
+    profession: 'Stakeholder',
+    accountRole: 'member',
+  },
+  {
+    login: 'observer2',
+    fullName: 'Irina Belova',
+    profession: 'Investor Relations',
+    accountRole: 'member',
+  },
 ];
 
-interface TeamDef {
+const TEAM_CATALOG: Array<{
   name: string;
   description: string;
-  ownerIdx: number;
-  members: { userIdx: number; teamRole: string }[];
-  projects: ProjectDef[];
-}
-
-interface ProjectDef {
-  name: string;
-  description: string;
-  status: string;
-  members: { userIdx: number; role: string }[];
-  tasks: TaskDef[];
-}
-
-interface TaskDef {
-  name: string;
-  description: string;
-  difficulty: number;
-  status: string;
-  assigneeUserIdx: number | null;
-  deadlineDaysFromNow: number;
-}
-
-const TEAMS: TeamDef[] = [
+  focus: string;
+}> = [
   {
     name: 'Frontend Core',
-    description: 'Команда фронтенд-разработки: React, TypeScript, UI-компоненты',
-    ownerIdx: 1,
-    members: [
-      { userIdx: 4, teamRole: 'member' },
-      { userIdx: 14, teamRole: 'member' },
-      { userIdx: 6, teamRole: 'member' },
-      { userIdx: 20, teamRole: 'observer' },
-    ],
-    projects: [
-      {
-        name: 'UI Component Library',
-        description: 'Библиотека переиспользуемых UI-компонентов на React',
-        status: 'active',
-        members: [
-          { userIdx: 1, role: 'team_lead' },
-          { userIdx: 4, role: 'developer' },
-          { userIdx: 14, role: 'developer' },
-          { userIdx: 20, role: 'observer' },
-        ],
-        tasks: [
-          { name: 'Создать компонент Button', description: 'Варианты: primary, secondary, ghost, danger', difficulty: 2, status: 'done', assigneeUserIdx: 4, deadlineDaysFromNow: -5 },
-          { name: 'Создать компонент Modal', description: 'Модальное окно с анимацией и overlay', difficulty: 3, status: 'done', assigneeUserIdx: 14, deadlineDaysFromNow: -3 },
-          { name: 'Компонент DataTable', description: 'Таблица с сортировкой, фильтрацией и пагинацией', difficulty: 5, status: 'in_progress', assigneeUserIdx: 1, deadlineDaysFromNow: 14 },
-          { name: 'Компонент DatePicker', description: 'Выбор даты и времени с поддержкой диапазонов', difficulty: 4, status: 'in_progress', assigneeUserIdx: 4, deadlineDaysFromNow: 10 },
-          { name: 'Компонент Toast/Notification', description: 'Всплывающие уведомления с auto-dismiss', difficulty: 2, status: 'new', assigneeUserIdx: 14, deadlineDaysFromNow: 21 },
-          { name: 'Написать Storybook stories', description: 'Документация для всех компонентов в Storybook', difficulty: 3, status: 'new', assigneeUserIdx: null, deadlineDaysFromNow: 30 },
-        ],
-      },
-      {
-        name: 'Landing Page Redesign',
-        description: 'Редизайн посадочной страницы продукта',
-        status: 'active',
-        members: [
-          { userIdx: 4, role: 'team_lead' },
-          { userIdx: 14, role: 'developer' },
-          { userIdx: 6, role: 'developer' },
-        ],
-        tasks: [
-          { name: 'Дизайн макета Hero секции', description: 'Новый hero-блок с анимацией', difficulty: 3, status: 'done', assigneeUserIdx: 4, deadlineDaysFromNow: -10 },
-          { name: 'Адаптивная вёрстка', description: 'Mobile-first адаптация всех секций', difficulty: 4, status: 'in_progress', assigneeUserIdx: 14, deadlineDaysFromNow: 7 },
-          { name: 'Интеграция с аналитикой', description: 'Google Analytics 4 + Яндекс.Метрика', difficulty: 2, status: 'new', assigneeUserIdx: 6, deadlineDaysFromNow: 14 },
-          { name: 'SEO-оптимизация', description: 'Meta-теги, OpenGraph, структурированные данные', difficulty: 3, status: 'new', assigneeUserIdx: null, deadlineDaysFromNow: 21 },
-          { name: 'Тестирование на кросс-браузерность', description: 'Chrome, Firefox, Safari, Edge', difficulty: 2, status: 'new', assigneeUserIdx: 6, deadlineDaysFromNow: 18 },
-        ],
-      },
-    ],
+    description: 'React applications, design surface and interaction quality.',
+    focus: 'frontend delivery',
   },
   {
     name: 'Backend Platform',
-    description: 'Серверная разработка: NestJS, API, микросервисы',
-    ownerIdx: 2,
-    members: [
-      { userIdx: 3, teamRole: 'member' },
-      { userIdx: 13, teamRole: 'member' },
-      { userIdx: 16, teamRole: 'member' },
-      { userIdx: 21, teamRole: 'observer' },
-    ],
-    projects: [
-      {
-        name: 'REST API v2',
-        description: 'Разработка нового API с улучшенной архитектурой',
-        status: 'active',
-        members: [
-          { userIdx: 2, role: 'team_lead' },
-          { userIdx: 3, role: 'developer' },
-          { userIdx: 13, role: 'developer' },
-          { userIdx: 16, role: 'developer' },
-          { userIdx: 21, role: 'observer' },
-        ],
-        tasks: [
-          { name: 'Миграция на Prisma ORM', description: 'Перевод слоя данных с JSON на PostgreSQL через Prisma', difficulty: 5, status: 'done', assigneeUserIdx: 2, deadlineDaysFromNow: -15 },
-          { name: 'Реализовать пагинацию cursor-based', description: 'Keyset pagination для больших датасетов', difficulty: 4, status: 'in_progress', assigneeUserIdx: 3, deadlineDaysFromNow: 10 },
-          { name: 'Rate limiting по API key', description: 'Индивидуальные лимиты для каждого клиента', difficulty: 3, status: 'in_progress', assigneeUserIdx: 13, deadlineDaysFromNow: 12 },
-          { name: 'WebSocket нотификации', description: 'Real-time уведомления через Socket.IO', difficulty: 4, status: 'new', assigneeUserIdx: 16, deadlineDaysFromNow: 25 },
-          { name: 'Кэширование Redis', description: 'Кэш для частых запросов (списки, справочники)', difficulty: 4, status: 'new', assigneeUserIdx: 3, deadlineDaysFromNow: 20 },
-          { name: 'Health checks и метрики', description: 'Prometheus метрики + health endpoint', difficulty: 2, status: 'review', assigneeUserIdx: 16, deadlineDaysFromNow: 5 },
-          { name: 'API versioning', description: 'Поддержка v1/v2 через URL prefix', difficulty: 3, status: 'new', assigneeUserIdx: null, deadlineDaysFromNow: 30 },
-        ],
-      },
-    ],
+    description: 'Public API, auth flows and service contracts.',
+    focus: 'backend platform',
   },
   {
-    name: 'DevOps & Infrastructure',
-    description: 'CI/CD, мониторинг, инфраструктура, контейнеризация',
-    ownerIdx: 5,
-    members: [
-      { userIdx: 18, teamRole: 'member' },
-      { userIdx: 16, teamRole: 'member' },
-    ],
-    projects: [
-      {
-        name: 'CI/CD Pipeline',
-        description: 'Автоматизация сборки, тестирования и деплоя',
-        status: 'active',
-        members: [
-          { userIdx: 5, role: 'team_lead' },
-          { userIdx: 18, role: 'developer' },
-          { userIdx: 16, role: 'developer' },
-        ],
-        tasks: [
-          { name: 'GitHub Actions workflow', description: 'Build → test → lint → deploy pipeline', difficulty: 4, status: 'done', assigneeUserIdx: 5, deadlineDaysFromNow: -20 },
-          { name: 'Docker multi-stage build', description: 'Оптимизация размера образов', difficulty: 3, status: 'done', assigneeUserIdx: 18, deadlineDaysFromNow: -12 },
-          { name: 'Kubernetes манифесты', description: 'Deployment, Service, Ingress для prod', difficulty: 5, status: 'in_progress', assigneeUserIdx: 5, deadlineDaysFromNow: 15 },
-          { name: 'Настройка Grafana дашборда', description: 'Мониторинг CPU/RAM/latency/errors', difficulty: 3, status: 'new', assigneeUserIdx: 18, deadlineDaysFromNow: 20 },
-          { name: 'SSL сертификаты auto-renew', description: 'Let\'s Encrypt + cert-manager', difficulty: 2, status: 'new', assigneeUserIdx: 16, deadlineDaysFromNow: 25 },
-          { name: 'Backup автоматизация', description: 'Ежедневные бекапы БД в S3', difficulty: 3, status: 'review', assigneeUserIdx: 5, deadlineDaysFromNow: 3 },
-        ],
-      },
-    ],
+    name: 'Mobile Studio',
+    description: 'Mobile release train for iOS and Android experiences.',
+    focus: 'mobile delivery',
   },
   {
-    name: 'QA & Testing',
-    description: 'Тестирование, автоматизация тестов, обеспечение качества',
-    ownerIdx: 15,
-    members: [
-      { userIdx: 6, teamRole: 'member' },
-      { userIdx: 12, teamRole: 'member' },
-      { userIdx: 20, teamRole: 'observer' },
-    ],
-    projects: [
-      {
-        name: 'Test Automation Framework',
-        description: 'Фреймворк для автоматизации E2E тестов',
-        status: 'active',
-        members: [
-          { userIdx: 15, role: 'team_lead' },
-          { userIdx: 6, role: 'developer' },
-          { userIdx: 12, role: 'developer' },
-          { userIdx: 20, role: 'observer' },
-        ],
-        tasks: [
-          { name: 'Playwright setup', description: 'Настройка Playwright для E2E тестирования', difficulty: 3, status: 'done', assigneeUserIdx: 15, deadlineDaysFromNow: -8 },
-          { name: 'Page Object Model', description: 'Создать POM для основных страниц', difficulty: 4, status: 'in_progress', assigneeUserIdx: 6, deadlineDaysFromNow: 8 },
-          { name: 'API тесты (Supertest)', description: 'Покрытие всех endpoints E2E тестами', difficulty: 4, status: 'in_progress', assigneeUserIdx: 12, deadlineDaysFromNow: 12 },
-          { name: 'Тесты безопасности OWASP', description: 'Проверка на основные уязвимости', difficulty: 5, status: 'new', assigneeUserIdx: null, deadlineDaysFromNow: 30 },
-          { name: 'Отчётность Allure', description: 'Интеграция Allure Reporter с CI', difficulty: 2, status: 'new', assigneeUserIdx: 6, deadlineDaysFromNow: 18 },
-        ],
-      },
-    ],
+    name: 'Design System',
+    description: 'Shared components, accessibility and brand consistency.',
+    focus: 'design system',
   },
   {
-    name: 'Mobile Team',
-    description: 'Мобильная разработка: React Native, iOS, Android',
-    ownerIdx: 9,
-    members: [
-      { userIdx: 3, teamRole: 'member' },
-      { userIdx: 14, teamRole: 'member' },
-      { userIdx: 4, teamRole: 'member' },
-    ],
-    projects: [
-      {
-        name: 'Мобильное приложение v1',
-        description: 'Мобильный клиент управления задачами на React Native',
-        status: 'active',
-        members: [
-          { userIdx: 9, role: 'team_lead' },
-          { userIdx: 3, role: 'developer' },
-          { userIdx: 14, role: 'developer' },
-          { userIdx: 4, role: 'developer' },
-        ],
-        tasks: [
-          { name: 'Экран авторизации', description: 'Login/Register с biometric auth', difficulty: 3, status: 'done', assigneeUserIdx: 9, deadlineDaysFromNow: -14 },
-          { name: 'Список задач', description: 'Экран со списком задач, pull-to-refresh, infinite scroll', difficulty: 4, status: 'done', assigneeUserIdx: 3, deadlineDaysFromNow: -7 },
-          { name: 'Push-уведомления', description: 'Firebase Cloud Messaging для Android и iOS', difficulty: 4, status: 'in_progress', assigneeUserIdx: 14, deadlineDaysFromNow: 10 },
-          { name: 'Оффлайн режим', description: 'SQLite + синхронизация при подключении', difficulty: 5, status: 'new', assigneeUserIdx: 3, deadlineDaysFromNow: 28 },
-          { name: 'Тёмная тема', description: 'Dark mode с системными настройками', difficulty: 2, status: 'in_progress', assigneeUserIdx: 4, deadlineDaysFromNow: 6 },
-          { name: 'Экран календаря', description: 'Календарь событий с drag-and-drop', difficulty: 4, status: 'new', assigneeUserIdx: 9, deadlineDaysFromNow: 21 },
-        ],
-      },
-    ],
+    name: 'QA Automation',
+    description: 'Regression coverage and release quality assurance.',
+    focus: 'quality automation',
   },
   {
-    name: 'Data & Analytics',
-    description: 'Аналитика, отчёты, работа с данными, BI',
-    ownerIdx: 8,
-    members: [
-      { userIdx: 19, teamRole: 'member' },
-      { userIdx: 11, teamRole: 'member' },
-    ],
-    projects: [
-      {
-        name: 'Analytics Dashboard',
-        description: 'Дашборд с метриками продукта и аналитикой',
-        status: 'active',
-        members: [
-          { userIdx: 8, role: 'team_lead' },
-          { userIdx: 19, role: 'developer' },
-          { userIdx: 11, role: 'developer' },
-        ],
-        tasks: [
-          { name: 'KPI виджеты', description: 'Карточки с ключевыми показателями', difficulty: 3, status: 'done', assigneeUserIdx: 8, deadlineDaysFromNow: -6 },
-          { name: 'Графики активности', description: 'Chart.js графики: задачи по дням, burndown', difficulty: 4, status: 'in_progress', assigneeUserIdx: 19, deadlineDaysFromNow: 8 },
-          { name: 'Экспорт в CSV/PDF', description: 'Выгрузка отчётов в разных форматах', difficulty: 3, status: 'new', assigneeUserIdx: 11, deadlineDaysFromNow: 16 },
-          { name: 'Фильтры по периоду', description: 'Выбор периода: неделя/месяц/квартал/custom', difficulty: 2, status: 'in_progress', assigneeUserIdx: 8, deadlineDaysFromNow: 5 },
-          { name: 'Email отчёты', description: 'Автоматическая рассылка еженедельных отчётов', difficulty: 4, status: 'new', assigneeUserIdx: null, deadlineDaysFromNow: 28 },
-        ],
-      },
-    ],
+    name: 'DevOps Reliability',
+    description: 'Build pipelines, environments and observability.',
+    focus: 'platform reliability',
   },
   {
-    name: 'Security Team',
-    description: 'Информационная безопасность, аудит, compliance',
-    ownerIdx: 18,
-    members: [
-      { userIdx: 5, teamRole: 'member' },
-      { userIdx: 13, teamRole: 'member' },
-      { userIdx: 21, teamRole: 'observer' },
-    ],
-    projects: [
-      {
-        name: 'Security Audit 2026',
-        description: 'Комплексный аудит безопасности системы',
-        status: 'active',
-        members: [
-          { userIdx: 18, role: 'team_lead' },
-          { userIdx: 5, role: 'developer' },
-          { userIdx: 13, role: 'developer' },
-          { userIdx: 21, role: 'observer' },
-        ],
-        tasks: [
-          { name: 'Pentest веб-приложения', description: 'Тестирование на проникновение: XSS, CSRF, SQLi', difficulty: 5, status: 'in_progress', assigneeUserIdx: 18, deadlineDaysFromNow: 14 },
-          { name: 'Ревью JWT реализации', description: 'Проверка безопасности токенов, ротация, хранение', difficulty: 4, status: 'done', assigneeUserIdx: 13, deadlineDaysFromNow: -4 },
-          { name: 'RBAC аудит', description: 'Проверка корректности разграничения прав', difficulty: 3, status: 'in_progress', assigneeUserIdx: 5, deadlineDaysFromNow: 10 },
-          { name: 'Логирование security events', description: 'Мониторинг подозрительной активности', difficulty: 4, status: 'new', assigneeUserIdx: 18, deadlineDaysFromNow: 22 },
-          { name: 'Compliance checklist', description: 'Подготовка документации соответствия стандартам', difficulty: 2, status: 'new', assigneeUserIdx: null, deadlineDaysFromNow: 30 },
-          { name: 'Dependency audit', description: 'npm audit + Snyk сканирование зависимостей', difficulty: 2, status: 'review', assigneeUserIdx: 5, deadlineDaysFromNow: 3 },
-        ],
-      },
-    ],
+    name: 'Data Warehouse',
+    description: 'Ingestion pipelines, marts and reporting storage.',
+    focus: 'data platform',
   },
   {
-    name: 'Product Management',
-    description: 'Управление продуктом, roadmap, приоритизация',
-    ownerIdx: 7,
-    members: [
-      { userIdx: 17, teamRole: 'member' },
-      { userIdx: 12, teamRole: 'member' },
-      { userIdx: 10, teamRole: 'member' },
-    ],
-    projects: [
-      {
-        name: 'Product Roadmap Q2 2026',
-        description: 'Планирование функционала на второй квартал',
-        status: 'active',
-        members: [
-          { userIdx: 7, role: 'team_lead' },
-          { userIdx: 17, role: 'developer' },
-          { userIdx: 12, role: 'developer' },
-          { userIdx: 10, role: 'developer' },
-        ],
-        tasks: [
-          { name: 'Анализ обратной связи', description: 'Систематизация фидбэка от пользователей', difficulty: 2, status: 'done', assigneeUserIdx: 7, deadlineDaysFromNow: -10 },
-          { name: 'Приоритизация фич (RICE)', description: 'Скоринг backlog методом RICE', difficulty: 3, status: 'done', assigneeUserIdx: 17, deadlineDaysFromNow: -5 },
-          { name: 'User Story Mapping', description: 'Карта пользовательских историй для Q2', difficulty: 3, status: 'in_progress', assigneeUserIdx: 12, deadlineDaysFromNow: 7 },
-          { name: 'Конкурентный анализ', description: 'Сравнение с Jira, Asana, ClickUp, Notion', difficulty: 3, status: 'in_progress', assigneeUserIdx: 10, deadlineDaysFromNow: 10 },
-          { name: 'OKR планирование', description: 'Objectives and Key Results для команды', difficulty: 2, status: 'new', assigneeUserIdx: 7, deadlineDaysFromNow: 14 },
-          { name: 'Презентация для стейкхолдеров', description: 'Подготовка квартального отчёта', difficulty: 2, status: 'new', assigneeUserIdx: 17, deadlineDaysFromNow: 20 },
-        ],
-      },
-    ],
+    name: 'Product Analytics',
+    description: 'Dashboards, experiments and product insight flows.',
+    focus: 'product analytics',
   },
   {
-    name: 'AI & ML',
-    description: 'Машинное обучение, модели прогнозирования, data science',
-    ownerIdx: 19,
-    members: [
-      { userIdx: 8, teamRole: 'member' },
-      { userIdx: 11, teamRole: 'member' },
-      { userIdx: 20, teamRole: 'observer' },
-    ],
-    projects: [
-      {
-        name: 'Risk Prediction Model',
-        description: 'ML-модель прогнозирования рисков срыва дедлайнов',
-        status: 'active',
-        members: [
-          { userIdx: 19, role: 'team_lead' },
-          { userIdx: 8, role: 'developer' },
-          { userIdx: 11, role: 'developer' },
-          { userIdx: 20, role: 'observer' },
-        ],
-        tasks: [
-          { name: 'Сбор данных для обучения', description: 'Генерация синтетического датасета (1000+ записей)', difficulty: 3, status: 'done', assigneeUserIdx: 19, deadlineDaysFromNow: -12 },
-          { name: 'Feature engineering', description: 'Выделение признаков: сложность, дедлайн, нагрузка', difficulty: 4, status: 'done', assigneeUserIdx: 8, deadlineDaysFromNow: -7 },
-          { name: 'Обучение Gradient Boosting', description: 'Регрессионная модель для прогноза времени', difficulty: 5, status: 'in_progress', assigneeUserIdx: 19, deadlineDaysFromNow: 10 },
-          { name: 'Logistic Regression классификатор', description: 'Бинарная классификация: срыв/не-срыв', difficulty: 4, status: 'in_progress', assigneeUserIdx: 8, deadlineDaysFromNow: 12 },
-          { name: 'Валидация модели', description: 'Cross-validation, метрики: F1, AUC-ROC, MAE', difficulty: 3, status: 'new', assigneeUserIdx: 11, deadlineDaysFromNow: 18 },
-          { name: 'REST API для inference', description: 'Эндпоинты для получения предсказаний', difficulty: 3, status: 'new', assigneeUserIdx: null, deadlineDaysFromNow: 25 },
-          { name: 'A/B тест rule-based vs ML', description: 'Сравнение текущего stub с ML-моделью', difficulty: 3, status: 'new', assigneeUserIdx: 19, deadlineDaysFromNow: 30 },
-        ],
-      },
-    ],
+    name: 'Security Operations',
+    description: 'Access control, audit readiness and hardening.',
+    focus: 'security operations',
   },
   {
-    name: 'Documentation',
-    description: 'Техническая и пользовательская документация',
-    ownerIdx: 10,
-    members: [
-      { userIdx: 7, teamRole: 'member' },
-      { userIdx: 12, teamRole: 'member' },
-    ],
-    projects: [
-      {
-        name: 'Technical Documentation',
-        description: 'Техническая документация API и архитектуры',
-        status: 'active',
-        members: [
-          { userIdx: 10, role: 'team_lead' },
-          { userIdx: 7, role: 'developer' },
-          { userIdx: 12, role: 'developer' },
-        ],
-        tasks: [
-          { name: 'Swagger полная документация', description: 'Описание всех endpoints с примерами', difficulty: 3, status: 'done', assigneeUserIdx: 10, deadlineDaysFromNow: -8 },
-          { name: 'Архитектурная схема', description: 'Диаграммы C4: контекст, контейнеры, компоненты', difficulty: 3, status: 'in_progress', assigneeUserIdx: 12, deadlineDaysFromNow: 7 },
-          { name: 'Гайд по развёртыванию', description: 'Пошаговая инструкция: Docker, env, миграции', difficulty: 2, status: 'done', assigneeUserIdx: 7, deadlineDaysFromNow: -3 },
-          { name: 'Пользовательская инструкция', description: 'Руководство для конечных пользователей', difficulty: 3, status: 'in_progress', assigneeUserIdx: 10, deadlineDaysFromNow: 14 },
-          { name: 'Changelog и Release Notes', description: 'Автоматизация CHANGELOG из коммитов', difficulty: 2, status: 'new', assigneeUserIdx: null, deadlineDaysFromNow: 21 },
-          { name: 'Contributing guide', description: 'Правила контрибуции в проект', difficulty: 1, status: 'new', assigneeUserIdx: 12, deadlineDaysFromNow: 18 },
-        ],
-      },
-    ],
+    name: 'CRM Integrations',
+    description: 'Customer syncs, partner connectors and lead routing.',
+    focus: 'CRM integrations',
+  },
+  {
+    name: 'Support Automation',
+    description: 'Support tooling and service process optimization.',
+    focus: 'support automation',
+  },
+  {
+    name: 'Marketplace Core',
+    description: 'Catalog, checkout and seller lifecycle services.',
+    focus: 'marketplace operations',
+  },
+  {
+    name: 'Billing Systems',
+    description: 'Payments, invoicing and reconciliation services.',
+    focus: 'billing systems',
+  },
+  {
+    name: 'HR Platform',
+    description: 'Employee lifecycle products and internal workflows.',
+    focus: 'HR systems',
+  },
+  {
+    name: 'Document Flow',
+    description: 'Templates, approvals and document knowledge base.',
+    focus: 'document automation',
+  },
+  {
+    name: 'AI Assistant Lab',
+    description: 'Copilots, semantic search and prompt-driven tools.',
+    focus: 'AI products',
+  },
+  {
+    name: 'Risk Management',
+    description: 'Risk scoring, controls and compliance delivery.',
+    focus: 'risk management',
+  },
+  {
+    name: 'Operations Control',
+    description: 'Dispatching, monitoring and execution discipline.',
+    focus: 'operations control',
+  },
+  {
+    name: 'Growth Experiments',
+    description: 'Funnels, campaigns and experiment lifecycle tooling.',
+    focus: 'growth delivery',
+  },
+  {
+    name: 'Partner Integrations',
+    description: 'Vendor APIs, settlements and external collaboration.',
+    focus: 'partner integrations',
+  },
+  {
+    name: 'Warehouse Digital',
+    description: 'Stock routing, scanners and warehouse visibility.',
+    focus: 'warehouse automation',
+  },
+  {
+    name: 'Enterprise Delivery',
+    description: 'Large-customer rollouts and enterprise change requests.',
+    focus: 'enterprise delivery',
   },
 ];
 
-const EVENT_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
+type TeamBlueprint = {
+  name: string;
+  description: string;
+  focus: string;
+  size: number;
+  ownerIndex: number;
+  memberIndexes: number[];
+};
+
+type CreatedProject = {
+  id: number;
+  name: string;
+  status: string;
+};
+
+type SeedAuditLog = {
+  userId: number;
+  action: string;
+  entityType: string;
+  entityId: number | null;
+  oldValue?: string | null;
+  newValue?: string | null;
+  description: string;
+  timestamp: Date;
+};
+
+type SeedCalendarEvent = {
+  userId: number;
+  projectId: number | null;
+  taskId: number | null;
+  title: string;
+  description: string;
+  startDate: Date;
+  endDate: Date;
+  allDay: boolean;
+  color: string;
+};
+
+type SeedCounters = {
+  teams: number;
+  teamMembers: number;
+  projects: number;
+  projectMembers: number;
+  tasks: number;
+  auditLogs: number;
+  calendarEvents: number;
+};
+
+type TeamSummary = {
+  name: string;
+  size: number;
+  projects: number;
+  cancelledTaskCount: number;
+  cancelledOwnerLogin: string;
+};
+
+function days(value: number): number {
+  return value * 24 * 60 * 60 * 1000;
+}
+
+function addDays(date: Date, value: number): Date {
+  return new Date(date.getTime() + days(value));
+}
+
+function addHours(date: Date, value: number): Date {
+  return new Date(date.getTime() + value * 60 * 60 * 1000);
+}
+
+function withHour(date: Date, hour: number): Date {
+  const next = new Date(date);
+  next.setUTCHours(hour, 0, 0, 0);
+  return next;
+}
+
+function pick<T>(values: readonly T[], seed: number): T {
+  return values[Math.abs(seed) % values.length];
+}
+
+function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function getProjectCount(teamSize: number): number {
+  if (teamSize <= 10) {
+    return 3;
+  }
+  if (teamSize <= 20) {
+    return 4;
+  }
+  if (teamSize <= 30) {
+    return 5;
+  }
+  if (teamSize <= 45) {
+    return 6;
+  }
+  return 7;
+}
+
+function getHistoryProjectCount(projectCount: number): number {
+  return projectCount >= 6 ? 3 : 2;
+}
+
+function getHistoryDistribution(historyProjectCount: number): number[] {
+  return historyProjectCount === 2 ? [8, 7] : [5, 5, 5];
+}
+
+function getCurrentTaskTarget(
+  teamSize: number,
+  currentProjectIndex: number,
+): number {
+  return Math.max(6, Math.ceil(teamSize / 6) + currentProjectIndex + 3);
+}
+
+function buildUsers(): SeedUser[] {
+  if (CORE_USERS.length > TOTAL_USERS) {
+    throw new Error('CORE_USERS is larger than TOTAL_USERS.');
+  }
+
+  const generatedUsers: SeedUser[] = [];
+  const generatedCount = TOTAL_USERS - CORE_USERS.length;
+
+  for (let index = 0; index < generatedCount; index += 1) {
+    const firstName = FIRST_NAMES[index % FIRST_NAMES.length];
+    const lastName = LAST_NAMES[Math.floor(index / FIRST_NAMES.length)];
+
+    generatedUsers.push({
+      login: `member${String(index + 1).padStart(3, '0')}`,
+      fullName: `${firstName} ${lastName}`,
+      profession: pick(PROFESSIONS, index),
+      accountRole: 'member',
+    });
+  }
+
+  return [...CORE_USERS, ...generatedUsers];
+}
+
+function buildTeamBlueprints(userCount: number): TeamBlueprint[] {
+  if (TEAM_CATALOG.length !== TEAM_SIZES.length) {
+    throw new Error('TEAM_CATALOG and TEAM_SIZES must have the same size.');
+  }
+
+  if (TEAM_CATALOG.length !== TEAM_OWNER_INDEXES.length) {
+    throw new Error('TEAM_OWNER_INDEXES must align with TEAM_CATALOG.');
+  }
+
+  const rosters = buildTeamRosters(
+    userCount,
+    [...TEAM_SIZES],
+    [...TEAM_OWNER_INDEXES],
+  );
+
+  return TEAM_CATALOG.map((team, index) => ({
+    ...team,
+    size: TEAM_SIZES[index],
+    ownerIndex: TEAM_OWNER_INDEXES[index],
+    memberIndexes: rosters[index],
+  }));
+}
+
+function buildTeamRosters(
+  userCount: number,
+  teamSizes: number[],
+  ownerIndexes: number[],
+): number[][] {
+  const rosters: number[][] = [];
+  let cursor = 0;
+
+  for (let teamIndex = 0; teamIndex < teamSizes.length; teamIndex += 1) {
+    const teamSize = teamSizes[teamIndex];
+    const ownerIndex = ownerIndexes[teamIndex];
+    const roster: number[] = [ownerIndex];
+    let offset = 0;
+
+    while (roster.length < teamSize) {
+      const candidate = (cursor + offset) % userCount;
+      if (!roster.includes(candidate)) {
+        roster.push(candidate);
+      }
+      offset += 1;
+    }
+
+    rosters.push(roster);
+    cursor = (cursor + Math.max(3, Math.floor(teamSize * 0.6))) % userCount;
+  }
+
+  ensureFullCoverage(rosters, userCount, ownerIndexes);
+  return rosters;
+}
+
+function ensureFullCoverage(
+  rosters: number[][],
+  userCount: number,
+  ownerIndexes: number[],
+): void {
+  const frequencies = new Map<number, number>();
+
+  const adjustFrequency = (userIndex: number, delta: number) => {
+    frequencies.set(userIndex, (frequencies.get(userIndex) ?? 0) + delta);
+  };
+
+  for (const roster of rosters) {
+    for (const userIndex of roster) {
+      adjustFrequency(userIndex, 1);
+    }
+  }
+
+  const uncovered: number[] = [];
+  for (let userIndex = 0; userIndex < userCount; userIndex += 1) {
+    if (!frequencies.has(userIndex)) {
+      uncovered.push(userIndex);
+    }
+  }
+
+  for (const uncoveredUserIndex of uncovered) {
+    let injected = false;
+
+    for (
+      let teamIndex = rosters.length - 1;
+      teamIndex >= 0 && !injected;
+      teamIndex -= 1
+    ) {
+      const roster = rosters[teamIndex];
+
+      if (roster.includes(uncoveredUserIndex)) {
+        injected = true;
+        break;
+      }
+
+      for (let position = roster.length - 1; position >= 0; position -= 1) {
+        const candidate = roster[position];
+
+        if (candidate === ownerIndexes[teamIndex]) {
+          continue;
+        }
+
+        if ((frequencies.get(candidate) ?? 0) <= 1) {
+          continue;
+        }
+
+        roster[position] = uncoveredUserIndex;
+        adjustFrequency(candidate, -1);
+        adjustFrequency(uncoveredUserIndex, 1);
+        injected = true;
+        break;
+      }
+    }
+
+    if (!injected) {
+      throw new Error(
+        `Failed to inject uncovered user index ${uncoveredUserIndex}.`,
+      );
+    }
+  }
+}
+
+function buildProjectName(
+  team: TeamBlueprint,
+  projectIndex: number,
+  historyProjectCount: number,
+): string {
+  if (projectIndex === 0) {
+    return `${team.name} Foundation`;
+  }
+
+  if (projectIndex === 1) {
+    return `${team.name} Stabilization`;
+  }
+
+  if (projectIndex === 2 && historyProjectCount === 3) {
+    return `${team.name} Migration`;
+  }
+
+  return `${team.name} Delivery Stream ${projectIndex - historyProjectCount + 1}`;
+}
+
+function buildProjectDescription(
+  team: TeamBlueprint,
+  projectName: string,
+  status: string,
+): string {
+  return `${projectName} for ${team.focus}. Seeded status: ${status}.`;
+}
+
+function buildProjectStatus(
+  projectIndex: number,
+  historyProjectCount: number,
+  currentProjectIndex: number,
+  currentProjectCount: number,
+): string {
+  if (projectIndex < historyProjectCount) {
+    if (projectIndex === 1) {
+      return 'archived';
+    }
+    return 'completed';
+  }
+
+  if (
+    currentProjectCount > 1 &&
+    currentProjectIndex === currentProjectCount - 1
+  ) {
+    return 'on_hold';
+  }
+
+  return 'active';
+}
+
+function buildHistoricalTaskName(assigneeName: string, seed: number): string {
+  const shortName = assigneeName.split(' ')[0];
+  const sequence = String((seed % 90) + 10).padStart(2, '0');
+  return `${pick(HISTORY_TASK_ACTIONS, seed)} ${pick(HISTORY_TASK_OBJECTS, seed + 3)} ${sequence} for ${shortName}`;
+}
+
+function buildHistoricalTaskDescription(
+  team: TeamBlueprint,
+  projectName: string,
+  assigneeName: string,
+): string {
+  return `${assigneeName} closed this task during ${projectName} while delivering ${team.focus}.`;
+}
+
+function buildCurrentTaskName(status: string, seed: number): string {
+  const statusSuffix =
+    status === 'cancelled'
+      ? 'recovery'
+      : status === 'review'
+        ? 'validation'
+        : status === 'done'
+          ? 'wrap-up'
+          : 'execution';
+
+  return `${pick(CURRENT_TASK_ACTIONS, seed)} ${pick(CURRENT_TASK_OBJECTS, seed + 5)} ${statusSuffix} ${((seed % 7) + 1).toString()}`;
+}
+
+function buildCurrentTaskDescription(
+  team: TeamBlueprint,
+  projectName: string,
+  status: string,
+): string {
+  return `Current ${status} task for ${projectName} in ${team.name}, focused on ${team.focus}.`;
+}
+
+function queueAuditLog(
+  buffer: SeedAuditLog[],
+  counters: SeedCounters,
+  entry: SeedAuditLog,
+): void {
+  buffer.push(entry);
+  counters.auditLogs += 1;
+}
+
+function queueCalendarEvent(
+  buffer: SeedCalendarEvent[],
+  counters: SeedCounters,
+  entry: SeedCalendarEvent,
+): void {
+  buffer.push(entry);
+  counters.calendarEvents += 1;
+}
+
+async function flushAuditLogs(buffer: SeedAuditLog[]): Promise<void> {
+  while (buffer.length > 0) {
+    const batch = buffer.splice(0, 500);
+    await prisma.auditLog.createMany({ data: batch });
+  }
+}
+
+async function flushCalendarEvents(buffer: SeedCalendarEvent[]): Promise<void> {
+  while (buffer.length > 0) {
+    const batch = buffer.splice(0, 500);
+    await prisma.calendarEvent.createMany({ data: batch });
+  }
+}
+
+function queueProjectLifecycleLogs(
+  auditBuffer: SeedAuditLog[],
+  counters: SeedCounters,
+  ownerId: number,
+  projectId: number,
+  projectName: string,
+  status: string,
+  createdAt: Date,
+): void {
+  queueAuditLog(auditBuffer, counters, {
+    userId: ownerId,
+    action: 'create',
+    entityType: 'project',
+    entityId: projectId,
+    description: `Created project "${projectName}".`,
+    timestamp: createdAt,
+  });
+
+  if (status === 'completed' || status === 'archived' || status === 'on_hold') {
+    queueAuditLog(auditBuffer, counters, {
+      userId: ownerId,
+      action: 'update',
+      entityType: 'project',
+      entityId: projectId,
+      oldValue: 'active',
+      newValue: status,
+      description: `Project "${projectName}" moved from active to ${status}.`,
+      timestamp: addDays(createdAt, 14),
+    });
+  }
+}
+
+function queueTaskLifecycleLogs(
+  auditBuffer: SeedAuditLog[],
+  counters: SeedCounters,
+  params: {
+    creatorId: number;
+    assigneeId: number;
+    taskId: number;
+    taskName: string;
+    createdAt: Date;
+    status: string;
+  },
+): void {
+  const { creatorId, assigneeId, taskId, taskName, createdAt, status } = params;
+
+  queueAuditLog(auditBuffer, counters, {
+    userId: creatorId,
+    action: 'create',
+    entityType: 'task',
+    entityId: taskId,
+    description: `Created task "${taskName}".`,
+    timestamp: createdAt,
+  });
+
+  queueAuditLog(auditBuffer, counters, {
+    userId: creatorId,
+    action: 'assign',
+    entityType: 'task',
+    entityId: taskId,
+    description: `Assigned "${taskName}" to user ${assigneeId}.`,
+    timestamp: addHours(createdAt, 2),
+  });
+
+  if (status === 'new') {
+    return;
+  }
+
+  if (status === 'cancelled') {
+    queueAuditLog(auditBuffer, counters, {
+      userId: assigneeId,
+      action: 'status_change',
+      entityType: 'task',
+      entityId: taskId,
+      oldValue: 'new',
+      newValue: 'cancelled',
+      description: `Task "${taskName}" moved from new to cancelled.`,
+      timestamp: addDays(createdAt, 2),
+    });
+    return;
+  }
+
+  queueAuditLog(auditBuffer, counters, {
+    userId: assigneeId,
+    action: 'status_change',
+    entityType: 'task',
+    entityId: taskId,
+    oldValue: 'new',
+    newValue: 'in_progress',
+    description: `Task "${taskName}" moved from new to in_progress.`,
+    timestamp: addDays(createdAt, 1),
+  });
+
+  if (status === 'in_progress') {
+    return;
+  }
+
+  queueAuditLog(auditBuffer, counters, {
+    userId: assigneeId,
+    action: 'status_change',
+    entityType: 'task',
+    entityId: taskId,
+    oldValue: 'in_progress',
+    newValue: 'review',
+    description: `Task "${taskName}" moved from in_progress to review.`,
+    timestamp: addDays(createdAt, 3),
+  });
+
+  if (status === 'review') {
+    return;
+  }
+
+  queueAuditLog(auditBuffer, counters, {
+    userId: assigneeId,
+    action: 'status_change',
+    entityType: 'task',
+    entityId: taskId,
+    oldValue: 'review',
+    newValue: 'done',
+    description: `Task "${taskName}" moved from review to done.`,
+    timestamp: addDays(createdAt, 5),
+  });
+}
+
+function assertSeedRequirements(
+  users: Array<{ id: number; login: string }>,
+  doneTasksByUser: Map<number, number>,
+  teamSummaries: TeamSummary[],
+): void {
+  const minimumDoneTasks = Math.min(
+    ...users.map((user) => doneTasksByUser.get(user.id) ?? 0),
+  );
+
+  if (teamSummaries.length < 20 || teamSummaries.length > 25) {
+    throw new Error(`Expected 20-25 teams, received ${teamSummaries.length}.`);
+  }
+
+  const invalidTeams = teamSummaries.filter(
+    (team) => team.size < 5 || team.size > 60,
+  );
+  if (invalidTeams.length > 0) {
+    throw new Error(
+      `Found teams with invalid size: ${invalidTeams.map((team) => team.name).join(', ')}`,
+    );
+  }
+
+  const underSeededUsers = users.filter(
+    (user) => (doneTasksByUser.get(user.id) ?? 0) < 15,
+  );
+  if (underSeededUsers.length > 0) {
+    throw new Error(
+      `Users without minimum done history: ${underSeededUsers
+        .slice(0, 10)
+        .map((user) => user.login)
+        .join(', ')}`,
+    );
+  }
+
+  const teamsWithoutCancelledWork = teamSummaries.filter(
+    (team) => team.cancelledTaskCount === 0,
+  );
+  if (teamsWithoutCancelledWork.length > 0) {
+    throw new Error(
+      `Each team needs a failed-task owner, but these teams have none: ${teamsWithoutCancelledWork
+        .map((team) => team.name)
+        .join(', ')}`,
+    );
+  }
+
+  if (minimumDoneTasks < 15) {
+    throw new Error(
+      `Minimum done task history is ${minimumDoneTasks}, expected at least 15.`,
+    );
+  }
+}
+
+async function resetDatabase(): Promise<void> {
+  await prisma.$executeRawUnsafe(`
+    TRUNCATE TABLE
+      "refresh_tokens",
+      "audit_logs",
+      "calendar_events",
+      "task_assignees",
+      "tasks",
+      "project_members",
+      "projects",
+      "team_members",
+      "teams",
+      "users"
+    RESTART IDENTITY CASCADE
+  `);
+}
 
 async function main(): Promise<void> {
-  console.log('Cleaning database...');
-  await prisma.calendarEvent.deleteMany();
-  await prisma.auditLog.deleteMany();
-  await prisma.task.deleteMany();
-  await prisma.projectMember.deleteMany();
-  await prisma.project.deleteMany();
-  await prisma.teamMember.deleteMany();
-  await prisma.team.deleteMany();
-  await prisma.user.deleteMany();
+  console.log('Resetting database...');
+  await resetDatabase();
 
-  await prisma.$executeRawUnsafe(`ALTER SEQUENCE users_id_seq RESTART WITH 1`);
-  await prisma.$executeRawUnsafe(`ALTER SEQUENCE teams_id_seq RESTART WITH 1`);
-  await prisma.$executeRawUnsafe(`ALTER SEQUENCE team_members_id_seq RESTART WITH 1`);
-  await prisma.$executeRawUnsafe(`ALTER SEQUENCE projects_id_seq RESTART WITH 1`);
-  await prisma.$executeRawUnsafe(`ALTER SEQUENCE project_members_id_seq RESTART WITH 1`);
-  await prisma.$executeRawUnsafe(`ALTER SEQUENCE tasks_id_seq RESTART WITH 1`);
-  await prisma.$executeRawUnsafe(`ALTER SEQUENCE audit_logs_id_seq RESTART WITH 1`);
-  await prisma.$executeRawUnsafe(`ALTER SEQUENCE calendar_events_id_seq RESTART WITH 1`);
+  const seedUsers = buildUsers();
+  const teamBlueprints = buildTeamBlueprints(seedUsers.length);
+  const defaultPasswordHash = await argon2.hash(DEFAULT_PASSWORD);
+  const adminPasswordHash = await argon2.hash(ADMIN_PASSWORD);
 
-  console.log('Creating users...');
-  const password = await argon2.hash('Password123!');
-  const adminPassword = await argon2.hash('Admin123!');
+  console.log(`Creating ${seedUsers.length} users...`);
+  await prisma.user.createMany({
+    data: seedUsers.map((user) => ({
+      login: user.login,
+      password:
+        user.accountRole === 'admin' ? adminPasswordHash : defaultPasswordHash,
+      fullName: user.fullName,
+      profession: user.profession,
+      accountStatus: 'active',
+      accountRole: user.accountRole,
+    })),
+  });
 
-  const userIds: number[] = [];
-  for (const u of USERS_DATA) {
-    const created = await prisma.user.create({
-      data: {
-        login: u.login,
-        password: u.login === 'admin' ? adminPassword : password,
-        fullName: u.fullName,
-        profession: u.profession,
-        accountStatus: 'active',
-        accountRole: u.accountRole,
+  const createdUsers = await prisma.user.findMany({
+    where: {
+      login: {
+        in: seedUsers.map((user) => user.login),
       },
-    });
-    userIds.push(created.id);
-  }
-  console.log(`  Created ${userIds.length} users`);
+    },
+    orderBy: { id: 'asc' },
+  });
 
-  let totalTeams = 0;
-  let totalMembers = 0;
-  let totalProjects = 0;
-  let totalTasks = 0;
-  let totalEvents = 0;
+  const usersByIndex = createdUsers;
+  const userNameById = new Map(
+    createdUsers.map((user) => [user.id, user.fullName]),
+  );
+  const userLoginById = new Map(
+    createdUsers.map((user) => [user.id, user.login]),
+  );
+  const doneTasksByUser = new Map(createdUsers.map((user) => [user.id, 0]));
+  const historySeededUsers = new Set<number>();
+  const auditBuffer: SeedAuditLog[] = [];
+  const calendarBuffer: SeedCalendarEvent[] = [];
+  const now = new Date();
+  const counters: SeedCounters = {
+    teams: 0,
+    teamMembers: 0,
+    projects: 0,
+    projectMembers: 0,
+    tasks: 0,
+    auditLogs: 0,
+    calendarEvents: 0,
+  };
+  const teamSummaries: TeamSummary[] = [];
 
-  for (const teamDef of TEAMS) {
-    console.log(`Creating team: ${teamDef.name}...`);
-    const ownerId = userIds[teamDef.ownerIdx];
+  for (const [teamIndex, blueprint] of teamBlueprints.entries()) {
+    const teamOwnerId = usersByIndex[blueprint.ownerIndex].id;
+    const rosterUserIds = blueprint.memberIndexes.map(
+      (memberIndex) => usersByIndex[memberIndex].id,
+    );
+    const observerUserId = rosterUserIds[rosterUserIds.length - 1];
+    const assignableUserIds = rosterUserIds.filter(
+      (userId) => userId !== observerUserId,
+    );
+    const troubledUserId =
+      assignableUserIds.find((userId) => userId !== teamOwnerId) ?? teamOwnerId;
+    const normalCurrentAssignees = assignableUserIds.filter(
+      (userId) => userId !== troubledUserId,
+    );
+
+    console.log(
+      `Seeding team ${teamIndex + 1}/${teamBlueprints.length}: ${blueprint.name} (${blueprint.size} members)`,
+    );
 
     const team = await prisma.team.create({
       data: {
-        name: teamDef.name,
-        description: teamDef.description,
-        createdById: ownerId,
+        name: blueprint.name,
+        description: blueprint.description,
+        createdById: teamOwnerId,
+        createdAt: addDays(now, -(280 - teamIndex * 6)),
       },
     });
-    totalTeams++;
+    counters.teams += 1;
 
-    await prisma.teamMember.create({
-      data: { userId: ownerId, teamId: team.id, teamRole: 'owner' },
+    await prisma.teamMember.createMany({
+      data: rosterUserIds.map((userId) => ({
+        teamId: team.id,
+        userId,
+        teamRole:
+          userId === teamOwnerId
+            ? 'owner'
+            : userId === observerUserId
+              ? 'observer'
+              : 'member',
+      })),
     });
-    totalMembers++;
+    counters.teamMembers += rosterUserIds.length;
 
-    for (const m of teamDef.members) {
-      await prisma.teamMember.create({
-        data: {
-          userId: userIds[m.userIdx],
-          teamId: team.id,
-          teamRole: m.teamRole,
-        },
-      });
-      totalMembers++;
-    }
+    const projectCount = getProjectCount(blueprint.size);
+    const historyProjectCount = getHistoryProjectCount(projectCount);
+    const currentProjectCount = projectCount - historyProjectCount;
+    const projects: CreatedProject[] = [];
 
-    for (const projDef of teamDef.projects) {
+    for (let projectIndex = 0; projectIndex < projectCount; projectIndex += 1) {
+      const currentProjectIndex = projectIndex - historyProjectCount;
+      const status = buildProjectStatus(
+        projectIndex,
+        historyProjectCount,
+        currentProjectIndex,
+        currentProjectCount,
+      );
+      const projectName = buildProjectName(
+        blueprint,
+        projectIndex,
+        historyProjectCount,
+      );
+      const projectCreatedAt =
+        projectIndex < historyProjectCount
+          ? addDays(now, -(240 - teamIndex * 3 - projectIndex * 18))
+          : addDays(now, -(50 - teamIndex + currentProjectIndex * 7));
+
       const project = await prisma.project.create({
         data: {
           teamId: team.id,
-          name: projDef.name,
-          description: projDef.description,
-          status: projDef.status,
+          name: projectName,
+          description: buildProjectDescription(blueprint, projectName, status),
+          status,
+          createdAt: projectCreatedAt,
         },
       });
-      totalProjects++;
 
-      for (const pm of projDef.members) {
-        await prisma.projectMember.create({
-          data: {
-            projectId: project.id,
-            userId: userIds[pm.userIdx],
-            role: pm.role,
-          },
-        });
+      projects.push({
+        id: project.id,
+        name: project.name,
+        status: project.status,
+      });
+      counters.projects += 1;
+
+      await prisma.projectMember.createMany({
+        data: rosterUserIds.map((userId) => ({
+          projectId: project.id,
+          userId,
+          role:
+            userId === teamOwnerId
+              ? 'team_lead'
+              : userId === observerUserId
+                ? 'observer'
+                : 'developer',
+        })),
+      });
+      counters.projectMembers += rosterUserIds.length;
+
+      queueProjectLifecycleLogs(
+        auditBuffer,
+        counters,
+        teamOwnerId,
+        project.id,
+        project.name,
+        project.status,
+        projectCreatedAt,
+      );
+    }
+
+    const historyProjects = projects.slice(0, historyProjectCount);
+    const currentProjects = projects.slice(historyProjectCount);
+    const usersNeedingHistory = rosterUserIds.filter(
+      (userId) => !historySeededUsers.has(userId),
+    );
+
+    for (const [historyUserOffset, userId] of usersNeedingHistory.entries()) {
+      const historyDistribution = getHistoryDistribution(
+        historyProjects.length,
+      );
+      const assigneeName = userNameById.get(userId) ?? `User ${userId}`;
+
+      for (const [
+        historyProjectIndex,
+        taskCount,
+      ] of historyDistribution.entries()) {
+        const project = historyProjects[historyProjectIndex];
+
+        for (let taskIndex = 0; taskIndex < taskCount; taskIndex += 1) {
+          const seed =
+            teamIndex * 10_000 +
+            userId * 100 +
+            historyProjectIndex * 10 +
+            taskIndex;
+          const createdAt = addDays(
+            now,
+            -(220 - ((seed + historyUserOffset) % 90)),
+          );
+          const doneAt = addDays(createdAt, 4 + (seed % 5));
+          const deadline = addDays(doneAt, 1 + (seed % 4));
+          const taskName = buildHistoricalTaskName(assigneeName, seed);
+
+          const task = await prisma.task.create({
+            data: {
+              projectId: project.id,
+              name: taskName,
+              description: buildHistoricalTaskDescription(
+                blueprint,
+                project.name,
+                assigneeName,
+              ),
+              deadline,
+              status: 'done',
+              difficulty: 1 + (seed % 5),
+              createdById: teamOwnerId,
+              createdAt,
+              assignees: {
+                create: {
+                  userId,
+                },
+              },
+            },
+          });
+
+          counters.tasks += 1;
+          doneTasksByUser.set(userId, (doneTasksByUser.get(userId) ?? 0) + 1);
+
+          queueAuditLog(auditBuffer, counters, {
+            userId: teamOwnerId,
+            action: 'create',
+            entityType: 'task',
+            entityId: task.id,
+            description: `Created task "${task.name}".`,
+            timestamp: createdAt,
+          });
+
+          queueAuditLog(auditBuffer, counters, {
+            userId,
+            action: 'assign',
+            entityType: 'task',
+            entityId: task.id,
+            description: `Assigned "${task.name}" to user ${userId}.`,
+            timestamp: addHours(createdAt, 2),
+          });
+
+          queueAuditLog(auditBuffer, counters, {
+            userId,
+            action: 'status_change',
+            entityType: 'task',
+            entityId: task.id,
+            oldValue: 'new',
+            newValue: 'in_progress',
+            description: `Task "${task.name}" moved from new to in_progress.`,
+            timestamp: addDays(createdAt, 1),
+          });
+
+          queueAuditLog(auditBuffer, counters, {
+            userId,
+            action: 'status_change',
+            entityType: 'task',
+            entityId: task.id,
+            oldValue: 'in_progress',
+            newValue: 'review',
+            description: `Task "${task.name}" moved from in_progress to review.`,
+            timestamp: addDays(createdAt, 3),
+          });
+
+          queueAuditLog(auditBuffer, counters, {
+            userId,
+            action: 'status_change',
+            entityType: 'task',
+            entityId: task.id,
+            oldValue: 'review',
+            newValue: 'done',
+            description: `Task "${task.name}" moved from review to done.`,
+            timestamp: doneAt,
+          });
+        }
       }
 
-      for (const taskDef of projDef.tasks) {
-        const deadline =
-          taskDef.deadlineDaysFromNow >= 0
-            ? futureDate(taskDef.deadlineDaysFromNow, taskDef.deadlineDaysFromNow + 2)
-            : pastDate(-taskDef.deadlineDaysFromNow - 2, -taskDef.deadlineDaysFromNow);
+      historySeededUsers.add(userId);
+    }
 
-        const createdAt =
-          taskDef.status === 'done'
-            ? pastDate(20, 30)
-            : taskDef.status === 'in_progress' || taskDef.status === 'review'
-              ? pastDate(7, 15)
-              : pastDate(1, 5);
+    let teamCancelledTaskCount = 0;
 
-        const assigneeUserId = taskDef.assigneeUserIdx !== null ? userIds[taskDef.assigneeUserIdx] : null;
-        const creatorId = userIds[teamDef.ownerIdx];
+    for (const [currentProjectIndex, project] of currentProjects.entries()) {
+      const taskTarget = getCurrentTaskTarget(
+        blueprint.size,
+        currentProjectIndex,
+      );
+      const cancelledCount = Math.max(1, Math.floor(taskTarget / 8));
+      const reviewCount = Math.max(1, Math.floor(taskTarget / 5));
+      const inProgressCount = Math.max(2, Math.floor(taskTarget / 3));
+      const doneCount = Math.max(1, Math.floor(taskTarget / 8));
+      const statusPlan: string[] = [];
+
+      for (let i = 0; i < cancelledCount; i += 1) {
+        statusPlan.push('cancelled');
+      }
+      for (let i = 0; i < reviewCount; i += 1) {
+        statusPlan.push('review');
+      }
+      for (let i = 0; i < inProgressCount; i += 1) {
+        statusPlan.push('in_progress');
+      }
+      for (let i = 0; i < doneCount; i += 1) {
+        statusPlan.push('done');
+      }
+      while (statusPlan.length < taskTarget) {
+        statusPlan.push('new');
+      }
+
+      for (let taskIndex = 0; taskIndex < taskTarget; taskIndex += 1) {
+        const status = statusPlan[taskIndex];
+        const seed = teamIndex * 1_000 + currentProjectIndex * 100 + taskIndex;
+        const assigneeId =
+          status === 'cancelled'
+            ? troubledUserId
+            : normalCurrentAssignees.length > 0
+              ? normalCurrentAssignees[
+                  taskIndex % normalCurrentAssignees.length
+                ]
+              : teamOwnerId;
+        const createdAt = addDays(now, -(18 + ((seed + taskIndex) % 20)));
+        let deadline: Date;
+
+        if (status === 'done') {
+          deadline = addDays(createdAt, 6 + (seed % 5));
+        } else if (status === 'cancelled') {
+          deadline = addDays(createdAt, 4 + (seed % 6));
+        } else if (status === 'review' && taskIndex % 3 === 0) {
+          deadline = addDays(now, -(1 + (taskIndex % 4)));
+        } else if (status === 'in_progress' && taskIndex % 4 === 0) {
+          deadline = addDays(now, -(1 + (taskIndex % 3)));
+        } else {
+          deadline = addDays(now, 3 + ((seed + taskIndex) % 18));
+        }
+
+        const taskName = buildCurrentTaskName(status, seed);
 
         const task = await prisma.task.create({
           data: {
             projectId: project.id,
-            name: taskDef.name,
-            description: taskDef.description,
+            name: taskName,
+            description: buildCurrentTaskDescription(
+              blueprint,
+              project.name,
+              status,
+            ),
             deadline,
-            status: taskDef.status,
-            difficulty: taskDef.difficulty,
-            ...(assigneeUserId !== null && {
-              assignees: { create: { userId: assigneeUserId } },
-            }),
-            createdById: creatorId,
+            status,
+            difficulty: 1 + ((seed + 2) % 5),
+            createdById: teamOwnerId,
             createdAt,
-          },
-        });
-        totalTasks++;
-
-        await prisma.auditLog.create({
-          data: {
-            userId: creatorId,
-            action: 'create',
-            entityType: 'task',
-            entityId: task.id,
-            description: `Создана задача "${task.name}"`,
-            timestamp: createdAt,
+            assignees: {
+              create: {
+                userId: assigneeId,
+              },
+            },
           },
         });
 
-        if (taskDef.status !== 'new') {
-          const transitions: Record<string, string[]> = {
-            in_progress: ['new', 'in_progress'],
-            review: ['new', 'in_progress', 'review'],
-            done: ['new', 'in_progress', 'review', 'done'],
-          };
-          const chain = transitions[taskDef.status];
-          if (chain) {
-            for (let i = 1; i < chain.length; i++) {
-              await prisma.auditLog.create({
-                data: {
-                  userId: assigneeUserId ?? creatorId,
-                  action: 'status_change',
-                  entityType: 'task',
-                  entityId: task.id,
-                  oldValue: chain[i - 1],
-                  newValue: chain[i],
-                  description: `Статус задачи "${task.name}": ${chain[i - 1]} → ${chain[i]}`,
-                  timestamp: new Date(
-                    createdAt.getTime() + days(i * 2),
-                  ),
-                },
-              });
-            }
-          }
+        counters.tasks += 1;
+        if (status === 'done') {
+          doneTasksByUser.set(
+            assigneeId,
+            (doneTasksByUser.get(assigneeId) ?? 0) + 1,
+          );
+        }
+        if (status === 'cancelled') {
+          teamCancelledTaskCount += 1;
         }
 
-        if (assigneeUserId && Math.random() > 0.5) {
-          const eventStart = new Date(deadline.getTime() - days(1));
-          await prisma.calendarEvent.create({
-            data: {
-              userId: assigneeUserId,
-              projectId: project.id,
-              taskId: task.id,
-              title: `Дедлайн: ${taskDef.name}`,
-              description: `Крайний срок задачи "${taskDef.name}"`,
-              startDate: eventStart,
-              endDate: deadline,
-              allDay: true,
-              color: pick(EVENT_COLORS),
-            },
+        queueTaskLifecycleLogs(auditBuffer, counters, {
+          creatorId: teamOwnerId,
+          assigneeId,
+          taskId: task.id,
+          taskName: task.name,
+          createdAt,
+          status,
+        });
+
+        if (status !== 'done' && status !== 'cancelled') {
+          const eventStart = withHour(addDays(deadline, -1), 10);
+          const eventEnd = withHour(deadline, 18);
+
+          queueCalendarEvent(calendarBuffer, counters, {
+            userId: assigneeId,
+            projectId: project.id,
+            taskId: task.id,
+            title: `Deadline: ${task.name}`,
+            description: `Planned deadline for ${task.name}.`,
+            startDate: eventStart,
+            endDate: eventEnd,
+            allDay: true,
+            color: pick(EVENT_COLORS, seed),
           });
-          totalEvents++;
         }
       }
     }
-  }
 
-  console.log('Creating standalone calendar events...');
+    const anchorProjectId = currentProjects[0]?.id ?? historyProjects[0].id;
+    const planningStart = withHour(addDays(now, 2 + (teamIndex % 5)), 10);
+    const reviewStart = withHour(addDays(now, 7 + (teamIndex % 6)), 15);
 
-  const meetingEvents = [
-    { title: 'Daily Standup', desc: 'Ежедневный стендап команды', recurring: 5 },
-    { title: 'Sprint Planning', desc: 'Планирование спринта на 2 недели', recurring: 1 },
-    { title: 'Sprint Retrospective', desc: 'Ретроспектива завершённого спринта', recurring: 1 },
-    { title: 'Code Review Session', desc: 'Совместное код-ревью', recurring: 2 },
-    { title: '1-on-1 с тимлидом', desc: 'Индивидуальная встреча', recurring: 1 },
-    { title: 'Demo для заказчика', desc: 'Демонстрация нового функционала', recurring: 1 },
-    { title: 'Tech Talk: TypeScript', desc: 'Внутренний доклад по advanced TypeScript', recurring: 1 },
-    { title: 'Workshop: Docker', desc: 'Мастер-класс по контейнеризации', recurring: 1 },
-  ];
+    queueCalendarEvent(calendarBuffer, counters, {
+      userId: teamOwnerId,
+      projectId: anchorProjectId,
+      taskId: null,
+      title: `${blueprint.name} planning`,
+      description: `Weekly planning for ${blueprint.name}.`,
+      startDate: planningStart,
+      endDate: addHours(planningStart, 2),
+      allDay: false,
+      color: pick(EVENT_COLORS, teamIndex),
+    });
 
-  for (const evt of meetingEvents) {
-    for (let i = 0; i < evt.recurring; i++) {
-      const userId = userIds[randomBetween(1, 19)];
-      const start = futureDate(i * 3 + 1, i * 3 + 5);
-      start.setHours(randomBetween(9, 16), 0, 0, 0);
-      const durationHours = randomBetween(1, 2);
-      const end = new Date(start.getTime() + durationHours * 60 * 60 * 1000);
+    queueCalendarEvent(calendarBuffer, counters, {
+      userId: troubledUserId,
+      projectId: anchorProjectId,
+      taskId: null,
+      title: `${blueprint.name} risk review`,
+      description: `Risk review session for cancelled and delayed work.`,
+      startDate: reviewStart,
+      endDate: addHours(reviewStart, 1),
+      allDay: false,
+      color: pick(EVENT_COLORS, teamIndex + 9),
+    });
 
-      await prisma.calendarEvent.create({
-        data: {
-          userId,
-          title: evt.title,
-          description: evt.desc,
-          startDate: start,
-          endDate: end,
-          allDay: false,
-          color: pick(EVENT_COLORS),
-        },
-      });
-      totalEvents++;
+    teamSummaries.push({
+      name: blueprint.name,
+      size: blueprint.size,
+      projects: projectCount,
+      cancelledTaskCount: teamCancelledTaskCount,
+      cancelledOwnerLogin:
+        userLoginById.get(troubledUserId) ?? `user-${troubledUserId}`,
+    });
+
+    if (auditBuffer.length >= 500) {
+      await flushAuditLogs(auditBuffer);
+    }
+    if (calendarBuffer.length >= 500) {
+      await flushCalendarEvents(calendarBuffer);
     }
   }
 
-  const personalEvents = [
-    'Отпуск', 'Больничный', 'Обучение', 'Конференция', 'Хакатон',
-    'Собеседование кандидата', 'Подготовка отчёта', 'Обновление документации',
-  ];
-
-  for (const title of personalEvents) {
-    const userId = userIds[randomBetween(1, 19)];
-    const start = futureDate(1, 30);
-    const isAllDay = Math.random() > 0.5;
-
-    if (isAllDay) {
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(start.getTime() + days(randomBetween(1, 3)));
-      await prisma.calendarEvent.create({
-        data: {
-          userId,
-          title,
-          description: '',
-          startDate: start,
-          endDate: end,
-          allDay: true,
-          color: pick(EVENT_COLORS),
-        },
-      });
-    } else {
-      start.setHours(randomBetween(9, 17), 0, 0, 0);
-      const end = new Date(start.getTime() + randomBetween(1, 3) * 60 * 60 * 1000);
-      await prisma.calendarEvent.create({
-        data: {
-          userId,
-          title,
-          description: '',
-          startDate: start,
-          endDate: end,
-          allDay: false,
-          color: pick(EVENT_COLORS),
-        },
-      });
-    }
-    totalEvents++;
-  }
-
-  for (let i = 0; i < userIds.length - 1; i++) {
-    await prisma.auditLog.create({
-      data: {
-        userId: userIds[i],
-        action: 'login',
-        entityType: 'auth',
-        entityId: null,
-        description: `Пользователь ${USERS_DATA[i].login} вошёл в систему`,
-        timestamp: pastDate(0, 3),
-      },
+  for (const user of createdUsers) {
+    queueAuditLog(auditBuffer, counters, {
+      userId: user.id,
+      action: 'login',
+      entityType: 'auth',
+      entityId: null,
+      description: `User ${user.login} signed in.`,
+      timestamp: addDays(now, -((user.id % 6) + 1)),
     });
   }
 
-  console.log('\n── Seed complete ──');
-  console.log(`  Users:           ${userIds.length}`);
-  console.log(`  Teams:           ${totalTeams}`);
-  console.log(`  Team Members:    ${totalMembers}`);
-  console.log(`  Projects:        ${totalProjects}`);
-  console.log(`  Tasks:           ${totalTasks}`);
-  console.log(`  Calendar Events: ${totalEvents}`);
+  await flushAuditLogs(auditBuffer);
+  await flushCalendarEvents(calendarBuffer);
+
+  assertSeedRequirements(createdUsers, doneTasksByUser, teamSummaries);
+
+  const minimumDoneTasks = Math.min(
+    ...createdUsers.map((user) => doneTasksByUser.get(user.id) ?? 0),
+  );
+  const maximumDoneTasks = Math.max(
+    ...createdUsers.map((user) => doneTasksByUser.get(user.id) ?? 0),
+  );
+  const minTeamSize = Math.min(...teamSummaries.map((team) => team.size));
+  const maxTeamSize = Math.max(...teamSummaries.map((team) => team.size));
+  const cancelledOwnersPreview = teamSummaries
+    .slice(0, 5)
+    .map((team) => `${team.name}: ${team.cancelledOwnerLogin}`)
+    .join('; ');
+
+  console.log('\nSeed complete');
+  console.log(`  Users:            ${createdUsers.length}`);
+  console.log(
+    `  Teams:            ${counters.teams} (sizes ${minTeamSize}-${maxTeamSize})`,
+  );
+  console.log(`  Team members:     ${counters.teamMembers}`);
+  console.log(`  Projects:         ${counters.projects}`);
+  console.log(`  Project members:  ${counters.projectMembers}`);
+  console.log(`  Tasks:            ${counters.tasks}`);
+  console.log(`  Audit logs:       ${counters.auditLogs}`);
+  console.log(`  Calendar events:  ${counters.calendarEvents}`);
+  console.log(
+    `  Done tasks/user:  min ${minimumDoneTasks}, max ${maximumDoneTasks}`,
+  );
+  console.log(`  Failed-task owners: ${cancelledOwnersPreview}`);
   console.log('\n  Login credentials:');
-  console.log('  admin / Admin123!');
-  console.log('  Any other user / Password123!');
+  console.log(`  admin / ${ADMIN_PASSWORD}`);
+  console.log(`  any non-admin user / ${DEFAULT_PASSWORD}`);
+  console.log(`  Example member login: ${createdUsers[1]?.login ?? 'n/a'}`);
+  console.log(`  Seed stamp: ${slugify(now.toISOString())}`);
 }
 
 main()
-  .catch((e) => {
-    console.error(e);
+  .catch((error) => {
+    console.error(error);
     process.exit(1);
   })
   .finally(async () => {

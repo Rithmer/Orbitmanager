@@ -20,7 +20,6 @@ export class AppErrorBoundary extends Component<
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     if (import.meta.env.DEV) {
-      // Keep diagnostics in local dev, avoid noisy production console output.
       console.error('AppErrorBoundary', error, info.componentStack)
     }
   }

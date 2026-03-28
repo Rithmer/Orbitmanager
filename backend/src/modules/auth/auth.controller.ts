@@ -1,4 +1,11 @@
-import { Controller, Post, Get, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
   ApiTags,
@@ -7,7 +14,7 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, RefreshDto } from './dto';
+import { RegisterDto, LoginDto, RefreshDto, ChangePasswordDto } from './dto';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { Public } from '@/common/decorators/public.decorator';
 
@@ -58,6 +65,15 @@ export class AuthController {
     return this.authService.refresh(dto.refreshToken);
   }
 
+  @Public()
+  @Post('logout')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Выход из системы (отзыв refresh-токена)' })
+  @ApiResponse({ status: 204, description: 'Токен отозван' })
+  logout(@Body() dto: RefreshDto): Promise<void> {
+    return this.authService.logout(dto.refreshToken);
+  }
+
   @Get('me')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Получить профиль текущего пользователя' })
@@ -65,5 +81,23 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Не авторизован' })
   getMe(@CurrentUser('id') userId: number) {
     return this.authService.getMe(userId);
+  }
+
+  @Post('change-password')
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Изменить пароль текущего пользователя' })
+  @ApiResponse({ status: 204, description: 'Пароль успешно изменён' })
+  @ApiResponse({ status: 400, description: 'Некорректный новый пароль' })
+  @ApiResponse({ status: 401, description: 'Текущий пароль неверен' })
+  @ApiResponse({
+    status: 429,
+    description: 'Смена пароля доступна не чаще одного раза за 24 часа',
+  })
+  changePassword(
+    @CurrentUser('id') userId: number,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(userId, dto);
   }
 }

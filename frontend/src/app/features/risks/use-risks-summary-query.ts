@@ -1,9 +1,8 @@
-import { useQueries, useQuery } from '@tanstack/react-query'
-import { risksApi } from '../../api/risks'
-import { appQueryKeys } from '../../query'
-import { adaptProjectRisksPayload } from './adapters'
-import type { RisksProjectCard } from './types'
-import type { RisksTaskRiskResponse } from '../../api/risks'
+import { useQuery } from '@tanstack/react-query'
+import { risksApi } from '@/app/api/risks'
+import { appQueryKeys } from '@/app/query'
+import { adaptProjectRisksPayload } from '@/app/features/risks/adapters'
+import type { RisksProjectCard } from '@/app/features/risks/types'
 
 export function useRisksSummaryQuery(
   projectIds: number[],
@@ -13,48 +12,23 @@ export function useRisksSummaryQuery(
   const enabled = options.enabled !== false && projectIds.length > 0
   const stableProjectIds = [...projectIds].sort((a, b) => a - b)
 
-  const projectRisksQuery = useQuery({
+  const query = useQuery({
     queryKey: appQueryKeys.risks.projectRisks({ projectIds: stableProjectIds.join(',') }),
     queryFn: ({ signal }) => risksApi.getProjectRisks({ projectIds: stableProjectIds }, { signal }),
     staleTime: 60_000,
     enabled,
   })
 
-  const taskRiskQueries = useQueries({
-    queries: stableProjectIds.map((projectId) => ({
-      queryKey: appQueryKeys.risks.taskRisks(projectId),
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        risksApi.getProjectTaskRisks(projectId, { signal }),
-      staleTime: 60_000,
-      enabled,
-    })),
-  })
-
-  const rawTaskRisksByProject = stableProjectIds.reduce<Record<number, RisksTaskRiskResponse>>(
-    (acc, projectId, index) => {
-      acc[projectId] = taskRiskQueries[index]?.data ?? {}
-      return acc
-    },
-    {},
-  )
-
   const data: RisksProjectCard[] = adaptProjectRisksPayload(
-    projectRisksQuery.data,
-    rawTaskRisksByProject,
+    query.data,
     projectNamesById,
   )
 
-  const isPending = projectRisksQuery.isPending || taskRiskQueries.some((query) => query.isPending)
-  const isFetching = projectRisksQuery.isFetching || taskRiskQueries.some((query) => query.isFetching)
-  const error = projectRisksQuery.error ?? taskRiskQueries.find((query) => query.error)?.error ?? null
-
   return {
     data,
-    error,
-    isPending,
-    isFetching,
-    refetch: async () => {
-      await Promise.all([projectRisksQuery.refetch(), ...taskRiskQueries.map((query) => query.refetch())])
-    },
+    error: query.error,
+    isPending: query.isPending,
+    isFetching: query.isFetching,
+    refetch: query.refetch,
   }
 }

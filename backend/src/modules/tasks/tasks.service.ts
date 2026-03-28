@@ -6,6 +6,7 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
+import { TtlCacheService } from '@/common/cache/ttl-cache.service';
 import { ProjectAccessService } from '@/common/access/project-access.service';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { AuditAction } from '@/common/enums/audit-action.enum';
@@ -14,10 +15,7 @@ import {
   TaskStatus,
 } from '@/common/enums/task-status.enum';
 import { BusinessException } from '@/common/exceptions/business.exception';
-import {
-  PaginatedResult,
-  QueryParams,
-} from '@/common/helpers/query.helper';
+import { PaginatedResult, QueryParams } from '@/common/helpers/query.helper';
 import { Task } from '@/domain/models/task.model';
 import type { IProjectMemberRepository } from '@/domain/repositories/project-member.repository';
 import { PROJECT_MEMBER_REPOSITORY } from '@/domain/repositories/project-member.repository';
@@ -42,6 +40,7 @@ export class TasksService {
     private readonly projectMemberRepository: IProjectMemberRepository,
     private readonly auditService: AuditService,
     private readonly projectAccessService: ProjectAccessService,
+    private readonly cache: TtlCacheService,
     @Optional() private readonly prisma?: PrismaService,
   ) {}
 
@@ -54,19 +53,16 @@ export class TasksService {
     const limit = normalizeLimit(params.limit);
     const projectId =
       typeof params.filters?.['projectId'] === 'number'
-        ? (params.filters['projectId'] as number)
+        ? params.filters['projectId']
         : undefined;
-    const status =
-      typeof params.filters?.['status'] === 'string'
-        ? (params.filters['status'] as string)
-        : undefined;
+    const status = parseTaskStatus(params.filters?.['status']);
     const difficulty =
       typeof params.filters?.['difficulty'] === 'number'
-        ? (params.filters['difficulty'] as number)
+        ? params.filters['difficulty']
         : undefined;
     const assigneeId =
       typeof params.filters?.['assigneeId'] === 'number'
-        ? (params.filters['assigneeId'] as number)
+        ? params.filters['assigneeId']
         : undefined;
 
     if (this.taskRepository.findPage) {
@@ -109,10 +105,18 @@ export class TasksService {
 
     return applyInMemoryPagination(
       tasks
-        .filter((task) => (projectId !== undefined ? task.projectId === projectId : true))
+        .filter((task) =>
+          projectId !== undefined ? task.projectId === projectId : true,
+        )
         .filter((task) => (status ? task.status === status : true))
-        .filter((task) => (difficulty !== undefined ? task.difficulty === difficulty : true))
-        .filter((task) => (assigneeId !== undefined ? task.assigneeIds.includes(assigneeId) : true))
+        .filter((task) =>
+          difficulty !== undefined ? task.difficulty === difficulty : true,
+        )
+        .filter((task) =>
+          assigneeId !== undefined
+            ? task.assigneeIds.includes(assigneeId)
+            : true,
+        )
         .filter((task) => {
           if (!params.search) {
             return true;
@@ -186,15 +190,18 @@ export class TasksService {
       }
     }
 
-    if (this.prisma) {
-      return this.createWithAuditTransaction(
-        dto,
-        userId,
-        assigneeIds,
-        deadlineDate,
-      );
-    }
+    const task = await (this.prisma
+      ? this.createWithAuditTransaction(dto, userId, assigneeIds, deadlineDate)
+      : this.createViaRepository(dto, userId, assigneeIds));
+    this.invalidateUserCaches(userId);
+    return task;
+  }
 
+  private async createViaRepository(
+    dto: CreateTaskDto,
+    userId: number,
+    assigneeIds: number[],
+  ): Promise<Task> {
     const now = new Date().toISOString();
     const task = await this.taskRepository.create({
       projectId: dto.projectId,
@@ -218,6 +225,11 @@ export class TasksService {
     );
 
     return task;
+  }
+
+  private invalidateUserCaches(userId: number): void {
+    this.cache.invalidateByPrefix(`dashboard:summary:${userId}:`);
+    this.cache.invalidateByPrefix(`reports:summary:${userId}:`);
   }
 
   private async createWithAuditTransaction(
@@ -344,6 +356,7 @@ export class TasksService {
       );
     }
 
+    this.invalidateUserCaches(userId);
     return updated;
   }
 
@@ -374,6 +387,8 @@ export class TasksService {
       id,
       `Удалена задача "${task.name}"`,
     );
+
+    this.invalidateUserCaches(userId);
   }
 
   private async assertCanChangeStatus(
@@ -422,6 +437,16 @@ function normalizePage(page: number | undefined): number {
   return Math.max(1, Math.trunc(page as number));
 }
 
+const TASK_STATUS_VALUES = new Set<string>(Object.values(TaskStatus));
+
+function parseTaskStatus(value: unknown): TaskStatus | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  return TASK_STATUS_VALUES.has(value) ? (value as TaskStatus) : undefined;
+}
+
 function normalizeLimit(limit: number | undefined): number {
   if (!Number.isFinite(limit)) {
     return 20;
@@ -451,5 +476,10 @@ function applyInMemoryPagination<T>(
   limit: number,
 ): PaginatedResult<T> {
   const offset = (page - 1) * limit;
-  return toPaginatedResult(items.slice(offset, offset + limit), items.length, page, limit);
+  return toPaginatedResult(
+    items.slice(offset, offset + limit),
+    items.length,
+    page,
+    limit,
+  );
 }

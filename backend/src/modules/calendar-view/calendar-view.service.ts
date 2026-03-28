@@ -47,6 +47,18 @@ type CalendarEventRecord = {
   } | null;
 };
 
+/**
+ * @architecture CQRS Query Service
+ *
+ * Сервис агрегированного чтения данных. Использует PrismaService напрямую —
+ * намеренное архитектурное решение: запросы включают сложные агрегации
+ * (count, groupBy, многотабличные JOIN), которые не выражаются через
+ * CRUD-репозитории без значительного усложнения их интерфейсов.
+ *
+ * Паттерн: CQRS-light — command-сервисы (TasksService, ProjectsService и др.)
+ * работают через репозитории; query-сервисы (этот класс) обращаются к БД
+ * напрямую для оптимальных read-path запросов.
+ */
 @Injectable()
 export class CalendarViewService {
   constructor(
@@ -61,7 +73,9 @@ export class CalendarViewService {
     accountRole: AccountRole,
     projectId?: number,
   ): Promise<CalendarMonthViewResponseDto> {
-    const normalizedYear = Number.isFinite(year) ? year : new Date().getFullYear();
+    const normalizedYear = Number.isFinite(year)
+      ? year
+      : new Date().getFullYear();
     const normalizedMonth = clampMonth(month);
     const { monthStart, nextMonthStart } = getMonthRange(
       normalizedYear,
@@ -206,9 +220,7 @@ export class CalendarViewService {
     );
   }
 
-  private toProjectDto(
-    project: CalendarProjectRecord,
-  ): CalendarViewProjectDto {
+  private toProjectDto(project: CalendarProjectRecord): CalendarViewProjectDto {
     return {
       id: project.id,
       name: project.name,

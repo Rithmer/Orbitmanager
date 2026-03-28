@@ -34,13 +34,16 @@ export class ProjectAccessService {
   }
 
   private async computeVisibleProjects(userId: number): Promise<Project[]> {
-    const visibleProjectIds = await this.getVisibleProjectIds(userId);
-    if (visibleProjectIds.length === 0) {
+    const teamMemberships = await this.teamMemberRepository.findByUser(userId);
+    if (teamMemberships.length === 0) {
       return [];
     }
 
-    const teamMemberships = await this.teamMemberRepository.findByUser(userId);
-    if (teamMemberships.length === 0) {
+    const visibleProjectIds = await this.resolveVisibleProjectIds(
+      userId,
+      teamMemberships,
+    );
+    if (visibleProjectIds.length === 0) {
       return [];
     }
 
@@ -50,7 +53,9 @@ export class ProjectAccessService {
     const allTeamProjects = await this.projectRepository.findByTeams(teamIds);
 
     return this.dedupeProjects(
-      allTeamProjects.filter((project) => visibleProjectIds.includes(project.id)),
+      allTeamProjects.filter((project) =>
+        visibleProjectIds.includes(project.id),
+      ),
     );
   }
 
@@ -60,6 +65,17 @@ export class ProjectAccessService {
       return [];
     }
 
+    return this.resolveVisibleProjectIds(userId, teamMemberships);
+  }
+
+  /**
+   * Core logic for resolving visible project IDs from team memberships.
+   * Extracted to avoid double-loading teamMemberships (audit M4).
+   */
+  private async resolveVisibleProjectIds(
+    userId: number,
+    teamMemberships: { teamId: number; teamRole: TeamRole }[],
+  ): Promise<number[]> {
     const ownerTeamIds = [
       ...new Set(
         teamMemberships
@@ -117,8 +133,12 @@ export class ProjectAccessService {
   async assertTeamOwnerOrAdmin(
     userId: number,
     teamId: number,
-    _accountRole: AccountRole,
+    accountRole: AccountRole,
   ): Promise<void> {
+    if (accountRole === AccountRole.ADMIN) {
+      return;
+    }
+
     const membership = await this.teamMemberRepository.findByUserAndTeam(
       userId,
       teamId,
@@ -168,8 +188,12 @@ export class ProjectAccessService {
     userId: number,
     teamId: number,
     projectId: number,
-    _accountRole: AccountRole,
+    accountRole: AccountRole,
   ): Promise<boolean> {
+    if (accountRole === AccountRole.ADMIN) {
+      return true;
+    }
+
     const teamMembership = await this.teamMemberRepository.findByUserAndTeam(
       userId,
       teamId,
@@ -193,12 +217,7 @@ export class ProjectAccessService {
       return [];
     }
 
-    if (this.projectRepository.findIdsByTeams) {
-      return this.projectRepository.findIdsByTeams(teamIds);
-    }
-
-    const projects = await this.projectRepository.findByTeams(teamIds);
-    return projects.map((project) => project.id);
+    return this.projectRepository.findIdsByTeams(teamIds);
   }
 
   /** Проекты команд, где пользователь не владелец: только с явным участием в проекте. */
@@ -219,19 +238,21 @@ export class ProjectAccessService {
     const membershipProjectIds = [
       ...new Set(projectMemberships.map((membership) => membership.projectId)),
     ];
-    const membershipProjects = this.projectRepository.findByIds
-      ? await this.projectRepository.findByIds(membershipProjectIds)
-      : await this.projectRepository.findByTeams(teamIds);
+    const membershipProjects =
+      await this.projectRepository.findByIds(membershipProjectIds);
 
     const teamSet = new Set(teamIds);
     const membershipProjectIdSet = new Set(membershipProjectIds);
     return membershipProjects
       .filter(
         (project) =>
-          teamSet.has(project.teamId) &&
-          membershipProjectIdSet.has(project.id),
+          teamSet.has(project.teamId) && membershipProjectIdSet.has(project.id),
       )
       .map((project) => project.id);
+  }
+
+  invalidateVisibleProjects(userId: number): void {
+    this.cache.invalidate(`visible_projects:${userId}`);
   }
 
   private dedupeProjects(projects: Project[]): Project[] {

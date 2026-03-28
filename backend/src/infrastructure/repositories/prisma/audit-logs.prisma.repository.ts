@@ -6,7 +6,11 @@ import type {
 } from '@/domain/repositories/audit-log.repository';
 import { AuditLog } from '@/domain/models/audit-log.model';
 import type { AuditLog as PrismaAuditLog } from '@prisma/client';
-import { buildOrderBy, buildStringSearch, getPagination } from './prisma-query.utils';
+import {
+  buildOrderBy,
+  buildStringSearch,
+  getPagination,
+} from './prisma-query.utils';
 
 @Injectable()
 export class AuditLogsPrismaRepository implements IAuditLogRepository {
@@ -34,7 +38,11 @@ export class AuditLogsPrismaRepository implements IAuditLogRepository {
             },
           }
         : {}),
-      ...buildStringSearch(params.search, ['description', 'entityType', 'action']),
+      ...buildStringSearch(params.search, [
+        'description',
+        'entityType',
+        'action',
+      ]),
     };
 
     const [rows, total] = await Promise.all([
@@ -93,9 +101,7 @@ export class AuditLogsPrismaRepository implements IAuditLogRepository {
     return rows.map((r) => this.toDomain(r));
   }
 
-  async findPaginated(
-    params: AuditLogListQuery,
-  ) {
+  async findPaginated(params: AuditLogListQuery) {
     const { skip, take } = getPagination(params.page, params.limit);
     const where = {
       ...(params.userId !== undefined ? { userId: params.userId } : {}),
@@ -110,7 +116,11 @@ export class AuditLogsPrismaRepository implements IAuditLogRepository {
             },
           }
         : {}),
-      ...buildStringSearch(params.search, ['description', 'entityType', 'action']),
+      ...buildStringSearch(params.search, [
+        'description',
+        'entityType',
+        'action',
+      ]),
     };
 
     const [rows, total] = await Promise.all([
