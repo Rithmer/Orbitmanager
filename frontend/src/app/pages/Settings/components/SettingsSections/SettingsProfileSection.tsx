@@ -4,7 +4,7 @@ import { ACCOUNT_ROLE_LABELS, AccountRole } from '@/app/types'
 import { abbreviateFullName } from '@/app/pages/Settings/helpers'
 import type { SettingsProfileSectionProps } from '@/app/pages/Settings/types'
 
-export function SettingsProfileSection(props: SettingsProfileSectionProps) {
+export function SettingsProfileSection({ theme, profile }: SettingsProfileSectionProps) {
   const {
     cardBg,
     cardBorder,
@@ -14,6 +14,8 @@ export function SettingsProfileSection(props: SettingsProfileSectionProps) {
     textSecondary,
     inputBg,
     inputText,
+  } = theme
+  const {
     user,
     fullName,
     setFullName,
@@ -27,9 +29,9 @@ export function SettingsProfileSection(props: SettingsProfileSectionProps) {
     avatarUploadError,
     avatarUploadSuccess,
     avatarInputRef,
-    onSaveProfile,
-    onAvatarFileChange,
-  } = props
+    saveProfile,
+    uploadAvatarFile,
+  } = profile
 
   const userInitial = user?.fullName?.charAt(0)?.toUpperCase() || 'U'
   const roleLabel = user ? ACCOUNT_ROLE_LABELS[user.accountRole as AccountRole] || user.accountRole : ''
@@ -69,7 +71,7 @@ export function SettingsProfileSection(props: SettingsProfileSectionProps) {
           ref={avatarInputRef}
           type="file"
           accept=".png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,.heic,.heif,image/png,image/jpeg,image/webp,image/gif,image/bmp,image/tiff,image/heic,image/heif"
-          onChange={(event) => onAvatarFileChange(event.target.files?.[0] ?? null)}
+          onChange={(event) => uploadAvatarFile(event.target.files?.[0] ?? null)}
           disabled={avatarUploading}
           className="hidden"
         />
@@ -124,7 +126,7 @@ export function SettingsProfileSection(props: SettingsProfileSectionProps) {
           </div>
         </div>
         <button
-          onClick={onSaveProfile}
+          onClick={() => void saveProfile()}
           disabled={saving}
           className="bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 disabled:opacity-50 flex items-center gap-2 btn-fizzy"
         >
