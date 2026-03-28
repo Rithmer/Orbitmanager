@@ -1,10 +1,6 @@
 import { ErrorMessage, InputField, Modal } from '@/app/components/Modal'
 import { TeamRole } from '@/app/types'
-import type { TeamsPageViewModel } from '@/app/pages/Teams/hooks/useTeamsPageController'
-
-type TeamsAddMemberModalProps = {
-  vm: TeamsPageViewModel
-}
+import type { TeamsAddMemberModalProps } from '@/app/pages/Teams/types'
 
 export function TeamsAddMemberModal({ vm }: TeamsAddMemberModalProps) {
   const {

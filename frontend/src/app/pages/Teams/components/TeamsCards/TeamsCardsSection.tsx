@@ -1,12 +1,8 @@
 import { TeamRole } from '@/app/types'
 import { TEAMS_PAGE_CONSTANTS } from '@/app/pages/Teams/constants'
-import type { TeamsPageViewModel } from '@/app/pages/Teams/hooks/useTeamsPageController'
-import { TeamCard } from '@/app/pages/Teams/components/TeamCard'
-import { TeamsGrid } from '@/app/pages/Teams/components/TeamsGrid'
-
-type TeamsCardsSectionProps = {
-  vm: TeamsPageViewModel
-}
+import { TeamCard } from './TeamCard'
+import { TeamsGrid } from './TeamsGrid'
+import type { TeamsCardsSectionProps } from '@/app/pages/Teams/types'
 
 export function TeamsCardsSection({ vm }: TeamsCardsSectionProps) {
   const {

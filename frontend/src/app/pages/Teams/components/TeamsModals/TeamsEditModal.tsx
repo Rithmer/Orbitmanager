@@ -1,31 +1,27 @@
 import { ErrorMessage, InputField, Modal, SubmitButton } from '@/app/components/Modal'
-import type { TeamsPageViewModel } from '@/app/pages/Teams/hooks/useTeamsPageController'
+import type { TeamsEditModalProps } from '@/app/pages/Teams/types'
 
-type TeamsCreateModalProps = {
-  vm: TeamsPageViewModel
-}
-
-export function TeamsCreateModal({ vm }: TeamsCreateModalProps) {
+export function TeamsEditModal({ vm }: TeamsEditModalProps) {
   const {
-    showCreateModal,
-    setShowCreateModal,
+    showEditModal,
+    setShowEditModal,
     formError,
     formName,
     setFormName,
     formDesc,
     setFormDesc,
     formLoading,
-    handleCreate,
+    handleEdit,
     tokens,
   } = vm
 
   return (
-    <Modal open={showCreateModal} onClose={() => setShowCreateModal(false)} title="Новая команда">
+    <Modal open={showEditModal} onClose={() => setShowEditModal(false)} title="Редактировать команду">
       <ErrorMessage message={formError} />
       <form
         onSubmit={(e) => {
           e.preventDefault()
-          void handleCreate()
+          void handleEdit()
         }}
         className="space-y-4"
       >
@@ -34,12 +30,12 @@ export function TeamsCreateModal({ vm }: TeamsCreateModalProps) {
         <div className="flex justify-end gap-3 pt-2">
           <button
             type="button"
-            onClick={() => setShowCreateModal(false)}
+            onClick={() => setShowEditModal(false)}
             className={`px-4 py-2 rounded-lg text-sm font-semibold ${tokens.textSecondary}`}
           >
             Отмена
           </button>
-          <SubmitButton loading={formLoading}>Создать</SubmitButton>
+          <SubmitButton loading={formLoading}>Сохранить</SubmitButton>
         </div>
       </form>
     </Modal>

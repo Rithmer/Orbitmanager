@@ -1,11 +1,5 @@
 import { Plus } from 'lucide-react'
-
-type TeamsPageHeaderProps = {
-  textPrimary: string
-  textSecondary: string
-  teamsCount: number
-  onCreate: () => void
-}
+import type { TeamsPageHeaderProps } from '@/app/pages/Teams/types'
 
 export function TeamsPageHeader({
   textPrimary,

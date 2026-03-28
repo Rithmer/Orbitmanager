@@ -2,7 +2,7 @@ import { Navigate } from 'react-router'
 import { PageShell } from '@/app/components/PageShell'
 import { useProjectsPageController } from '@/app/pages/Projects/hooks/useProjectsPageController'
 import { ProjectsMainSection } from '@/app/pages/Projects/components/ProjectsMainSection'
-import { ProjectsPageModals } from '@/app/pages/Projects/components/ProjectsPageModals'
+import { ProjectsPageModals } from '@/app/pages/Projects/components/ProjectsModals'
 import { ProjectsPageNewProjectButton } from '@/app/pages/Projects/components/ProjectsPageNewProjectButton'
 import { ProjectsPagination } from '@/app/pages/Projects/components/ProjectsPagination'
 

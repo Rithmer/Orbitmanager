@@ -1,8 +1,5 @@
 import { Plus } from 'lucide-react'
-
-type ProjectsPageNewProjectButtonProps = {
-  onClick: () => void
-}
+import type { ProjectsPageNewProjectButtonProps } from '@/app/pages/Projects/types'
 
 export function ProjectsPageNewProjectButton({ onClick }: ProjectsPageNewProjectButtonProps) {
   return (

@@ -1,8 +1,4 @@
-import type { TeamsThemeTokens } from '@/app/pages/Teams/hooks/useTeamsThemeTokens'
-
-type TeamsLoadingStateProps = {
-  tokens: TeamsThemeTokens
-}
+import type { TeamsLoadingStateProps } from '@/app/pages/Teams/types'
 
 export function TeamsLoadingState({ tokens }: TeamsLoadingStateProps) {
   return (

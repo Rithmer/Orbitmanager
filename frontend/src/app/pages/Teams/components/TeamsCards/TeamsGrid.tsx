@@ -1,18 +1,6 @@
 import { Search } from 'lucide-react'
-import type { ReactNode } from 'react'
-import type { Team, TeamMember } from '@/app/types'
-import { TeamCard } from '@/app/pages/Teams/components/TeamCard'
-
-type TeamsGridProps = {
-  teams: Team[]
-  teamMembers: Record<number, TeamMember[]>
-  cardBg: string
-  cardBorder: string
-  textSecondary: string
-  isDark: boolean
-  renderCard: (team: Team, members: TeamMember[], idx: number) => ReactNode
-  searchQuery: string
-}
+import { TeamCard } from './TeamCard'
+import type { TeamsGridProps } from '@/app/pages/Teams/types'
 
 export function TeamsGrid({
   teams,

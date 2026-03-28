@@ -2,11 +2,7 @@ import { ArrowLeft, LoaderCircle, Trash2, UserPlus } from 'lucide-react'
 import { ErrorMessage, Modal, SelectField, SubmitButton } from '@/app/components/Modal'
 import { PageRefreshOverlay } from '@/app/components/PageShell'
 import { ProjectRole, PROJECT_ROLE_LABELS } from '@/app/types'
-import type { ProjectsPageViewModel } from '@/app/pages/Projects/hooks/useProjectsPageController'
-
-type ProjectsMembersModalProps = {
-  vm: ProjectsPageViewModel
-}
+import type { ProjectsMembersModalProps } from '@/app/pages/Projects/types'
 
 export function ProjectsMembersModal({ vm }: ProjectsMembersModalProps) {
   const { members, shell } = vm

@@ -1,31 +1,6 @@
 import { CheckCircle2, Crown, Eye, MoreVertical, Trash2, UserPlus, Users } from 'lucide-react'
-import type { Team, TeamMember } from '@/app/types'
 import { TEAM_ROLE_LABELS, TeamRole } from '@/app/types'
-
-type TeamCardProps = {
-  team: Team
-  members: TeamMember[]
-  idx: number
-  isDark: boolean
-  cardBg: string
-  cardBorder: string
-  textPrimary: string
-  textSecondary: string
-  dividerColor: string
-  avatarBg: string
-  color: string
-  textColor: string
-  lightBg: string
-  openMenuId: number | null
-  canManage: boolean
-  currentUserId: number | undefined
-  getUserName: (id: number) => string
-  getUserRole: (id: number) => string
-  onToggleMenu: (id: number) => void
-  onEdit: (team: Team) => void
-  onAddMember: (teamId: number) => void
-  onDelete: (teamId: number) => void
-}
+import type { TeamCardProps } from '@/app/pages/Teams/types'
 
 export function TeamCard(props: TeamCardProps) {
   const {

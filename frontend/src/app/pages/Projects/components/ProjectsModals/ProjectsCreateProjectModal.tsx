@@ -1,11 +1,7 @@
 import { ErrorMessage, Modal, InputField, SelectField, SubmitButton } from '@/app/components/Modal'
 import { ProjectStatus, PROJECT_STATUS_LABELS } from '@/app/types'
 import { VISIBLE_PROJECT_STATUSES } from '@/app/pages/Projects/constants'
-import type { ProjectsPageViewModel } from '@/app/pages/Projects/hooks/useProjectsPageController'
-
-type ProjectsCreateProjectModalProps = {
-  vm: ProjectsPageViewModel
-}
+import type { ProjectsCreateProjectModalProps } from '@/app/pages/Projects/types'
 
 export function ProjectsCreateProjectModal({ vm }: ProjectsCreateProjectModalProps) {
   const { projectForm, list, shell } = vm

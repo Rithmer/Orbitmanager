@@ -5,15 +5,11 @@ import {
   RefreshBadge,
 } from '@/app/components/PageShell'
 import { CARD_COLORS } from '@/app/pages/Projects/constants'
-import type { ProjectsPageViewModel } from '@/app/pages/Projects/hooks/useProjectsPageController'
 import { ProjectsToolbar } from '@/app/pages/Projects/components/ProjectsToolbar'
 import { ProjectsEmptyState } from '@/app/pages/Projects/components/ProjectsEmptyState'
 import { ProjectsErrorState } from '@/app/pages/Projects/components/ProjectsErrorState'
 import { ProjectsProjectCard } from '@/app/pages/Projects/components/ProjectsProjectCard'
-
-type ProjectsMainSectionProps = {
-  vm: ProjectsPageViewModel
-}
+import type { ProjectsMainSectionProps } from '@/app/pages/Projects/types'
 
 export function ProjectsMainSection({ vm }: ProjectsMainSectionProps) {
   const { navigate, shell, list, menu, projectForm, members } = vm
