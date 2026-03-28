@@ -2,4 +2,13 @@ export const REPORTS_PAGE_CONSTANTS = {
   DAY_MS: 24 * 60 * 60 * 1000,
   FILTER_LOADING_TEXT: 'Загрузка фильтров...',
   EMPTY_TEXT: 'Нет данных',
+  STATUS_PIE_HEIGHT: 280,
+  STATUS_PIE_MARGIN: { top: 10, right: 8, left: 8, bottom: 8 },
+  STATUS_PIE_INNER_RADIUS: 52,
+  STATUS_PIE_OUTER_RADIUS: 86,
+  STATUS_PIE_CX: '50%',
+  STATUS_PIE_CY: '48%',
+  STATUS_PIE_MIN_PERCENT_LABEL: 0.07,
+  STATUS_PIE_LABEL_RING_T: 0.58,
+  STATUS_PIE_NEON_DIM: 0.35,
 } as const

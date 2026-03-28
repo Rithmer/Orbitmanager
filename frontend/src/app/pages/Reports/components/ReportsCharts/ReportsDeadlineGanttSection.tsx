@@ -1,16 +1,7 @@
 import { PageSection } from '@/app/components/PageShell'
 import { REPORTS_PAGE_CONSTANTS } from '@/app/pages/Reports/constants'
-import { formatDeadline, type GanttTask } from '@/app/pages/Reports/helpers'
-import type { ReportsThemeTokens } from '@/app/pages/Reports/hooks/useReportsThemeTokens'
-
-type ReportsDeadlineGanttSectionProps = {
-  tokens: ReportsThemeTokens
-  isDark: boolean
-  ganttTasks: GanttTask[]
-  todayStart: number
-  maxDeadline: number
-  onNavigateToBoard: (projectId: number) => void
-}
+import { formatDeadline } from '@/app/pages/Reports/helpers'
+import type { ReportsDeadlineGanttSectionProps } from '@/app/pages/Reports/types'
 
 export function ReportsDeadlineGanttSection({
   tokens,

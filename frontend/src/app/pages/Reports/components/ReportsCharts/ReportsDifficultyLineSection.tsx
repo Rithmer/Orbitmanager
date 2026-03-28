@@ -1,17 +1,6 @@
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { PageSection } from '@/app/components/PageShell'
-import type { ReportsThemeTokens } from '@/app/pages/Reports/hooks/useReportsThemeTokens'
-
-type NormalizedDifficultyRow = {
-  difficulty: number
-  label: string
-  value: number
-}
-
-type ReportsDifficultyLineSectionProps = {
-  tokens: ReportsThemeTokens
-  normalizedDifficultyDistribution: NormalizedDifficultyRow[]
-}
+import type { ReportsDifficultyLineSectionProps } from '@/app/pages/Reports/types'
 
 export function ReportsDifficultyLineSection({ tokens, normalizedDifficultyDistribution }: ReportsDifficultyLineSectionProps) {
   return (

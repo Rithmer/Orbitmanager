@@ -1,7 +1,7 @@
 import { PageRefreshOverlay } from '@/app/components/PageShell'
 import type { ReportsPageModel } from '@/app/pages/Reports/hooks/useReportsPageModel'
-import { ReportsDeadlineGanttSection } from '@/app/pages/Reports/components/ReportsDeadlineGanttSection'
-import { ReportsStatusPieSection } from '@/app/pages/Reports/components/ReportsStatusPieSection'
+import { ReportsStatusPieSection } from '@/app/pages/Reports/components/ReportsStatusPie'
+import { ReportsDeadlineGanttSection } from './ReportsDeadlineGanttSection'
 
 type ReportsChartsGridProps = {
   model: ReportsPageModel
@@ -31,7 +31,13 @@ export function ReportsChartsGrid({ model, onNavigateToBoard }: ReportsChartsGri
           maxDeadline={maxDeadline}
           onNavigateToBoard={onNavigateToBoard}
         />
-        <ReportsStatusPieSection tokens={tokens} statusDistribution={statusDistribution} statusTotal={statusTotal} />
+        <ReportsStatusPieSection
+          tokens={tokens}
+          isDark={isDark}
+          statusDistribution={statusDistribution}
+          statusTotal={statusTotal}
+          isRefreshing={isRefreshing}
+        />
       </div>
     </PageRefreshOverlay>
   )

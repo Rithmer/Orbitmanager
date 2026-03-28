@@ -1,4 +1,4 @@
-type ReportsSummaryWarningProps = { show: boolean }
+import type { ReportsSummaryWarningProps } from '@/app/pages/Reports/types'
 
 export function ReportsSummaryWarning({ show }: ReportsSummaryWarningProps) {
   if (!show) return null
