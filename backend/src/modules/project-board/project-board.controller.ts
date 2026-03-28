@@ -1,4 +1,10 @@
-import { Controller, Get, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ApiAuth } from '@/common/decorators/api-auth.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
@@ -18,7 +24,11 @@ export class ProjectBoardController {
   @Get(':id/board-view')
   @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
   @ApiOperation({ summary: 'Получить board view проекта' })
-  @ApiResponse({ status: 200, description: 'Board view проекта', type: ProjectBoardViewResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Board view проекта',
+    type: ProjectBoardViewResponseDto,
+  })
   @ApiResponse({ status: 404, description: 'Проект не найден' })
   @ApiResponse({ status: 403, description: 'Нет доступа к проекту' })
   getBoardView(
@@ -26,6 +36,10 @@ export class ProjectBoardController {
     @CurrentUser('id') userId: number,
     @CurrentUser('accountRole') accountRole: AccountRole,
   ): Promise<ProjectBoardViewResponseDto> {
-    return this.projectBoardService.getBoardView(projectId, userId, accountRole);
+    return this.projectBoardService.getBoardView(
+      projectId,
+      userId,
+      accountRole,
+    );
   }
 }

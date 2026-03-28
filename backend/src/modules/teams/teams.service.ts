@@ -30,10 +30,7 @@ import { CreateTeamDto } from './dto/create-team.dto';
 import { UpdateTeamDto } from './dto/update-team.dto';
 import { AddTeamMemberDto } from './dto/add-team-member.dto';
 import { UpdateTeamMemberDto } from './dto/update-team-member.dto';
-import {
-  QueryParams,
-  PaginatedResult,
-} from '@/common/helpers/query.helper';
+import { QueryParams, PaginatedResult } from '@/common/helpers/query.helper';
 import { AuditService } from '@/modules/audit-logs/audit.service';
 import { AuditAction } from '@/common/enums/audit-action.enum';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
@@ -320,7 +317,11 @@ export class TeamsService {
     if (this.prisma) {
       await this.removeMemberWithTransaction(member, userId);
     } else {
-      await this.detachUserFromTeamProjects(member.userId, member.teamId, userId);
+      await this.detachUserFromTeamProjects(
+        member.userId,
+        member.teamId,
+        userId,
+      );
 
       await this.teamMemberRepository.delete(memberId);
 
@@ -618,7 +619,12 @@ function applyInMemoryPagination<T>(
   limit: number,
 ): PaginatedResult<T> {
   const offset = (page - 1) * limit;
-  return toPaginatedResult(items.slice(offset, offset + limit), items.length, page, limit);
+  return toPaginatedResult(
+    items.slice(offset, offset + limit),
+    items.length,
+    page,
+    limit,
+  );
 }
 
 function mapTeamRecord(team: {

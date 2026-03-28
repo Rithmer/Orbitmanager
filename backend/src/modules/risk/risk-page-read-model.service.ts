@@ -34,7 +34,11 @@ export interface RiskPageContext {
   allInputs: TaskRiskInput[];
 }
 
-const ACTIVE_STATUSES = [TaskStatus.NEW, TaskStatus.IN_PROGRESS, TaskStatus.REVIEW];
+const ACTIVE_STATUSES = [
+  TaskStatus.NEW,
+  TaskStatus.IN_PROGRESS,
+  TaskStatus.REVIEW,
+];
 
 @Injectable()
 export class RiskPageReadModelService {
@@ -48,7 +52,11 @@ export class RiskPageReadModelService {
     userRole: AccountRole,
     requestedProjectIds?: number[],
   ): Promise<RiskPageContext> {
-    const projectIds = await this.resolveProjectIds(userId, userRole, requestedProjectIds);
+    const projectIds = await this.resolveProjectIds(
+      userId,
+      userRole,
+      requestedProjectIds,
+    );
 
     if (projectIds.length === 0) {
       return {
@@ -133,17 +141,18 @@ export class RiskPageReadModelService {
     }
 
     const taskIds = tasks.map((t) => t.id);
-    const statusChanges = taskIds.length > 0
-      ? await this.prisma.auditLog.groupBy({
-          by: ['entityId'],
-          where: {
-            entityType: 'task',
-            entityId: { in: taskIds },
-            action: AuditAction.STATUS_CHANGE,
-          },
-          _count: { id: true },
-        })
-      : [];
+    const statusChanges =
+      taskIds.length > 0
+        ? await this.prisma.auditLog.groupBy({
+            by: ['entityId'],
+            where: {
+              entityType: 'task',
+              entityId: { in: taskIds },
+              action: AuditAction.STATUS_CHANGE,
+            },
+            _count: { id: true },
+          })
+        : [];
 
     const statusChangesByTaskId = new Map<number, number>();
     for (const row of statusChanges) {
@@ -207,7 +216,8 @@ export class RiskPageReadModelService {
         });
         return found.map((p) => p.id);
       }
-      const visible = await this.projectAccessService.getVisibleProjects(userId);
+      const visible =
+        await this.projectAccessService.getVisibleProjects(userId);
       const requestedSet = new Set(requestedProjectIds);
       return visible.filter((p) => requestedSet.has(p.id)).map((p) => p.id);
     }
@@ -225,7 +235,10 @@ export class RiskPageReadModelService {
     const activeCountsByAssignee = new Map<number, number>();
     for (const task of tasks) {
       for (const uid of task.assigneeIds) {
-        activeCountsByAssignee.set(uid, (activeCountsByAssignee.get(uid) ?? 0) + 1);
+        activeCountsByAssignee.set(
+          uid,
+          (activeCountsByAssignee.get(uid) ?? 0) + 1,
+        );
       }
     }
 

@@ -15,7 +15,11 @@ export class ReportsController {
 
   @Get('summary')
   @ApiOperation({ summary: 'Получить сводку отчетов' })
-  @ApiResponse({ status: 200, description: 'Сводка отчетов', type: ReportsSummaryResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Сводка отчетов',
+    type: ReportsSummaryResponseDto,
+  })
   getSummary(
     @CurrentUser('id') userId: number,
     @CurrentUser('accountRole') accountRole: AccountRole,

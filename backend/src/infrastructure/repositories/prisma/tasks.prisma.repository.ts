@@ -5,7 +5,11 @@ import type {
   TaskListQuery,
 } from '@/domain/repositories/task.repository';
 import { Task } from '@/domain/models/task.model';
-import { buildOrderBy, buildStringSearch, getPagination } from './prisma-query.utils';
+import {
+  buildOrderBy,
+  buildStringSearch,
+  getPagination,
+} from './prisma-query.utils';
 
 type TaskWithAssignees = {
   id: number;
@@ -39,9 +43,13 @@ export class TasksPrismaRepository implements ITaskRepository {
     const { skip, take } = getPagination(params.page, params.limit);
     const where = {
       ...(params.projectIds ? { projectId: { in: params.projectIds } } : {}),
-      ...(params.projectId !== undefined ? { projectId: params.projectId } : {}),
+      ...(params.projectId !== undefined
+        ? { projectId: params.projectId }
+        : {}),
       ...(params.status ? { status: params.status } : {}),
-      ...(params.difficulty !== undefined ? { difficulty: params.difficulty } : {}),
+      ...(params.difficulty !== undefined
+        ? { difficulty: params.difficulty }
+        : {}),
       ...(params.assigneeId !== undefined
         ? { assignees: { some: { userId: params.assigneeId } } }
         : {}),
@@ -158,10 +166,13 @@ export class TasksPrismaRepository implements ITaskRepository {
     try {
       const scalarData: Record<string, unknown> = {};
       if (partial.name !== undefined) scalarData['name'] = partial.name;
-      if (partial.description !== undefined) scalarData['description'] = partial.description;
-      if (partial.deadline !== undefined) scalarData['deadline'] = new Date(partial.deadline);
+      if (partial.description !== undefined)
+        scalarData['description'] = partial.description;
+      if (partial.deadline !== undefined)
+        scalarData['deadline'] = new Date(partial.deadline);
       if (partial.status !== undefined) scalarData['status'] = partial.status;
-      if (partial.difficulty !== undefined) scalarData['difficulty'] = partial.difficulty;
+      if (partial.difficulty !== undefined)
+        scalarData['difficulty'] = partial.difficulty;
 
       if (partial.assigneeIds !== undefined) {
         const newIds = partial.assigneeIds ?? [];
@@ -172,7 +183,9 @@ export class TasksPrismaRepository implements ITaskRepository {
             data: {
               ...scalarData,
               ...(newIds.length > 0
-                ? { assignees: { create: newIds.map((userId) => ({ userId })) } }
+                ? {
+                    assignees: { create: newIds.map((userId) => ({ userId })) },
+                  }
                 : {}),
             },
             include: TASK_INCLUDE,

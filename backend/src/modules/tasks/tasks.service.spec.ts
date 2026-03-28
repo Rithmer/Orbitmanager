@@ -123,8 +123,8 @@ const mockPrismaTx = {
 };
 
 const mockPrismaService = {
-  $transaction: jest.fn(
-    (fn: (tx: typeof mockPrismaTx) => Promise<unknown>) => fn(mockPrismaTx),
+  $transaction: jest.fn((fn: (tx: typeof mockPrismaTx) => Promise<unknown>) =>
+    fn(mockPrismaTx),
   ),
 };
 
@@ -157,7 +157,11 @@ describe('TasksService', () => {
         },
         {
           provide: InMemoryCacheService,
-          useValue: { get: jest.fn(), set: jest.fn(), invalidateByPrefix: jest.fn() },
+          useValue: {
+            get: jest.fn(),
+            set: jest.fn(),
+            invalidateByPrefix: jest.fn(),
+          },
         },
         {
           provide: PrismaService,
@@ -209,7 +213,11 @@ describe('TasksService', () => {
       const result = await service.findAll({}, OWNER_ID, AccountRole.MEMBER);
       expect(result.items).toHaveLength(1);
       expect(mockTaskRepository.findPage).toHaveBeenCalledWith(
-        expect.objectContaining({ page: 1, limit: 20, projectIds: [PROJECT_ID] }),
+        expect.objectContaining({
+          page: 1,
+          limit: 20,
+          projectIds: [PROJECT_ID],
+        }),
       );
     });
   });

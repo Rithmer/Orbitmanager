@@ -16,10 +16,14 @@ import type { ProjectsListViewResponseDto } from './projects-list-view.types';
 @ApiBearerAuth()
 @Controller('projects/list-view')
 export class ProjectsListViewController {
-  constructor(private readonly projectsListViewService: ProjectsListViewService) {}
+  constructor(
+    private readonly projectsListViewService: ProjectsListViewService,
+  ) {}
 
   @Get()
-  @ApiOperation({ summary: 'Получить пагинированный список проектов для карточек' })
+  @ApiOperation({
+    summary: 'Получить пагинированный список проектов для карточек',
+  })
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'teamId', required: false, type: Number })
   @ApiQuery({ name: 'status', required: false })

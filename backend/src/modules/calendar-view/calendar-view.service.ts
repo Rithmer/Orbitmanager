@@ -73,7 +73,9 @@ export class CalendarViewService {
     accountRole: AccountRole,
     projectId?: number,
   ): Promise<CalendarMonthViewResponseDto> {
-    const normalizedYear = Number.isFinite(year) ? year : new Date().getFullYear();
+    const normalizedYear = Number.isFinite(year)
+      ? year
+      : new Date().getFullYear();
     const normalizedMonth = clampMonth(month);
     const { monthStart, nextMonthStart } = getMonthRange(
       normalizedYear,
@@ -218,9 +220,7 @@ export class CalendarViewService {
     );
   }
 
-  private toProjectDto(
-    project: CalendarProjectRecord,
-  ): CalendarViewProjectDto {
+  private toProjectDto(project: CalendarProjectRecord): CalendarViewProjectDto {
     return {
       id: project.id,
       name: project.name,

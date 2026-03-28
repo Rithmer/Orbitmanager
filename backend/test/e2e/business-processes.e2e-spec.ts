@@ -719,9 +719,7 @@ describe('Business Processes (e2e)', () => {
         .set('Authorization', `Bearer ${adminLogin.accessToken}`)
         .expect(200);
 
-      const projectIds = (res.body.items as { id: number }[]).map(
-        (p) => p.id,
-      );
+      const projectIds = (res.body.items as { id: number }[]).map((p) => p.id);
       expect(projectIds).toContain(projectId);
     });
 

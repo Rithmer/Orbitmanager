@@ -12,12 +12,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { ApiAuth } from '@/common/decorators/api-auth.decorator';
 import { UsersService } from './users.service';
 import { CreateUserDto, UpdateUserDto, UpdateProfileDto } from './dto';
@@ -63,10 +58,7 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Профиль обновлён' })
   @ApiResponse({ status: 404, description: 'Пользователь не найден' })
   @ApiResponse({ status: 429, description: 'Слишком частые обновления' })
-  updateMe(
-    @CurrentUser('id') userId: number,
-    @Body() dto: UpdateProfileDto,
-  ) {
+  updateMe(@CurrentUser('id') userId: number, @Body() dto: UpdateProfileDto) {
     return this.usersService.updateMe(userId, dto);
   }
 

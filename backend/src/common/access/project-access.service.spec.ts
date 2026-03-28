@@ -14,7 +14,11 @@ import { ProjectAccessService } from './project-access.service';
 const mockCache = {
   get: jest.fn(),
   set: jest.fn(),
-  getOrSet: jest.fn().mockImplementation((_key: string, factory: () => Promise<unknown>) => factory()),
+  getOrSet: jest
+    .fn()
+    .mockImplementation((_key: string, factory: () => Promise<unknown>) =>
+      factory(),
+    ),
   invalidate: jest.fn(),
   invalidateByPrefix: jest.fn(),
 };
@@ -173,6 +177,8 @@ describe('ProjectAccessService', () => {
       service.assertCanManageProject(project, 3, AccountRole.ADMIN),
     ).resolves.not.toThrow();
     expect(mockTeamMemberRepository.findByUserAndTeam).not.toHaveBeenCalled();
-    expect(mockProjectMemberRepository.findByUserAndProject).not.toHaveBeenCalled();
+    expect(
+      mockProjectMemberRepository.findByUserAndProject,
+    ).not.toHaveBeenCalled();
   });
 });

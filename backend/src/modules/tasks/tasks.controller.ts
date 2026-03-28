@@ -11,12 +11,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto, UpdateTaskDto } from './dto';
 import { ApiAuth } from '@/common/decorators/api-auth.decorator';
@@ -65,10 +60,16 @@ export class TasksController {
         page: parseOptionalInt(page),
         limit: parseOptionalInt(limit),
         filters: {
-          ...(parsedProjectId !== undefined ? { projectId: parsedProjectId } : {}),
+          ...(parsedProjectId !== undefined
+            ? { projectId: parsedProjectId }
+            : {}),
           ...(status ? { status } : {}),
-          ...(parsedDifficulty !== undefined ? { difficulty: parsedDifficulty } : {}),
-          ...(parsedAssigneeId !== undefined ? { assigneeId: parsedAssigneeId } : {}),
+          ...(parsedDifficulty !== undefined
+            ? { difficulty: parsedDifficulty }
+            : {}),
+          ...(parsedAssigneeId !== undefined
+            ? { assigneeId: parsedAssigneeId }
+            : {}),
         },
       },
       userId,

@@ -44,13 +44,25 @@ export class CalendarViewEventDto {
   @ApiProperty({ description: 'ID пользователя-владельца события' })
   userId!: number;
 
-  @ApiProperty({ description: 'ID связанного проекта', required: false, nullable: true })
+  @ApiProperty({
+    description: 'ID связанного проекта',
+    required: false,
+    nullable: true,
+  })
   projectId!: number | null;
 
-  @ApiProperty({ description: 'Название связанного проекта', required: false, nullable: true })
+  @ApiProperty({
+    description: 'Название связанного проекта',
+    required: false,
+    nullable: true,
+  })
   projectName!: string | null;
 
-  @ApiProperty({ description: 'ID связанной задачи', required: false, nullable: true })
+  @ApiProperty({
+    description: 'ID связанной задачи',
+    required: false,
+    nullable: true,
+  })
   taskId!: number | null;
 
   @ApiProperty({ description: 'Заголовок события' })
@@ -79,12 +91,21 @@ export class CalendarMonthViewResponseDto {
   @ApiProperty({ description: 'Месяц (1 — 12)' })
   month!: number;
 
-  @ApiProperty({ description: 'Проекты пользователя в данном месяце', type: () => [CalendarViewProjectDto] })
+  @ApiProperty({
+    description: 'Проекты пользователя в данном месяце',
+    type: () => [CalendarViewProjectDto],
+  })
   projects!: CalendarViewProjectDto[];
 
-  @ApiProperty({ description: 'Задачи с дедлайном в данном месяце', type: () => [CalendarViewTaskDto] })
+  @ApiProperty({
+    description: 'Задачи с дедлайном в данном месяце',
+    type: () => [CalendarViewTaskDto],
+  })
   tasks!: CalendarViewTaskDto[];
 
-  @ApiProperty({ description: 'События календаря в данном месяце', type: () => [CalendarViewEventDto] })
+  @ApiProperty({
+    description: 'События календаря в данном месяце',
+    type: () => [CalendarViewEventDto],
+  })
   events!: CalendarViewEventDto[];
 }

@@ -6,7 +6,11 @@ import type {
 } from '@/domain/repositories/user.repository';
 import { User } from '@/domain/models/user.model';
 import type { User as PrismaUser } from '@prisma/client';
-import { buildOrderBy, buildStringSearch, getPagination } from './prisma-query.utils';
+import {
+  buildOrderBy,
+  buildStringSearch,
+  getPagination,
+} from './prisma-query.utils';
 
 @Injectable()
 export class UsersPrismaRepository implements IUserRepository {

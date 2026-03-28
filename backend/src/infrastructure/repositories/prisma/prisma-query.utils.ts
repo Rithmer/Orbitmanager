@@ -14,7 +14,10 @@ export function normalizeLimit(limit: number | undefined): number {
   return Math.min(100, Math.max(1, Math.trunc(limit as number)));
 }
 
-export function getPagination(page: number | undefined, limit: number | undefined) {
+export function getPagination(
+  page: number | undefined,
+  limit: number | undefined,
+) {
   const safePage = normalizePage(page);
   const safeLimit = normalizeLimit(limit);
 

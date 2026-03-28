@@ -9,12 +9,7 @@ import {
   Inject,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiQuery,
-  ApiOperation,
-  ApiResponse,
-} from '@nestjs/swagger';
+import { ApiTags, ApiQuery, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ApiAuth } from '@/common/decorators/api-auth.decorator';
 import { ProjectAccessService } from '@/common/access/project-access.service';
 import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
@@ -105,14 +100,15 @@ export class RiskController {
     const assigneeLoad =
       task.assigneeIds.length > 0
         ? Math.max(
-            ...task.assigneeIds.map((uid: number) =>
-              allTasks.filter(
-                (candidate: Task) =>
-                  candidate.assigneeIds.includes(uid) &&
-                  candidate.status !== TaskStatus.DONE &&
-                  candidate.status !== TaskStatus.CANCELLED &&
-                  candidate.id !== task.id,
-              ).length,
+            ...task.assigneeIds.map(
+              (uid: number) =>
+                allTasks.filter(
+                  (candidate: Task) =>
+                    candidate.assigneeIds.includes(uid) &&
+                    candidate.status !== TaskStatus.DONE &&
+                    candidate.status !== TaskStatus.CANCELLED &&
+                    candidate.id !== task.id,
+                ).length,
             ),
           )
         : 0;
@@ -154,17 +150,18 @@ export class RiskController {
   @ApiOperation({ summary: 'Оценка рисков всех задач проекта (расширенный)' })
   @ApiResponse({ status: 200, description: 'Риски всех задач проекта' })
   @ApiResponse({ status: 404, description: 'Проект не найден' })
-  @ApiResponse({ status: 503, description: 'ML-сервис недоступен (strict mode)' })
+  @ApiResponse({
+    status: 503,
+    description: 'ML-сервис недоступен (strict mode)',
+  })
   async getProjectTasksRisk(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('id') userId: number,
     @CurrentUser('accountRole') userRole: AccountRole,
   ): Promise<Record<number, RiskPageTaskDto>> {
-    const context = await this.riskPageReadModel.loadContext(
-      userId,
-      userRole,
-      [id],
-    );
+    const context = await this.riskPageReadModel.loadContext(userId, userRole, [
+      id,
+    ]);
 
     if (!context.projectIds.includes(id)) {
       throw new NotFoundException(`Проект #${id} не найден`);
@@ -185,7 +182,10 @@ export class RiskController {
     summary: 'Оценка рисков всех видимых проектов (расширенный, page-ready)',
   })
   @ApiResponse({ status: 200, description: 'Риски проектов' })
-  @ApiResponse({ status: 503, description: 'ML-сервис недоступен (strict mode)' })
+  @ApiResponse({
+    status: 503,
+    description: 'ML-сервис недоступен (strict mode)',
+  })
   async getAllProjectsRisk(
     @CurrentUser('id') userId: number,
     @CurrentUser('accountRole') userRole: AccountRole,
@@ -210,7 +210,11 @@ export class RiskController {
   @ApiOperation({ summary: 'Переобучение ML-модели рисков' })
   @ApiResponse({ status: 200, description: 'Статус переобучения' })
   @ApiResponse({ status: 502, description: 'ML-сервис недоступен' })
-  async retrain(): Promise<{ status: string; message: string; metrics?: Record<string, unknown> | null }> {
+  async retrain(): Promise<{
+    status: string;
+    message: string;
+    metrics?: Record<string, unknown> | null;
+  }> {
     const result = await this.mlClient.retrain();
     if (!result) {
       return { status: 'error', message: 'ML service is unavailable' };

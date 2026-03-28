@@ -111,14 +111,18 @@ describe('ProjectsListViewService', () => {
       const service = await buildService();
       await service.getListView({}, 42, AccountRole.MEMBER);
 
-      expect(mockProjectAccessService.getVisibleProjectIds).toHaveBeenCalledWith(42);
+      expect(
+        mockProjectAccessService.getVisibleProjectIds,
+      ).toHaveBeenCalledWith(42);
     });
 
     it('does not call getVisibleProjectIds for ADMIN', async () => {
       const service = await buildService();
       await service.getListView({}, 1, AccountRole.ADMIN);
 
-      expect(mockProjectAccessService.getVisibleProjectIds).not.toHaveBeenCalled();
+      expect(
+        mockProjectAccessService.getVisibleProjectIds,
+      ).not.toHaveBeenCalled();
     });
 
     it('returns empty result immediately when member has no visible projects', async () => {
@@ -155,7 +159,11 @@ describe('ProjectsListViewService', () => {
       mockPrisma.project.count.mockResolvedValue(0);
 
       const service = await buildService();
-      const result = await service.getListView({ page: 2, limit: 5 }, 1, AccountRole.ADMIN);
+      const result = await service.getListView(
+        { page: 2, limit: 5 },
+        1,
+        AccountRole.ADMIN,
+      );
 
       expect(result.page).toBe(2);
       expect(result.limit).toBe(5);

@@ -15,15 +15,10 @@ export interface AuditLogListQuery extends RepositoryPageParams {
 
 export interface IAuditLogRepository {
   findAll(): Promise<AuditLog[]>;
-  findPage?(
-    params: AuditLogListQuery,
-  ): Promise<RepositoryPageResult<AuditLog>>;
+  findPage?(params: AuditLogListQuery): Promise<RepositoryPageResult<AuditLog>>;
   findById(id: number): Promise<AuditLog | null>;
   findByEntity(entityType: string, entityId: number): Promise<AuditLog[]>;
-  findByEntityIds(
-    entityType: string,
-    entityIds: number[],
-  ): Promise<AuditLog[]>;
+  findByEntityIds(entityType: string, entityIds: number[]): Promise<AuditLog[]>;
   findByUser(userId: number): Promise<AuditLog[]>;
   create(log: Omit<AuditLog, 'id'>): Promise<AuditLog>;
   createMany(logs: Omit<AuditLog, 'id'>[]): Promise<number>;

@@ -1,10 +1,5 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { ApiAuth } from '@/common/decorators/api-auth.decorator';
 import { AuditService } from './audit.service';
 import { AccountRolesGuard } from '@/common/guards/account-roles.guard';

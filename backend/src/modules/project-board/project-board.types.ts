@@ -31,7 +31,10 @@ export class ProjectBoardMemberDto {
   @ApiProperty({ description: 'Дата назначения на проект (ISO 8601)' })
   assignedAt!: string;
 
-  @ApiProperty({ description: 'Краткая информация о пользователе', type: () => ProjectBoardUserSummaryDto })
+  @ApiProperty({
+    description: 'Краткая информация о пользователе',
+    type: () => ProjectBoardUserSummaryDto,
+  })
   user!: ProjectBoardUserSummaryDto;
 }
 
@@ -83,11 +86,18 @@ export class ProjectBoardTaskDto {
   @ApiProperty({ description: 'Список ID исполнителей', type: [Number] })
   assigneeIds!: number[];
 
-  @ApiProperty({ description: 'Список исполнителей', type: () => [ProjectBoardUserSummaryDto] })
+  @ApiProperty({
+    description: 'Список исполнителей',
+    type: () => [ProjectBoardUserSummaryDto],
+  })
   assignees!: ProjectBoardUserSummaryDto[];
 
   /** @deprecated обратная совместимость — первый исполнитель или null */
-  @ApiProperty({ description: 'ID первого исполнителя (устаревшее)', required: false, nullable: true })
+  @ApiProperty({
+    description: 'ID первого исполнителя (устаревшее)',
+    required: false,
+    nullable: true,
+  })
   assigneeId!: number | null;
 
   @ApiProperty({ description: 'ID создателя задачи' })
@@ -101,16 +111,29 @@ export class ProjectBoardTaskDto {
 }
 
 export class ProjectBoardViewResponseDto {
-  @ApiProperty({ description: 'Информация о проекте', type: () => ProjectBoardProjectDto })
+  @ApiProperty({
+    description: 'Информация о проекте',
+    type: () => ProjectBoardProjectDto,
+  })
   project!: ProjectBoardProjectDto;
 
-  @ApiProperty({ description: 'Участники проекта', type: () => [ProjectBoardMemberDto] })
+  @ApiProperty({
+    description: 'Участники проекта',
+    type: () => [ProjectBoardMemberDto],
+  })
   members!: ProjectBoardMemberDto[];
 
-  @ApiProperty({ description: 'Задачи проекта', type: () => [ProjectBoardTaskDto] })
+  @ApiProperty({
+    description: 'Задачи проекта',
+    type: () => [ProjectBoardTaskDto],
+  })
   tasks!: ProjectBoardTaskDto[];
 
-  @ApiProperty({ description: 'Риск-данные по задачам (ключ — ID задачи)', type: 'object', additionalProperties: true })
+  @ApiProperty({
+    description: 'Риск-данные по задачам (ключ — ID задачи)',
+    type: 'object',
+    additionalProperties: true,
+  })
   riskByTaskId!: Record<number, TaskRiskOutputDto>;
 }
 

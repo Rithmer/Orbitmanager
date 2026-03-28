@@ -77,22 +77,21 @@ export class RiskMlService implements IRiskAssessmentService {
 
     const inputs: TaskRiskInput[] = activeTasks.map((task) => {
       const statusChangesCount = auditLogs.filter(
-        (l) =>
-          l.entityId === task.id &&
-          l.action === AuditAction.STATUS_CHANGE,
+        (l) => l.entityId === task.id && l.action === AuditAction.STATUS_CHANGE,
       ).length;
 
       const assigneeLoad =
         task.assigneeIds.length > 0
           ? Math.max(
-              ...task.assigneeIds.map((uid) =>
-                tasks.filter(
-                  (t) =>
-                    t.assigneeIds.includes(uid) &&
-                    t.status !== TaskStatus.DONE &&
-                    t.status !== TaskStatus.CANCELLED &&
-                    t.id !== task.id,
-                ).length,
+              ...task.assigneeIds.map(
+                (uid) =>
+                  tasks.filter(
+                    (t) =>
+                      t.assigneeIds.includes(uid) &&
+                      t.status !== TaskStatus.DONE &&
+                      t.status !== TaskStatus.CANCELLED &&
+                      t.id !== task.id,
+                  ).length,
               ),
             )
           : 0;
@@ -136,29 +135,31 @@ export class RiskMlService implements IRiskAssessmentService {
 
     const allAuditLogs =
       allActiveTaskIds.length > 0
-        ? await this.auditLogRepository.findByEntityIds('task', allActiveTaskIds)
+        ? await this.auditLogRepository.findByEntityIds(
+            'task',
+            allActiveTaskIds,
+          )
         : [];
 
     // Build inputs for all active tasks
     const allInputs: TaskRiskInput[] = allActiveTasks.map((task) => {
       const statusChangesCount = allAuditLogs.filter(
-        (l) =>
-          l.entityId === task.id &&
-          l.action === AuditAction.STATUS_CHANGE,
+        (l) => l.entityId === task.id && l.action === AuditAction.STATUS_CHANGE,
       ).length;
 
       const projectTasks = tasksByProject.get(task.projectId) ?? [];
       const assigneeLoad =
         task.assigneeIds.length > 0
           ? Math.max(
-              ...task.assigneeIds.map((uid) =>
-                projectTasks.filter(
-                  (t) =>
-                    t.assigneeIds.includes(uid) &&
-                    t.status !== TaskStatus.DONE &&
-                    t.status !== TaskStatus.CANCELLED &&
-                    t.id !== task.id,
-                ).length,
+              ...task.assigneeIds.map(
+                (uid) =>
+                  projectTasks.filter(
+                    (t) =>
+                      t.assigneeIds.includes(uid) &&
+                      t.status !== TaskStatus.DONE &&
+                      t.status !== TaskStatus.CANCELLED &&
+                      t.id !== task.id,
+                  ).length,
               ),
             )
           : 0;
@@ -167,9 +168,7 @@ export class RiskMlService implements IRiskAssessmentService {
     });
 
     const mlResults =
-      allInputs.length > 0
-        ? await this.mlClient.predictBatch(allInputs)
-        : null;
+      allInputs.length > 0 ? await this.mlClient.predictBatch(allInputs) : null;
 
     if (!mlResults) {
       this.logger.warn(

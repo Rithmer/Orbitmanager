@@ -14,10 +14,7 @@ import { AuditAction } from '@/common/enums/audit-action.enum';
 import { ProjectRole } from '@/common/enums/project-role.enum';
 import { ProjectStatus } from '@/common/enums/project-status.enum';
 import { TeamRole } from '@/common/enums/team-role.enum';
-import {
-  PaginatedResult,
-  QueryParams,
-} from '@/common/helpers/query.helper';
+import { PaginatedResult, QueryParams } from '@/common/helpers/query.helper';
 import { ProjectMember } from '@/domain/models/project-member.model';
 import { Project } from '@/domain/models/project.model';
 import type { IProjectMemberRepository } from '@/domain/repositories/project-member.repository';
@@ -68,12 +65,9 @@ export class ProjectsService {
     const limit = normalizeLimit(params.limit);
     const teamId =
       typeof params.filters?.['teamId'] === 'number'
-        ? (params.filters['teamId'] as number)
+        ? params.filters['teamId']
         : undefined;
-    const status =
-      typeof params.filters?.['status'] === 'string'
-        ? (params.filters['status'] as string)
-        : undefined;
+    const status = parseProjectStatus(params.filters?.['status']);
 
     if (this.projectRepository.findPage) {
       const projectIds =
@@ -105,7 +99,9 @@ export class ProjectsService {
 
     return applyInMemoryPagination(
       projects
-        .filter((project) => (teamId !== undefined ? project.teamId === teamId : true))
+        .filter((project) =>
+          teamId !== undefined ? project.teamId === teamId : true,
+        )
         .filter((project) => (status ? project.status === status : true))
         .filter((project) => {
           if (!params.search) {
@@ -537,6 +533,18 @@ function normalizePage(page: number | undefined): number {
   return Math.max(1, Math.trunc(page as number));
 }
 
+const PROJECT_STATUS_VALUES = new Set<string>(Object.values(ProjectStatus));
+
+function parseProjectStatus(value: unknown): ProjectStatus | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  return PROJECT_STATUS_VALUES.has(value)
+    ? (value as ProjectStatus)
+    : undefined;
+}
+
 function normalizeLimit(limit: number | undefined): number {
   if (!Number.isFinite(limit)) {
     return 20;
@@ -566,7 +574,12 @@ function applyInMemoryPagination<T>(
   limit: number,
 ): PaginatedResult<T> {
   const offset = (page - 1) * limit;
-  return toPaginatedResult(items.slice(offset, offset + limit), items.length, page, limit);
+  return toPaginatedResult(
+    items.slice(offset, offset + limit),
+    items.length,
+    page,
+    limit,
+  );
 }
 
 function mapProjectRecord(project: {

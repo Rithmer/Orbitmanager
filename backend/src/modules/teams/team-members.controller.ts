@@ -12,12 +12,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiQuery,
-  ApiOperation,
-  ApiResponse,
-} from '@nestjs/swagger';
+import { ApiTags, ApiQuery, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ApiAuth } from '@/common/decorators/api-auth.decorator';
 import { TeamsService } from './teams.service';
 import { AddTeamMemberDto, UpdateTeamMemberDto } from './dto';

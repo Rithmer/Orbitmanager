@@ -1,4 +1,8 @@
-import { Inject, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type {
   IRiskAssessmentService,
@@ -82,14 +86,16 @@ export class RiskPageProjectionService {
 
       tasksAtRisk.sort((a, b) => b.delayProbability - a.delayProbability);
 
-      const avgDelay =
-        tasks.length > 0 ? totalDelay / tasks.length : 0;
+      const avgDelay = tasks.length > 0 ? totalDelay / tasks.length : 0;
       const riskScore = Math.round(avgDelay * 100);
       const riskLevel: 'low' | 'medium' | 'high' =
         avgDelay > 0.6 ? 'high' : avgDelay > 0.3 ? 'medium' : 'low';
       const successProbability = clamp(100 - riskScore, 0, 100);
 
-      const riskFactors = this.collectProjectRiskFactors(taskInsights, predictionsByTaskId);
+      const riskFactors = this.collectProjectRiskFactors(
+        taskInsights,
+        predictionsByTaskId,
+      );
       const recommendations = this.generateRecommendations(
         taskInsights,
         predictionsByTaskId,
@@ -103,7 +109,13 @@ export class RiskPageProjectionService {
         riskScore,
         riskLevel,
         tasksAtRisk,
-        summary: this.buildSummary(riskLevel, riskScore, tasks.length, tasksAtRisk.length, highRiskCount),
+        summary: this.buildSummary(
+          riskLevel,
+          riskScore,
+          tasks.length,
+          tasksAtRisk.length,
+          highRiskCount,
+        ),
         predictionSource: this.provider === 'ml' ? 'ml' : 'stub',
         successProbability,
         riskFactors,
@@ -207,20 +219,35 @@ export class RiskPageProjectionService {
     members: ProjectMemberRecord[],
     activeTaskCountByUser: Map<number, number>,
   ): TaskInsightDto {
-    const delayPercent = clamp(Math.round(prediction.delayProbability * 100), 0, 100);
+    const delayPercent = clamp(
+      Math.round(prediction.delayProbability * 100),
+      0,
+      100,
+    );
     const taskSuccessProbability = clamp(100 - delayPercent, 0, 100);
 
     const assigneeCount = input?.assigneeCount ?? task.assigneeIds.length;
     const statusChangesCount = input?.statusChangesCount ?? 0;
-    const avgLoad = task.assigneeIds.length > 0
-      ? task.assigneeIds.reduce((sum, uid) => sum + (activeTaskCountByUser.get(uid) ?? 0), 0) / task.assigneeIds.length
-      : 0;
+    const avgLoad =
+      task.assigneeIds.length > 0
+        ? task.assigneeIds.reduce(
+            (sum, uid) => sum + (activeTaskCountByUser.get(uid) ?? 0),
+            0,
+          ) / task.assigneeIds.length
+        : 0;
 
     const coordinationWeight = Math.min(
       0.85,
-      0.20 + 0.10 * Math.max(0, assigneeCount - 1) + 0.05 * Math.min(3, statusChangesCount) + 0.05 * Math.min(4, avgLoad),
+      0.2 +
+        0.1 * Math.max(0, assigneeCount - 1) +
+        0.05 * Math.min(3, statusChangesCount) +
+        0.05 * Math.min(4, avgLoad),
     );
-    const coordinationPenalty = clamp(Math.round(delayPercent * coordinationWeight), 0, 100);
+    const coordinationPenalty = clamp(
+      Math.round(delayPercent * coordinationWeight),
+      0,
+      100,
+    );
 
     const assigneeBreakdown = this.scoringService.buildAssigneeBreakdown(
       task,
@@ -255,7 +282,10 @@ export class RiskPageProjectionService {
     taskInsights: TaskInsightDto[],
     predictionsByTaskId: Map<number, TaskRiskOutput>,
   ): RiskFactorDto[] {
-    const factorCounts = new Map<string, { label: string; severity: 'low' | 'medium' | 'high'; count: number }>();
+    const factorCounts = new Map<
+      string,
+      { label: string; severity: 'low' | 'medium' | 'high'; count: number }
+    >();
 
     for (const insight of taskInsights) {
       const prediction = predictionsByTaskId.get(insight.taskId);
@@ -294,7 +324,12 @@ export class RiskPageProjectionService {
     taskRiskLevel: 'low' | 'medium' | 'high',
   ): 'low' | 'medium' | 'high' {
     const lower = factorText.toLowerCase();
-    if (lower.includes('высок') || lower.includes('крит') || lower.includes('high')) return 'high';
+    if (
+      lower.includes('высок') ||
+      lower.includes('крит') ||
+      lower.includes('high')
+    )
+      return 'high';
     if (lower.includes('низк') || lower.includes('low')) return 'low';
     if (taskRiskLevel === 'high') return 'high';
     if (taskRiskLevel === 'medium') return 'medium';
@@ -315,14 +350,20 @@ export class RiskPageProjectionService {
       if (!prediction) continue;
 
       const isUnassigned = insight.assigneeBreakdown.length === 0;
-      const riskFactorsLower = prediction.riskFactors.map((f) => f.toLowerCase());
-      const hasHighLoad = riskFactorsLower.some((f) => f.includes('нагрузк') || f.includes('load'));
+      const riskFactorsLower = prediction.riskFactors.map((f) =>
+        f.toLowerCase(),
+      );
+      const hasHighLoad = riskFactorsLower.some(
+        (f) => f.includes('нагрузк') || f.includes('load'),
+      );
 
       // add_member: unassigned or high load with top candidate not current assignee
       if (isUnassigned || hasHighLoad) {
         const topCandidate = insight.recommendedAssignees[0];
         const isTopAlreadyAssigned = topCandidate
-          ? insight.assigneeBreakdown.some((a) => a.userId === topCandidate.userId)
+          ? insight.assigneeBreakdown.some(
+              (a) => a.userId === topCandidate.userId,
+            )
           : true;
 
         if (!isTopAlreadyAssigned || isUnassigned) {
@@ -340,9 +381,13 @@ export class RiskPageProjectionService {
       }
 
       // swap_members: current assignee has negative fitScore, candidate has >= 0.20
-      const negativeAssignees = insight.assigneeBreakdown.filter((a) => a.impactScore < 0);
+      const negativeAssignees = insight.assigneeBreakdown.filter(
+        (a) => a.impactScore < 0,
+      );
       const goodCandidate = insight.recommendedAssignees.find(
-        (c) => c.fitScore >= 0.20 && !insight.assigneeBreakdown.some((a) => a.userId === c.userId),
+        (c) =>
+          c.fitScore >= 0.2 &&
+          !insight.assigneeBreakdown.some((a) => a.userId === c.userId),
       );
 
       if (negativeAssignees.length > 0 && goodCandidate) {
@@ -362,7 +407,8 @@ export class RiskPageProjectionService {
           id: `rec-${recIndex++}`,
           type: 'rebalance_load',
           title: `Перебалансировать нагрузку по задаче «${insight.taskName}»`,
-          reason: 'Несколько исполнителей с высокой нагрузкой — рекомендуется перераспределить задачи.',
+          reason:
+            'Несколько исполнителей с высокой нагрузкой — рекомендуется перераспределить задачи.',
           taskId: insight.taskId,
         });
       }

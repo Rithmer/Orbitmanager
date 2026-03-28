@@ -6,7 +6,11 @@ import type {
 } from '@/domain/repositories/project.repository';
 import { Project } from '@/domain/models/project.model';
 import type { Project as PrismaProject } from '@prisma/client';
-import { buildOrderBy, buildStringSearch, getPagination } from './prisma-query.utils';
+import {
+  buildOrderBy,
+  buildStringSearch,
+  getPagination,
+} from './prisma-query.utils';
 
 @Injectable()
 export class ProjectsPrismaRepository implements IProjectRepository {
@@ -31,7 +35,15 @@ export class ProjectsPrismaRepository implements IProjectRepository {
         where,
         orderBy: buildOrderBy(
           params.sort,
-          ['id', 'teamId', 'name', 'description', 'status', 'createdAt', 'updatedAt'],
+          [
+            'id',
+            'teamId',
+            'name',
+            'description',
+            'status',
+            'createdAt',
+            'updatedAt',
+          ],
           'id',
         ),
         skip,

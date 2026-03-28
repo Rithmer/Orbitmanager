@@ -35,13 +35,18 @@ const mockStubResult = {
   delayProbability: 0.25,
   riskLevel: 'low' as const,
   riskFactors: [],
-  recommendation: 'Задача находится в зелёной зоне. Продолжайте в текущем режиме.',
+  recommendation:
+    'Задача находится в зелёной зоне. Продолжайте в текущем режиме.',
 };
 
 describe('RiskMlService', () => {
   let service: RiskMlService;
   let mlClient: { predict: jest.Mock; predictBatch: jest.Mock };
-  let stubService: { assessTask: jest.Mock; assessProject: jest.Mock; assessProjectsBatch: jest.Mock };
+  let stubService: {
+    assessTask: jest.Mock;
+    assessProject: jest.Mock;
+    assessProjectsBatch: jest.Mock;
+  };
   let taskRepo: { findByProject: jest.Mock; findByProjects: jest.Mock };
   let projectRepo: { findById: jest.Mock };
   let auditLogRepo: { findByEntityIds: jest.Mock };

@@ -100,7 +100,9 @@ describe('ProjectBoardService', () => {
     jest.clearAllMocks();
     mockPrisma.project.findUnique.mockResolvedValue(makeProjectRecord());
     mockPrisma.auditLog.findMany.mockResolvedValue([]);
-    mockProjectAccessService.assertProjectVisibility.mockResolvedValue(undefined);
+    mockProjectAccessService.assertProjectVisibility.mockResolvedValue(
+      undefined,
+    );
     mockRiskAssessmentService.assessTask.mockResolvedValue({
       predictedCompletionDate: '2026-04-02T00:00:00.000Z',
       delayProbability: 0.15,
@@ -128,37 +130,42 @@ describe('ProjectBoardService', () => {
       const result = await service.getBoardView(1, 7, AccountRole.MEMBER);
 
       expect(result.project.id).toBe(1);
-      expect(mockProjectAccessService.assertProjectVisibility).toHaveBeenCalledTimes(1);
+      expect(
+        mockProjectAccessService.assertProjectVisibility,
+      ).toHaveBeenCalledTimes(1);
     });
 
     it('passes userId to assertProjectVisibility for non-admin users', async () => {
       const service = await buildService();
       await service.getBoardView(1, 42, AccountRole.MEMBER);
 
-      expect(mockProjectAccessService.assertProjectVisibility).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 1 }),
-        42,
-      );
+      expect(
+        mockProjectAccessService.assertProjectVisibility,
+      ).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }), 42);
     });
 
     it('skips assertProjectVisibility for ADMIN', async () => {
       const service = await buildService();
       await service.getBoardView(1, 1, AccountRole.ADMIN);
 
-      expect(mockProjectAccessService.assertProjectVisibility).not.toHaveBeenCalled();
+      expect(
+        mockProjectAccessService.assertProjectVisibility,
+      ).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException when project does not exist', async () => {
       mockPrisma.project.findUnique.mockResolvedValue(null);
 
       const service = await buildService();
-      await expect(service.getBoardView(999, 1, AccountRole.ADMIN)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.getBoardView(999, 1, AccountRole.ADMIN),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('returns a board with empty tasks and empty riskByTaskId when project has no tasks', async () => {
-      mockPrisma.project.findUnique.mockResolvedValue(makeProjectRecord({ tasks: [] }));
+      mockPrisma.project.findUnique.mockResolvedValue(
+        makeProjectRecord({ tasks: [] }),
+      );
 
       const service = await buildService();
       const result = await service.getBoardView(1, 1, AccountRole.ADMIN);

@@ -12,12 +12,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto, UpdateProjectDto } from './dto';
 import { ApiAuth } from '@/common/decorators/api-auth.decorator';

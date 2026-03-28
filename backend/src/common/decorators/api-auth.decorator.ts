@@ -4,6 +4,8 @@ import { ApiBearerAuth, ApiUnauthorizedResponse } from '@nestjs/swagger';
 export function ApiAuth() {
   return applyDecorators(
     ApiBearerAuth(),
-    ApiUnauthorizedResponse({ description: 'Недействительный или отсутствующий токен' }),
+    ApiUnauthorizedResponse({
+      description: 'Недействительный или отсутствующий токен',
+    }),
   );
 }

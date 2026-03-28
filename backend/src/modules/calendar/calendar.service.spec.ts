@@ -1,5 +1,9 @@
 import { Test } from '@nestjs/testing';
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { CALENDAR_EVENT_REPOSITORY } from '@/domain/repositories/calendar-event.repository';
 import { PROJECT_REPOSITORY } from '@/domain/repositories/project.repository';
@@ -59,7 +63,10 @@ describe('CalendarService', () => {
     const module = await Test.createTestingModule({
       providers: [
         CalendarService,
-        { provide: CALENDAR_EVENT_REPOSITORY, useValue: mockCalendarEventRepository },
+        {
+          provide: CALENDAR_EVENT_REPOSITORY,
+          useValue: mockCalendarEventRepository,
+        },
         { provide: PROJECT_REPOSITORY, useValue: mockProjectRepository },
         { provide: TASK_REPOSITORY, useValue: mockTaskRepository },
         { provide: AuditService, useValue: mockAuditService },
@@ -99,7 +106,9 @@ describe('CalendarService', () => {
         allDay: false,
       };
 
-      await expect(service.create(dto, 10, AccountRole.MEMBER)).rejects.toThrow(BadRequestException);
+      await expect(service.create(dto, 10, AccountRole.MEMBER)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('throws BadRequestException when endDate equals startDate', async () => {
@@ -111,7 +120,9 @@ describe('CalendarService', () => {
         allDay: false,
       };
 
-      await expect(service.create(dto, 10, AccountRole.MEMBER)).rejects.toThrow(BadRequestException);
+      await expect(service.create(dto, 10, AccountRole.MEMBER)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('returns created event and calls auditService.log', async () => {
@@ -173,7 +184,10 @@ describe('CalendarService', () => {
 
     it('throws BadRequestException when task does not belong to specified project', async () => {
       mockProjectRepository.findById.mockResolvedValueOnce(mockProject);
-      mockTaskRepository.findById.mockResolvedValueOnce({ ...mockTask, projectId: 42 });
+      mockTaskRepository.findById.mockResolvedValueOnce({
+        ...mockTask,
+        projectId: 42,
+      });
 
       const dto = {
         title: 'Mismatched task/project',
@@ -218,7 +232,9 @@ describe('CalendarService', () => {
 
     it('throws ForbiddenException when non-owner non-admin tries to delete', async () => {
       const otherUsersEvent = { ...mockEvent, userId: 99 };
-      mockCalendarEventRepository.findById.mockResolvedValueOnce(otherUsersEvent);
+      mockCalendarEventRepository.findById.mockResolvedValueOnce(
+        otherUsersEvent,
+      );
 
       await expect(service.remove(1, 10, AccountRole.MEMBER)).rejects.toThrow(
         ForbiddenException,

@@ -40,12 +40,18 @@ export class ProjectListViewItemDto {
   @ApiProperty({ description: 'Количество участников проекта' })
   memberCount!: number;
 
-  @ApiProperty({ description: 'Сводка рисков проекта', type: () => ProjectRiskOutputDto })
+  @ApiProperty({
+    description: 'Сводка рисков проекта',
+    type: () => ProjectRiskOutputDto,
+  })
   riskSummary!: ProjectRiskOutputDto;
 }
 
 export class ProjectsListViewResponseDto implements PaginatedResult<ProjectListViewItemDto> {
-  @ApiProperty({ description: 'Список проектов', type: () => [ProjectListViewItemDto] })
+  @ApiProperty({
+    description: 'Список проектов',
+    type: () => [ProjectListViewItemDto],
+  })
   items!: ProjectListViewItemDto[];
 
   @ApiProperty({ description: 'Общее количество проектов' })

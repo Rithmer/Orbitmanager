@@ -6,7 +6,11 @@ import type {
 } from '@/domain/repositories/team.repository';
 import { Team } from '@/domain/models/team.model';
 import type { Team as PrismaTeam } from '@prisma/client';
-import { buildOrderBy, buildStringSearch, getPagination } from './prisma-query.utils';
+import {
+  buildOrderBy,
+  buildStringSearch,
+  getPagination,
+} from './prisma-query.utils';
 
 @Injectable()
 export class TeamsPrismaRepository implements ITeamRepository {

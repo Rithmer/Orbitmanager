@@ -1,6 +1,9 @@
 import { RiskAssigneeScoringService } from './risk-assignee-scoring.service';
 import type { TaskRiskOutput } from '@/domain/services/risk-assessment.interface';
-import type { ProjectMemberRecord, TaskRecord } from './risk-page-read-model.service';
+import type {
+  ProjectMemberRecord,
+  TaskRecord,
+} from './risk-page-read-model.service';
 
 describe('RiskAssigneeScoringService', () => {
   let service: RiskAssigneeScoringService;
@@ -21,7 +24,9 @@ describe('RiskAssigneeScoringService', () => {
     ...overrides,
   });
 
-  const makePrediction = (overrides: Partial<TaskRiskOutput> = {}): TaskRiskOutput => ({
+  const makePrediction = (
+    overrides: Partial<TaskRiskOutput> = {},
+  ): TaskRiskOutput => ({
     predictedCompletionDate: '2026-04-12T00:00:00.000Z',
     delayProbability: 0.5,
     riskLevel: 'medium',
@@ -31,11 +36,41 @@ describe('RiskAssigneeScoringService', () => {
   });
 
   const makeMembers = (): ProjectMemberRecord[] => [
-    { userId: 100, role: 'developer', fullName: 'Alice', profession: 'Backend', accountStatus: 'active' },
-    { userId: 101, role: 'team_lead', fullName: 'Bob', profession: 'Lead', accountStatus: 'active' },
-    { userId: 102, role: 'developer', fullName: 'Charlie', profession: 'Frontend', accountStatus: 'active' },
-    { userId: 103, role: 'observer', fullName: 'Diana', profession: 'PM', accountStatus: 'active' },
-    { userId: 104, role: 'developer', fullName: 'Eve', profession: 'Backend', accountStatus: 'blocked' },
+    {
+      userId: 100,
+      role: 'developer',
+      fullName: 'Alice',
+      profession: 'Backend',
+      accountStatus: 'active',
+    },
+    {
+      userId: 101,
+      role: 'team_lead',
+      fullName: 'Bob',
+      profession: 'Lead',
+      accountStatus: 'active',
+    },
+    {
+      userId: 102,
+      role: 'developer',
+      fullName: 'Charlie',
+      profession: 'Frontend',
+      accountStatus: 'active',
+    },
+    {
+      userId: 103,
+      role: 'observer',
+      fullName: 'Diana',
+      profession: 'PM',
+      accountStatus: 'active',
+    },
+    {
+      userId: 104,
+      role: 'developer',
+      fullName: 'Eve',
+      profession: 'Backend',
+      accountStatus: 'blocked',
+    },
   ];
 
   describe('buildAssigneeBreakdown', () => {
@@ -45,7 +80,10 @@ describe('RiskAssigneeScoringService', () => {
         task,
         makePrediction(),
         makeMembers(),
-        new Map([[100, 3], [101, 2]]),
+        new Map([
+          [100, 3],
+          [101, 2],
+        ]),
       );
 
       expect(result).toHaveLength(2);
@@ -71,7 +109,10 @@ describe('RiskAssigneeScoringService', () => {
         makeTask(),
         prediction,
         makeMembers(),
-        new Map([[100, 5], [101, 1]]),
+        new Map([
+          [100, 5],
+          [101, 1],
+        ]),
       );
 
       const alice = result.find((r) => r.userId === 100)!;
@@ -86,7 +127,10 @@ describe('RiskAssigneeScoringService', () => {
         makeTask(),
         prediction,
         makeMembers(),
-        new Map([[100, 20], [101, 20]]),
+        new Map([
+          [100, 20],
+          [101, 20],
+        ]),
       );
 
       for (const item of result) {
@@ -100,12 +144,15 @@ describe('RiskAssigneeScoringService', () => {
         makeTask(),
         makePrediction(),
         makeMembers(),
-        new Map([[100, 1], [101, 1]]),
+        new Map([
+          [100, 1],
+          [101, 1],
+        ]),
       );
 
       for (const item of result) {
         expect(item.confidence).toBeGreaterThanOrEqual(0.55);
-        expect(item.confidence).toBeLessThanOrEqual(0.90);
+        expect(item.confidence).toBeLessThanOrEqual(0.9);
       }
     });
   });
@@ -116,7 +163,12 @@ describe('RiskAssigneeScoringService', () => {
         makeTask(),
         makePrediction(),
         makeMembers(),
-        new Map([[100, 3], [101, 2], [102, 1], [103, 0]]),
+        new Map([
+          [100, 3],
+          [101, 2],
+          [102, 1],
+          [103, 0],
+        ]),
       );
       expect(result.length).toBeLessThanOrEqual(5);
     });
@@ -137,11 +189,17 @@ describe('RiskAssigneeScoringService', () => {
         makeTask(),
         makePrediction(),
         makeMembers(),
-        new Map([[100, 1], [101, 1], [102, 0]]),
+        new Map([
+          [100, 1],
+          [101, 1],
+          [102, 0],
+        ]),
       );
 
       for (let i = 1; i < result.length; i++) {
-        expect(result[i - 1].fitScore).toBeGreaterThanOrEqual(result[i].fitScore);
+        expect(result[i - 1].fitScore).toBeGreaterThanOrEqual(
+          result[i].fitScore,
+        );
       }
     });
 
@@ -151,7 +209,10 @@ describe('RiskAssigneeScoringService', () => {
         task,
         makePrediction(),
         makeMembers(),
-        new Map([[100, 1], [102, 1]]),
+        new Map([
+          [100, 1],
+          [102, 1],
+        ]),
       );
 
       const alice = result.find((r) => r.userId === 100);
@@ -170,7 +231,9 @@ describe('RiskAssigneeScoringService', () => {
         new Map(),
       );
 
-      const developers = result.filter((r) => r.role === 'developer' || r.role === 'team_lead');
+      const developers = result.filter(
+        (r) => r.role === 'developer' || r.role === 'team_lead',
+      );
       const observers = result.filter((r) => r.role === 'observer');
 
       if (developers.length > 0 && observers.length > 0) {

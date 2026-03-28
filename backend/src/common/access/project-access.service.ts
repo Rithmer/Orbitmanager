@@ -50,7 +50,9 @@ export class ProjectAccessService {
     const allTeamProjects = await this.projectRepository.findByTeams(teamIds);
 
     return this.dedupeProjects(
-      allTeamProjects.filter((project) => visibleProjectIds.includes(project.id)),
+      allTeamProjects.filter((project) =>
+        visibleProjectIds.includes(project.id),
+      ),
     );
   }
 
@@ -222,15 +224,15 @@ export class ProjectAccessService {
     const membershipProjectIds = [
       ...new Set(projectMemberships.map((membership) => membership.projectId)),
     ];
-    const membershipProjects = await this.projectRepository.findByIds(membershipProjectIds);
+    const membershipProjects =
+      await this.projectRepository.findByIds(membershipProjectIds);
 
     const teamSet = new Set(teamIds);
     const membershipProjectIdSet = new Set(membershipProjectIds);
     return membershipProjects
       .filter(
         (project) =>
-          teamSet.has(project.teamId) &&
-          membershipProjectIdSet.has(project.id),
+          teamSet.has(project.teamId) && membershipProjectIdSet.has(project.id),
       )
       .map((project) => project.id);
   }

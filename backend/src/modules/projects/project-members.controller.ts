@@ -12,12 +12,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiQuery,
-  ApiOperation,
-  ApiResponse,
-} from '@nestjs/swagger';
+import { ApiTags, ApiQuery, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ApiAuth } from '@/common/decorators/api-auth.decorator';
 import { ProjectsService } from './projects.service';
 import { AddProjectMemberDto, UpdateProjectMemberDto } from './dto';
@@ -56,10 +51,8 @@ export class ProjectMembersController {
     @Query('projectIds') projectIds?: string | string[],
     @Query('ids') legacyIds?: string | string[],
   ) {
-    const allMembersByProjectId = await this.projectsService.findAllMembersBatch(
-      userId,
-      userRole,
-    );
+    const allMembersByProjectId =
+      await this.projectsService.findAllMembersBatch(userId, userRole);
     const requestedProjectIds = this.readModelResponseFactory.normalizeIds(
       projectIds ?? legacyIds,
     );

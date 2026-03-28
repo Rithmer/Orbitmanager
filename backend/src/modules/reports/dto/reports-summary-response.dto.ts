@@ -63,15 +63,27 @@ export class ReportsDifficultyDistributionItemDto {
 }
 
 export class ReportsSummaryResponseDto {
-  @ApiProperty({ description: 'Сводка показателей', type: () => ReportsSummaryOverviewDto })
+  @ApiProperty({
+    description: 'Сводка показателей',
+    type: () => ReportsSummaryOverviewDto,
+  })
   overview!: ReportsSummaryOverviewDto;
 
-  @ApiProperty({ description: 'Распределение задач по статусам', type: () => [ReportsStatusDistributionItemDto] })
+  @ApiProperty({
+    description: 'Распределение задач по статусам',
+    type: () => [ReportsStatusDistributionItemDto],
+  })
   statusDistribution!: ReportsStatusDistributionItemDto[];
 
-  @ApiProperty({ description: 'Разбивка задач по проектам', type: () => [ReportsProjectTaskBreakdownItemDto] })
+  @ApiProperty({
+    description: 'Разбивка задач по проектам',
+    type: () => [ReportsProjectTaskBreakdownItemDto],
+  })
   projectTaskBreakdown!: ReportsProjectTaskBreakdownItemDto[];
 
-  @ApiProperty({ description: 'Распределение задач по сложности', type: () => [ReportsDifficultyDistributionItemDto] })
+  @ApiProperty({
+    description: 'Распределение задач по сложности',
+    type: () => [ReportsDifficultyDistributionItemDto],
+  })
   difficultyDistribution!: ReportsDifficultyDistributionItemDto[];
 }

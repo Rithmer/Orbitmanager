@@ -4,7 +4,7 @@ import {
   RepositoryPageResult,
 } from './paginated-query.types';
 
-export interface TeamListQuery extends RepositoryPageParams {}
+export type TeamListQuery = RepositoryPageParams;
 
 export interface ITeamRepository {
   findAll(): Promise<Team[]>;

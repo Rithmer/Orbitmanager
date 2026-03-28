@@ -22,7 +22,11 @@ export class CalendarViewController {
   @ApiQuery({ name: 'year', required: true, type: Number })
   @ApiQuery({ name: 'month', required: true, type: Number })
   @ApiQuery({ name: 'projectId', required: false, type: Number })
-  @ApiResponse({ status: 200, description: 'Month view календаря', type: CalendarMonthViewResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Month view календаря',
+    type: CalendarMonthViewResponseDto,
+  })
   getMonthView(
     @Query('year') yearParam: string,
     @Query('month') monthParam: string,
@@ -31,7 +35,8 @@ export class CalendarViewController {
     @CurrentUser('accountRole') accountRole: AccountRole,
   ): Promise<CalendarMonthViewResponseDto> {
     const currentYear = parseOptionalInt(yearParam) ?? new Date().getFullYear();
-    const currentMonth = parseOptionalInt(monthParam) ?? new Date().getMonth() + 1;
+    const currentMonth =
+      parseOptionalInt(monthParam) ?? new Date().getMonth() + 1;
     const projectId = parseOptionalInt(projectIdParam);
 
     return this.calendarViewService.getMonthView(

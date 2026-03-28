@@ -215,7 +215,11 @@ describe('ProjectsService', () => {
         mockProjectAccessService.getVisibleProjectIds,
       ).toHaveBeenCalledWith(10);
       expect(mockProjectRepository.findPage).toHaveBeenCalledWith(
-        expect.objectContaining({ page: 1, limit: 20, projectIds: [mockProject.id] }),
+        expect.objectContaining({
+          page: 1,
+          limit: 20,
+          projectIds: [mockProject.id],
+        }),
       );
     });
   });

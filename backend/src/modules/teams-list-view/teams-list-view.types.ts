@@ -36,7 +36,10 @@ export class TeamListViewMemberDto {
   @ApiProperty({ description: 'Роль пользователя в команде', enum: TeamRole })
   teamRole!: TeamRole;
 
-  @ApiProperty({ description: 'Краткая информация о пользователе', type: () => TeamListViewUserSummaryDto })
+  @ApiProperty({
+    description: 'Краткая информация о пользователе',
+    type: () => TeamListViewUserSummaryDto,
+  })
   user!: TeamListViewUserSummaryDto;
 }
 
@@ -59,15 +62,26 @@ export class TeamListViewItemDto {
   @ApiProperty({ description: 'Количество участников команды' })
   memberCount!: number;
 
-  @ApiProperty({ description: 'Роль текущего пользователя в команде', enum: TeamRole, required: false, nullable: true })
+  @ApiProperty({
+    description: 'Роль текущего пользователя в команде',
+    enum: TeamRole,
+    required: false,
+    nullable: true,
+  })
   currentUserRole!: TeamRole | null;
 
-  @ApiProperty({ description: 'Список участников команды', type: () => [TeamListViewMemberDto] })
+  @ApiProperty({
+    description: 'Список участников команды',
+    type: () => [TeamListViewMemberDto],
+  })
   members!: TeamListViewMemberDto[];
 }
 
 export class TeamsListViewResponseDto implements PaginatedResult<TeamListViewItemDto> {
-  @ApiProperty({ description: 'Список команд', type: () => [TeamListViewItemDto] })
+  @ApiProperty({
+    description: 'Список команд',
+    type: () => [TeamListViewItemDto],
+  })
   items!: TeamListViewItemDto[];
 
   @ApiProperty({ description: 'Общее количество команд' })

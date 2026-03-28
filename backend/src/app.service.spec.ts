@@ -67,14 +67,14 @@ describe('AppService', () => {
       }
 
       expect(thrown).toBeInstanceOf(ServiceUnavailableException);
-      expect((thrown as ServiceUnavailableException).getResponse()).toMatchObject(
-        {
-          status: 'error',
-          checks: {
-            database: 'down',
-          },
+      expect(
+        (thrown as ServiceUnavailableException).getResponse(),
+      ).toMatchObject({
+        status: 'error',
+        checks: {
+          database: 'down',
         },
-      );
+      });
       expect(prisma.checkConnection).toHaveBeenCalledTimes(1);
     });
   });

@@ -11,12 +11,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { CalendarService } from './calendar.service';
 import { CreateCalendarEventDto, UpdateCalendarEventDto } from './dto';
 import { ApiAuth } from '@/common/decorators/api-auth.decorator';

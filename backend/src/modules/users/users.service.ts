@@ -19,10 +19,7 @@ import { AUDIT_LOG_REPOSITORY } from '@/domain/repositories/audit-log.repository
 import { User } from '@/domain/models/user.model';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { CreateUserDto, UpdateUserDto, UpdateProfileDto } from './dto';
-import {
-  QueryParams,
-  PaginatedResult,
-} from '@/common/helpers/query.helper';
+import { QueryParams, PaginatedResult } from '@/common/helpers/query.helper';
 import { AuditService } from '../audit-logs/audit.service';
 import { AuditAction } from '@/common/enums/audit-action.enum';
 
@@ -63,7 +60,7 @@ export class UsersService {
         sort: params.sort,
         accountRole:
           typeof params.filters?.['accountRole'] === 'string'
-            ? (params.filters['accountRole'] as string)
+            ? params.filters['accountRole']
             : undefined,
       });
 
@@ -94,8 +91,9 @@ export class UsersService {
           }
 
           const search = params.search.toLowerCase();
-          return [user.login, user.fullName, user.profession]
-            .some((field) => field?.toLowerCase().includes(search));
+          return [user.login, user.fullName, user.profession].some((field) =>
+            field?.toLowerCase().includes(search),
+          );
         }),
       page,
       limit,

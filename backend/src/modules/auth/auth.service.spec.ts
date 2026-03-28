@@ -311,7 +311,9 @@ describe('AuthService', () => {
     });
 
     it('throws UnauthorizedException for revoked token', async () => {
-      mockPrismaService.refreshToken.updateMany.mockResolvedValueOnce({ count: 0 });
+      mockPrismaService.refreshToken.updateMany.mockResolvedValueOnce({
+        count: 0,
+      });
 
       await expect(service.refresh('valid-refresh-token')).rejects.toThrow(
         UnauthorizedException,

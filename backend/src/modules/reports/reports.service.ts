@@ -8,6 +8,8 @@ import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { ReportsSummaryResponseDto } from './dto/reports-summary-response.dto';
 
 const REPORTS_CACHE_TTL_MS = 60_000;
+const DONE_TASK_STATUSES = new Set<string>([TaskStatus.DONE]);
+const OWNER_TEAM_ROLES = new Set<string>([TeamRole.OWNER]);
 
 export interface ProjectNameRow {
   id: number;
@@ -65,14 +67,9 @@ export class ReportsService {
     }
 
     const targetProjectIds =
-      projectId !== undefined
-        ? [projectId]
-        : accessibleProjectIds;
+      projectId !== undefined ? [projectId] : accessibleProjectIds;
 
-    if (
-      projectId !== undefined &&
-      !accessibleProjectIds.includes(projectId)
-    ) {
+    if (projectId !== undefined && !accessibleProjectIds.includes(projectId)) {
       throw new ForbiddenException('Нет прав на выбранный проект');
     }
 
@@ -145,16 +142,18 @@ export class ReportsService {
       }),
     ]);
 
-    const projectTaskSummary = new Map<number, { taskCount: number; completedTaskCount: number }>();
+    const projectTaskSummary = new Map<
+      number,
+      { taskCount: number; completedTaskCount: number }
+    >();
     for (const group of projectTaskGroups) {
-      const summary =
-        projectTaskSummary.get(group.projectId) ?? {
-          taskCount: 0,
-          completedTaskCount: 0,
-        };
+      const summary = projectTaskSummary.get(group.projectId) ?? {
+        taskCount: 0,
+        completedTaskCount: 0,
+      };
 
       summary.taskCount += group._count._all;
-      if (group.status === TaskStatus.DONE) {
+      if (DONE_TASK_STATUSES.has(group.status)) {
         summary.completedTaskCount += group._count._all;
       }
 
@@ -210,23 +209,28 @@ export class ReportsService {
       },
     ].filter((item) => item.value > 0);
 
-    const projectTaskBreakdown = topProjectEntries.map(([projectId, summary]) => ({
-      projectId,
-      projectName: projectNameById.get(projectId) ?? `Проект #${projectId}`,
-      taskCount: summary.taskCount,
-      completedTaskCount: summary.completedTaskCount,
-    }));
+    const projectTaskBreakdown = topProjectEntries.map(
+      ([projectId, summary]) => ({
+        projectId,
+        projectName: projectNameById.get(projectId) ?? `Проект #${projectId}`,
+        taskCount: summary.taskCount,
+        completedTaskCount: summary.completedTaskCount,
+      }),
+    );
 
-    const difficultyDistribution = [1, 2, 3, 4, 5].map((difficulty) => {
-      const count =
-        difficultyGroups.find((group) => group.difficulty === difficulty)?._count._all ?? 0;
+    const difficultyDistribution = [1, 2, 3, 4, 5]
+      .map((difficulty) => {
+        const count =
+          difficultyGroups.find((group) => group.difficulty === difficulty)
+            ?._count._all ?? 0;
 
-      return {
-        difficulty,
-        label: `Сложность ${difficulty}`,
-        value: count,
-      };
-    }).filter((item) => item.value > 0);
+        return {
+          difficulty,
+          label: `Сложность ${difficulty}`,
+          value: count,
+        };
+      })
+      .filter((item) => item.value > 0);
 
     return {
       overview: {
@@ -236,7 +240,8 @@ export class ReportsService {
         newTasks,
         overdueTasks,
         totalTasks,
-        efficiency: totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0,
+        efficiency:
+          totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0,
         projectCount: targetProjectIds.length,
       },
       statusDistribution,
@@ -282,7 +287,7 @@ export class ReportsService {
     const ownerTeamIds = [
       ...new Set(
         teamMemberships
-          .filter((m) => m.teamRole === TeamRole.OWNER)
+          .filter((m) => OWNER_TEAM_ROLES.has(m.teamRole))
           .map((m) => m.teamId),
       ),
     ];

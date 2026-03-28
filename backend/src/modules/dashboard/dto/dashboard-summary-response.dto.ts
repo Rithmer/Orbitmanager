@@ -47,7 +47,11 @@ export class DashboardRecentTaskItemDto {
   @ApiProperty({ description: 'Дедлайн задачи (ISO 8601)' })
   deadline!: string;
 
-  @ApiProperty({ description: 'Имя первого исполнителя', required: false, nullable: true })
+  @ApiProperty({
+    description: 'Имя первого исполнителя',
+    required: false,
+    nullable: true,
+  })
   assigneeName?: string | null;
 
   @ApiProperty({ description: 'Имена всех исполнителей', type: [String] })
@@ -81,7 +85,10 @@ export class DashboardRiskInsightDto {
   @ApiProperty({ description: 'Уровень риска', enum: RiskLevel })
   riskLevel!: RiskLevel;
 
-  @ApiProperty({ description: 'Тип инсайта', enum: ['error', 'warning', 'info'] })
+  @ApiProperty({
+    description: 'Тип инсайта',
+    enum: ['error', 'warning', 'info'],
+  })
   type!: DashboardRiskInsightType;
 
   @ApiProperty({ description: 'Сообщение о риске' })
@@ -92,12 +99,21 @@ export class DashboardRiskInsightDto {
 }
 
 export class DashboardSummaryResponseDto {
-  @ApiProperty({ description: 'Сводка показателей', type: () => DashboardSummaryOverviewDto })
+  @ApiProperty({
+    description: 'Сводка показателей',
+    type: () => DashboardSummaryOverviewDto,
+  })
   overview!: DashboardSummaryOverviewDto;
 
-  @ApiProperty({ description: 'Последние задачи', type: () => [DashboardRecentTaskItemDto] })
+  @ApiProperty({
+    description: 'Последние задачи',
+    type: () => [DashboardRecentTaskItemDto],
+  })
   recentTasks!: DashboardRecentTaskItemDto[];
 
-  @ApiProperty({ description: 'Инсайты по рискам задач', type: () => [DashboardRiskInsightDto] })
+  @ApiProperty({
+    description: 'Инсайты по рискам задач',
+    type: () => [DashboardRiskInsightDto],
+  })
   riskInsights!: DashboardRiskInsightDto[];
 }

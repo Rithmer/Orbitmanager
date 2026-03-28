@@ -40,7 +40,9 @@ export class ReadModelResponseFactory {
     return buildPaginatedResult(items, total, page, limit);
   }
 
-  toRecordById<T extends { id: number }>(items: readonly T[]): Record<number, T> {
+  toRecordById<T extends { id: number }>(
+    items: readonly T[],
+  ): Record<number, T> {
     const record: Record<number, T> = {};
 
     for (const item of items) {

@@ -50,7 +50,10 @@ export class CreateUserDto {
   @MaxLength(100)
   fullName!: string;
 
-  @ApiPropertyOptional({ example: 'Backend Developer', description: 'Профессия' })
+  @ApiPropertyOptional({
+    example: 'Backend Developer',
+    description: 'Профессия',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(100)

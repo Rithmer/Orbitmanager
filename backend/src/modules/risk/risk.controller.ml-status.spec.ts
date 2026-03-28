@@ -37,7 +37,10 @@ describe('RiskController – getMlStatus', () => {
         { provide: PROJECT_REPOSITORY, useValue: {} },
         { provide: AUDIT_LOG_REPOSITORY, useValue: {} },
         { provide: ProjectAccessService, useValue: {} },
-        { provide: ReadModelResponseFactory, useValue: { normalizeIds: jest.fn() } },
+        {
+          provide: ReadModelResponseFactory,
+          useValue: { normalizeIds: jest.fn() },
+        },
         { provide: RiskPageReadModelService, useValue: {} },
         { provide: RiskPageProjectionService, useValue: {} },
       ],

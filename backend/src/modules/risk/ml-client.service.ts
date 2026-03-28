@@ -108,18 +108,13 @@ export class MlClientService {
     }
   }
 
-  async retrain(
-    sampleSize = 5000,
-  ): Promise<MlRetrainResponse | null> {
+  async retrain(sampleSize = 5000): Promise<MlRetrainResponse | null> {
     try {
-      const response = await this.fetchWithTimeout(
-        `${this.baseUrl}/retrain`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sample_size: sampleSize }),
-        },
-      );
+      const response = await this.fetchWithTimeout(`${this.baseUrl}/retrain`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sample_size: sampleSize }),
+      });
 
       if (!response.ok) {
         this.logger.warn(`ML retrain returned ${response.status}`);
@@ -135,10 +130,9 @@ export class MlClientService {
 
   async health(): Promise<MlHealthResponse | null> {
     try {
-      const response = await this.fetchWithTimeout(
-        `${this.baseUrl}/health`,
-        { method: 'GET' },
-      );
+      const response = await this.fetchWithTimeout(`${this.baseUrl}/health`, {
+        method: 'GET',
+      });
 
       if (!response.ok) return null;
       return (await response.json()) as MlHealthResponse;

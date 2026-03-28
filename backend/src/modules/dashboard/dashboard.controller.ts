@@ -14,7 +14,11 @@ export class DashboardController {
 
   @Get('summary')
   @ApiOperation({ summary: 'Получить сводку дашборда' })
-  @ApiResponse({ status: 200, description: 'Сводка дашборда', type: DashboardSummaryResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Сводка дашборда',
+    type: DashboardSummaryResponseDto,
+  })
   getSummary(
     @CurrentUser('id') userId: number,
     @CurrentUser('accountRole') accountRole: AccountRole,

@@ -4,7 +4,10 @@ import { AuditAction } from '@/common/enums/audit-action.enum';
 import { TaskStatus } from '@/common/enums/task-status.enum';
 import { ProjectAccessService } from '@/common/access/project-access.service';
 import { InMemoryCacheService } from '@/common/cache/in-memory-cache.service';
-import { RISK_ASSESSMENT_SERVICE, type IRiskAssessmentService } from '@/domain/services/risk-assessment.interface';
+import {
+  RISK_ASSESSMENT_SERVICE,
+  type IRiskAssessmentService,
+} from '@/domain/services/risk-assessment.interface';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { DashboardService } from './dashboard.service';
 
@@ -16,14 +19,36 @@ const mockPrisma = {
   task: {
     count: jest
       .fn()
-      .mockImplementation(async ({ where }: { where?: Record<string, unknown> }) => {
-        const status = where?.['status'];
-        if (status === TaskStatus.DONE) return 1;
-        if (status === TaskStatus.IN_PROGRESS) return 1;
-        return 2;
-      }),
-    findMany: jest.fn().mockImplementation(async ({ take }: { take?: number }) => {
-      if (take === 6) {
+      .mockImplementation(
+        async ({ where }: { where?: Record<string, unknown> }) => {
+          const status = where?.['status'];
+          if (status === TaskStatus.DONE) return 1;
+          if (status === TaskStatus.IN_PROGRESS) return 1;
+          return 2;
+        },
+      ),
+    findMany: jest
+      .fn()
+      .mockImplementation(async ({ take }: { take?: number }) => {
+        if (take === 6) {
+          return [
+            {
+              id: 10,
+              projectId: 1,
+              name: 'Task 10',
+              description: '',
+              deadline: new Date(Date.now() + 86_400_000),
+              status: TaskStatus.NEW,
+              difficulty: 3,
+              createdById: 1,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              project: { name: 'Project 1' },
+              assignees: [{ userId: 20, user: { fullName: 'User 20' } }],
+            },
+          ];
+        }
+
         return [
           {
             id: 10,
@@ -37,31 +62,15 @@ const mockPrisma = {
             createdAt: new Date(),
             updatedAt: new Date(),
             project: { name: 'Project 1' },
-            assignees: [{ userId: 20, user: { fullName: 'User 20' } }],
+            assignees: [{ userId: 20 }],
           },
         ];
-      }
-
-      return [
-        {
-          id: 10,
-          projectId: 1,
-          name: 'Task 10',
-          description: '',
-          deadline: new Date(Date.now() + 86_400_000),
-          status: TaskStatus.NEW,
-          difficulty: 3,
-          createdById: 1,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          project: { name: 'Project 1' },
-          assignees: [{ userId: 20 }],
-        },
-      ];
-    }),
+      }),
   },
   auditLog: {
-    findMany: jest.fn().mockResolvedValue([{ entityId: 10, action: AuditAction.STATUS_CHANGE }]),
+    findMany: jest
+      .fn()
+      .mockResolvedValue([{ entityId: 10, action: AuditAction.STATUS_CHANGE }]),
   },
 };
 

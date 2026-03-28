@@ -95,7 +95,10 @@ export class DashboardService {
     userId: number,
     accountRole: AccountRole,
   ): Promise<DashboardSummaryResponseDto> {
-    const visibleProjectIds = await this.getVisibleProjectIds(userId, accountRole);
+    const visibleProjectIds = await this.getVisibleProjectIds(
+      userId,
+      accountRole,
+    );
 
     if (visibleProjectIds.length === 0) {
       return {
@@ -262,8 +265,7 @@ export class DashboardService {
       await Promise.all(
         activeTaskRows.map(async (taskRow) => {
           const task = this.toTaskDomain(taskRow);
-          const statusChangesCount =
-            statusChangesByTaskId.get(task.id) ?? 0;
+          const statusChangesCount = statusChangesByTaskId.get(task.id) ?? 0;
           const assigneeLoad =
             task.assigneeIds.length > 0
               ? Math.max(
@@ -290,7 +292,10 @@ export class DashboardService {
       )
     )
       .filter(({ risk }) => risk.delayProbability > 0.3)
-      .sort((left, right) => right.risk.delayProbability - left.risk.delayProbability)
+      .sort(
+        (left, right) =>
+          right.risk.delayProbability - left.risk.delayProbability,
+      )
       .slice(0, DASHBOARD_RISK_INSIGHT_LIMIT)
       .map(({ taskRow, risk }) => this.toRiskInsight(taskRow, risk));
 

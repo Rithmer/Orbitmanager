@@ -7,10 +7,7 @@ import {
 } from '@nestjs/common';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { AuditAction } from '@/common/enums/audit-action.enum';
-import {
-  PaginatedResult,
-  QueryParams,
-} from '@/common/helpers/query.helper';
+import { PaginatedResult, QueryParams } from '@/common/helpers/query.helper';
 import { CalendarEvent } from '@/domain/models/calendar-event.model';
 import type { ICalendarEventRepository } from '@/domain/repositories/calendar-event.repository';
 import { CALENDAR_EVENT_REPOSITORY } from '@/domain/repositories/calendar-event.repository';
@@ -40,9 +37,7 @@ export class CalendarService {
     if (dto.projectId) {
       const project = await this.projectRepository.findById(dto.projectId);
       if (!project) {
-        throw new NotFoundException(
-          `Проект #${dto.projectId} не найден`,
-        );
+        throw new NotFoundException(`Проект #${dto.projectId} не найден`);
       }
     }
 
@@ -286,5 +281,10 @@ function applyInMemoryPagination<T>(
   limit: number,
 ): PaginatedResult<T> {
   const offset = (page - 1) * limit;
-  return toPaginatedResult(items.slice(offset, offset + limit), items.length, page, limit);
+  return toPaginatedResult(
+    items.slice(offset, offset + limit),
+    items.length,
+    page,
+    limit,
+  );
 }

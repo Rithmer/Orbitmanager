@@ -93,7 +93,9 @@ describe('CalendarViewService', () => {
       updatedAt: new Date(),
     });
     mockProjectAccessService.getVisibleProjectIds.mockResolvedValue([1, 2]);
-    mockProjectAccessService.assertProjectVisibility.mockResolvedValue(undefined);
+    mockProjectAccessService.assertProjectVisibility.mockResolvedValue(
+      undefined,
+    );
   });
 
   describe('getMonthView', () => {
@@ -115,14 +117,18 @@ describe('CalendarViewService', () => {
       const service = await buildService();
       await service.getMonthView(2026, 3, 42, AccountRole.MEMBER);
 
-      expect(mockProjectAccessService.getVisibleProjectIds).toHaveBeenCalledWith(42);
+      expect(
+        mockProjectAccessService.getVisibleProjectIds,
+      ).toHaveBeenCalledWith(42);
     });
 
     it('skips getVisibleProjectIds for ADMIN and queries all projects', async () => {
       const service = await buildService();
       await service.getMonthView(2026, 3, 1, AccountRole.ADMIN);
 
-      expect(mockProjectAccessService.getVisibleProjectIds).not.toHaveBeenCalled();
+      expect(
+        mockProjectAccessService.getVisibleProjectIds,
+      ).not.toHaveBeenCalled();
     });
 
     it('returns empty collections when there are no tasks or events in the month', async () => {
@@ -164,10 +170,20 @@ describe('CalendarViewService', () => {
     it('clamps month to valid range (1–12)', async () => {
       const service = await buildService();
 
-      const resultLow = await service.getMonthView(2026, 0, 7, AccountRole.MEMBER);
+      const resultLow = await service.getMonthView(
+        2026,
+        0,
+        7,
+        AccountRole.MEMBER,
+      );
       expect(resultLow.month).toBe(1);
 
-      const resultHigh = await service.getMonthView(2026, 13, 7, AccountRole.MEMBER);
+      const resultHigh = await service.getMonthView(
+        2026,
+        13,
+        7,
+        AccountRole.MEMBER,
+      );
       expect(resultHigh.month).toBe(12);
     });
   });

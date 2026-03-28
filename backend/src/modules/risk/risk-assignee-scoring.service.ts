@@ -1,12 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import type { TaskRiskOutput } from '@/domain/services/risk-assessment.interface';
-import type { ProjectMemberRecord, TaskRecord } from './risk-page-read-model.service';
-import type { AssigneeBreakdownDto, RecommendedAssigneeDto } from './dto/risk-page.types';
+import type {
+  ProjectMemberRecord,
+  TaskRecord,
+} from './risk-page-read-model.service';
+import type {
+  AssigneeBreakdownDto,
+  RecommendedAssigneeDto,
+} from './dto/risk-page.types';
 
 const ROLE_WEIGHTS: Record<string, number> = {
-  developer: 0.30,
-  team_lead: 0.20,
-  observer: -0.10,
+  developer: 0.3,
+  team_lead: 0.2,
+  observer: -0.1,
 };
 
 @Injectable()
@@ -29,10 +35,12 @@ export class RiskAssigneeScoringService {
       const activeCount = activeTaskCountByUser.get(uid) ?? 0;
 
       let impactScore = ROLE_WEIGHTS[role] ?? 0;
-      const loadPenalty = Math.min(0.40, activeCount * 0.05);
+      const loadPenalty = Math.min(0.4, activeCount * 0.05);
       impactScore -= loadPenalty;
 
-      const hasHighLoad = riskFactorsLower.some((f) => f.includes('нагрузк') || f.includes('load'));
+      const hasHighLoad = riskFactorsLower.some(
+        (f) => f.includes('нагрузк') || f.includes('load'),
+      );
       if (hasHighLoad) impactScore -= 0.25;
 
       impactScore = clamp(impactScore, -1, 1);
@@ -41,11 +49,17 @@ export class RiskAssigneeScoringService {
       if (role === 'developer') matchedRules++;
       if (role === 'team_lead') matchedRules++;
       if (hasHighLoad) matchedRules++;
-      const confidence = clamp(0.55 + 0.10 * matchedRules, 0.55, 0.90);
+      const confidence = clamp(0.55 + 0.1 * matchedRules, 0.55, 0.9);
 
       const note = this.buildAssigneeNote(role, activeCount, hasHighLoad);
 
-      return { userId: uid, userName, impactScore: round2(impactScore), confidence: round2(confidence), note };
+      return {
+        userId: uid,
+        userName,
+        impactScore: round2(impactScore),
+        confidence: round2(confidence),
+        note,
+      };
     });
   }
 
@@ -56,9 +70,19 @@ export class RiskAssigneeScoringService {
     activeTaskCountByUser: Map<number, number>,
   ): RecommendedAssigneeDto[] {
     const riskFactorsLower = prediction.riskFactors.map((f) => f.toLowerCase());
-    const hasHighLoad = riskFactorsLower.some((f) => f.includes('нагрузк') || f.includes('load'));
-    const hasCloseDeadline = riskFactorsLower.some((f) => f.includes('дедлайн') || f.includes('deadline') || f.includes('близк'));
-    const hasStatusInstability = riskFactorsLower.some((f) => f.includes('статус') || f.includes('status') || f.includes('нестабильн'));
+    const hasHighLoad = riskFactorsLower.some(
+      (f) => f.includes('нагрузк') || f.includes('load'),
+    );
+    const hasCloseDeadline = riskFactorsLower.some(
+      (f) =>
+        f.includes('дедлайн') || f.includes('deadline') || f.includes('близк'),
+    );
+    const hasStatusInstability = riskFactorsLower.some(
+      (f) =>
+        f.includes('статус') ||
+        f.includes('status') ||
+        f.includes('нестабильн'),
+    );
     const isUnassigned = task.assigneeIds.length === 0;
 
     const candidates = projectMembers
@@ -68,8 +92,8 @@ export class RiskAssigneeScoringService {
         const activeCount = activeTaskCountByUser.get(m.userId) ?? 0;
         const isCurrentAssignee = task.assigneeIds.includes(m.userId);
 
-        let roleWeight = ROLE_WEIGHTS[role] ?? 0;
-        const loadPenalty = Math.min(0.40, activeCount * 0.05);
+        const roleWeight = ROLE_WEIGHTS[role] ?? 0;
+        const loadPenalty = Math.min(0.4, activeCount * 0.05);
         let bonuses = 0;
         let matchedRuleCount = 0;
 
@@ -83,13 +107,16 @@ export class RiskAssigneeScoringService {
           matchedRuleCount++;
         }
 
-        if ((hasCloseDeadline || hasStatusInstability) && role === 'team_lead') {
-          bonuses += 0.10;
+        if (
+          (hasCloseDeadline || hasStatusInstability) &&
+          role === 'team_lead'
+        ) {
+          bonuses += 0.1;
           matchedRuleCount++;
         }
 
         if (isUnassigned && (role === 'developer' || role === 'team_lead')) {
-          bonuses += 0.10;
+          bonuses += 0.1;
           matchedRuleCount++;
         }
 
@@ -99,9 +126,16 @@ export class RiskAssigneeScoringService {
         }
 
         const fitScore = clamp(roleWeight - loadPenalty + bonuses, -1, 1);
-        const confidence = clamp(0.55 + 0.10 * matchedRuleCount, 0.55, 0.90);
+        const confidence = clamp(0.55 + 0.1 * matchedRuleCount, 0.55, 0.9);
 
-        const reason = this.buildRecommendationReason(role, activeCount, isCurrentAssignee, hasHighLoad, hasCloseDeadline, isUnassigned);
+        const reason = this.buildRecommendationReason(
+          role,
+          activeCount,
+          isCurrentAssignee,
+          hasHighLoad,
+          hasCloseDeadline,
+          isUnassigned,
+        );
 
         return {
           userId: m.userId,
@@ -119,7 +153,11 @@ export class RiskAssigneeScoringService {
     return candidates.map(({ confidence: _, ...rest }) => rest);
   }
 
-  private buildAssigneeNote(role: string, activeCount: number, hasHighLoad: boolean): string {
+  private buildAssigneeNote(
+    role: string,
+    activeCount: number,
+    hasHighLoad: boolean,
+  ): string {
     if (hasHighLoad && activeCount > 3) {
       return 'Высокая нагрузка — рекомендуется перераспределить задачи.';
     }

@@ -8,7 +8,9 @@ import { ReportsService } from './reports.service';
 
 const mockPrisma = {
   teamMember: {
-    findMany: jest.fn().mockResolvedValue([{ teamId: 1, teamRole: TeamRole.OWNER }]),
+    findMany: jest
+      .fn()
+      .mockResolvedValue([{ teamId: 1, teamRole: TeamRole.OWNER }]),
   },
   projectMember: {
     findMany: jest.fn().mockResolvedValue([]),
@@ -20,14 +22,18 @@ const mockPrisma = {
     ]),
   },
   task: {
-    count: jest.fn().mockImplementation(async ({ where }: { where?: Record<string, unknown> }) => {
-      const status = where?.['status'];
-      if (status === TaskStatus.DONE) return 1;
-      if (status === TaskStatus.IN_PROGRESS) return 1;
-      if (status === TaskStatus.REVIEW) return 1;
-      if (status === TaskStatus.NEW) return 2;
-      return 4;
-    }),
+    count: jest
+      .fn()
+      .mockImplementation(
+        async ({ where }: { where?: Record<string, unknown> }) => {
+          const status = where?.['status'];
+          if (status === TaskStatus.DONE) return 1;
+          if (status === TaskStatus.IN_PROGRESS) return 1;
+          if (status === TaskStatus.REVIEW) return 1;
+          if (status === TaskStatus.NEW) return 2;
+          return 4;
+        },
+      ),
     groupBy: jest.fn().mockImplementation(async ({ by }: { by: string[] }) => {
       if (by.includes('difficulty')) {
         return [
@@ -65,7 +71,9 @@ describe('ReportsService', () => {
     const result = await service.getSummary(1, AccountRole.MEMBER);
 
     expect(result.overview.totalTasks).toBe(4);
-    expect(result.statusDistribution.some((s) => s.label === 'Тестирование')).toBe(true);
+    expect(
+      result.statusDistribution.some((s) => s.label === 'Тестирование'),
+    ).toBe(true);
     expect(result.statusDistribution.length).toBeGreaterThanOrEqual(4);
     expect(result.projectTaskBreakdown.length).toBeGreaterThan(0);
   });
