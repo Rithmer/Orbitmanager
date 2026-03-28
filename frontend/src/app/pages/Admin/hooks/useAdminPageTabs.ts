@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { AdminTab } from '@/app/pages/Admin/constants'
+import type { AdminTab } from '@/app/pages/Admin/types'
 
 export function useAdminPageTabs() {
   const [activeTab, setActiveTab] = useState<AdminTab>('users')

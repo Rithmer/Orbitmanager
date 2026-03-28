@@ -5,12 +5,9 @@ import { PageRefreshOverlay, PageShell } from '@/app/components/PageShell'
 import { RISKS_PAGE_CONSTANTS } from '@/app/pages/Risks/constants'
 import { useRisksSelectionState } from '@/app/pages/Risks/hooks/useRisksSelectionState'
 import { useRisksPageData } from '@/app/pages/Risks/hooks/useRisksPageData'
-import { RisksSkeletonState } from '@/app/pages/Risks/components/RisksSkeletonState'
-import { RisksAccessDeniedState } from '@/app/pages/Risks/components/RisksAccessDeniedState'
+import { RisksSkeletonState, RisksAccessDeniedState, RisksErrorState } from '@/app/pages/Risks/components/RisksStates'
 import { RisksToolbarActions } from '@/app/pages/Risks/components/RisksToolbarActions'
-import { RisksErrorState } from '@/app/pages/Risks/components/RisksErrorState'
-import { RisksNavigatorSection } from '@/app/pages/Risks/components/RisksNavigatorSection'
-import { RisksInsightsSection } from '@/app/pages/Risks/components/RisksInsightsSection'
+import { RisksNavigatorSection, RisksInsightsSection } from '@/app/pages/Risks/components/RisksContent'
 
 export function RisksPageContent() {
   const base = usePageThemeTokens()

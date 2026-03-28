@@ -1,15 +1,5 @@
 import { Filter } from 'lucide-react'
-import type { EventFilterType } from '@/app/pages/Calendar/types'
-
-type FilterButton = { key: EventFilterType; label: string }
-
-type CalendarFiltersProps = {
-  textSecondary: string
-  isDark: boolean
-  filterType: EventFilterType
-  filterButtons: readonly FilterButton[]
-  onChange: (value: EventFilterType) => void
-}
+import type { CalendarFiltersProps } from '@/app/pages/Calendar/types'
 
 export function CalendarFilters({
   textSecondary,

@@ -1,7 +1,6 @@
 import { Brain, FileText, Users, type LucideIcon } from 'lucide-react'
 import { AccountRole, AuditAction, type UserAccountStatus } from '@/app/types'
-
-export type AdminTab = 'users' | 'audit' | 'ml-model'
+import type { AdminTab } from '@/app/pages/Admin/types'
 
 export const USERS_PAGE_SIZE = 15
 export const AUDIT_PAGE_SIZE = 20
