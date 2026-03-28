@@ -5,32 +5,38 @@ import { PROJECT_BOARD_COLUMNS, getColumnTasks } from '@/app/features/board/boar
 import type { BoardPageLoadedBodyProps } from '@/app/pages/Board/types'
 import { BoardPageModals } from './BoardPageModals'
 
-export function BoardPageLoadedBody({
-  projectBoardView,
-  boardQuery,
-  isDark,
-  columnBg,
-  cardBg,
-  cardBorder,
-  textPrimary,
-  textSecondary,
-  canEditTasks,
-  viewMode,
-  openedTaskMenuId,
-  setOpenedTaskMenuId,
-  kanbanColumnModal,
-  setKanbanColumnModal,
-  isRiskModalOpen,
-  setIsRiskModalOpen,
-  isTaskDetailsOpen,
-  setIsTaskDetailsOpen,
-  selectedTaskForDetails,
-  setSelectedTaskForDetails,
-  selectedTaskForRisk,
-  setSelectedTaskForRisk,
-  taskForm,
-  mutations,
-}: BoardPageLoadedBodyProps) {
+type BoardPageLoadedBodyComponentProps = {
+  body: BoardPageLoadedBodyProps
+}
+
+export function BoardPageLoadedBody({ body }: BoardPageLoadedBodyComponentProps) {
+  const {
+    projectBoardView,
+    boardQuery,
+    isDark,
+    columnBg,
+    cardBg,
+    cardBorder,
+    textPrimary,
+    textSecondary,
+    canEditTasks,
+    viewMode,
+    openedTaskMenuId,
+    setOpenedTaskMenuId,
+    kanbanColumnModal,
+    setKanbanColumnModal,
+    isRiskModalOpen,
+    setIsRiskModalOpen,
+    isTaskDetailsOpen,
+    setIsTaskDetailsOpen,
+    selectedTaskForDetails,
+    setSelectedTaskForDetails,
+    selectedTaskForRisk,
+    setSelectedTaskForRisk,
+    taskForm,
+    mutations,
+  } = body
+
   const projectMembers = projectBoardView.members
   const boardTasks = projectBoardView.tasks
   const isBoardRefreshing = boardQuery.isFetching && !boardQuery.isLoading && Boolean(projectBoardView)

@@ -1,6 +1,5 @@
+import type { TeamsPageViewModel } from '@/app/pages/Teams/hooks/useTeamsPageController'
+
 export type TeamsSearchBarProps = {
-  value: string
-  onChange: (value: string) => void
-  textSecondary: string
-  inputBg: string
+  model: Pick<TeamsPageViewModel, 'ui' | 'search'>
 }

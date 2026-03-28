@@ -4,7 +4,7 @@ import { VISIBLE_PROJECT_STATUSES } from '@/app/pages/Projects/constants'
 import type { ProjectsEditProjectModalProps } from '@/app/pages/Projects/types'
 
 export function ProjectsEditProjectModal({ vm }: ProjectsEditProjectModalProps) {
-  const { projectForm, shell } = vm
+  const { projectForm, projectActions, shell } = vm
   const {
     showEditModal,
     setShowEditModal,
@@ -16,8 +16,8 @@ export function ProjectsEditProjectModal({ vm }: ProjectsEditProjectModalProps) 
     formStatus,
     setFormStatus,
     formLoading,
-    handleEditProject,
   } = projectForm
+  const { handleEditProject } = projectActions
   const { theme } = shell
 
   return (

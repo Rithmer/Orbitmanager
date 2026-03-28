@@ -2,14 +2,9 @@ import { ArrowUpRight } from 'lucide-react'
 import { PageRefreshOverlay } from '@/app/components/PageShell'
 import type { DashboardStatsSectionProps } from '@/app/pages/Dashboard/types'
 
-export function DashboardStatsSection({
-  stats,
-  isRefreshing,
-  cardBg,
-  cardBorder,
-  textPrimary,
-  textSecondary,
-}: DashboardStatsSectionProps) {
+export function DashboardStatsSection({ stats, isRefreshing, ui }: DashboardStatsSectionProps) {
+  const { cardBg, cardBorder, textPrimary, textSecondary } = ui
+
   return (
     <PageRefreshOverlay show={isRefreshing} label="Сводка обновляется" className="mb-6 md:mb-8">
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 md:gap-5 stagger-row">

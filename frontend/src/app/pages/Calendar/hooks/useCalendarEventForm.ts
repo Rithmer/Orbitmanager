@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { calendarApi } from '@/app/api/calendar'
 import type { CalendarEvent } from '@/app/types'
+import type { CalendarEventFormValues } from '@/app/pages/Calendar/types'
 
 type UseCalendarEventFormArgs = {
   currentYear: number
@@ -22,54 +23,60 @@ export function useCalendarEventForm({
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
-  const [formTitle, setFormTitle] = useState('')
-  const [formDesc, setFormDesc] = useState('')
-  const [formDate, setFormDate] = useState('')
-  const [formTime, setFormTime] = useState('09:00')
-  const [formDuration, setFormDuration] = useState('60')
-  const [formColor, setFormColor] = useState('#3b82f6')
-  const [formProjectId, setFormProjectId] = useState('')
-  const [formAllDay, setFormAllDay] = useState(false)
-  const [formLoading, setFormLoading] = useState(false)
-  const [formError, setFormError] = useState('')
+  const [createSessionId, setCreateSessionId] = useState(0)
+  const [editSessionId, setEditSessionId] = useState(0)
+  const [createInitial, setCreateInitial] = useState<CalendarEventFormValues>({
+    title: '',
+    description: '',
+    date: '',
+    time: '09:00',
+    duration: '60',
+    color: '#3b82f6',
+    projectId: '',
+    allDay: false,
+  })
+  const [editInitial, setEditInitial] = useState<CalendarEventFormValues>({
+    title: '',
+    description: '',
+    date: '',
+    time: '09:00',
+    duration: '60',
+    color: '#3b82f6',
+    projectId: '',
+    allDay: false,
+  })
 
   const openCreateForDay = (day?: number) => {
     const d = day || selectedDay || today.getDate()
     const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-    setFormTitle('')
-    setFormDesc('')
-    setFormDate(dateStr)
-    setFormTime('09:00')
-    setFormDuration('60')
-    setFormColor('#3b82f6')
-    setFormProjectId('')
-    setFormAllDay(false)
-    setFormError('')
+    setCreateInitial({
+      title: '',
+      description: '',
+      date: dateStr,
+      time: '09:00',
+      duration: '60',
+      color: '#3b82f6',
+      projectId: '',
+      allDay: false,
+    })
+    setCreateSessionId((s) => s + 1)
     setShowCreateModal(true)
   }
 
-  const handleCreate = async () => {
-    setFormLoading(true)
-    setFormError('')
-    try {
-      const startDate = new Date(`${formDate}T${formTime}:00`).toISOString()
-      const endDate = new Date(new Date(`${formDate}T${formTime}:00`).getTime() + Number(formDuration) * 60000).toISOString()
-      await calendarApi.create({
-        title: formTitle,
-        description: formDesc || undefined,
-        startDate,
-        endDate,
-        color: formColor,
-        projectId: formProjectId ? Number(formProjectId) : undefined,
-        allDay: formAllDay,
-      })
-      setShowCreateModal(false)
-      await onEventsUpdated()
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Ошибка создания')
-    } finally {
-      setFormLoading(false)
-    }
+  const submitCreate = async (values: CalendarEventFormValues) => {
+    const startDate = new Date(`${values.date}T${values.time}:00`).toISOString()
+    const endDate = new Date(new Date(`${values.date}T${values.time}:00`).getTime() + Number(values.duration) * 60000).toISOString()
+    await calendarApi.create({
+      title: values.title,
+      description: values.description || undefined,
+      startDate,
+      endDate,
+      color: values.color,
+      projectId: values.projectId ? Number(values.projectId) : undefined,
+      allDay: values.allDay,
+    })
+    setShowCreateModal(false)
+    await onEventsUpdated()
   }
 
   const openEditEvent = (eventId: number) => {
@@ -77,43 +84,38 @@ export function useCalendarEventForm({
     if (!ev) return
     setEditingEvent(ev)
     const start = new Date(ev.startDate)
-    setFormTitle(ev.title)
-    setFormDesc(ev.description || '')
-    setFormDate(`${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`)
-    setFormTime(start.toTimeString().slice(0, 5))
     const diffMin = Math.round((new Date(ev.endDate).getTime() - start.getTime()) / 60000)
-    setFormDuration(String(diffMin))
-    setFormColor(ev.color)
-    setFormProjectId(ev.projectId ? String(ev.projectId) : '')
-    setFormAllDay(ev.allDay)
-    setFormError('')
+    setEditInitial({
+      title: ev.title,
+      description: ev.description || '',
+      date: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`,
+      time: start.toTimeString().slice(0, 5),
+      duration: String(diffMin),
+      color: ev.color,
+      projectId: ev.projectId ? String(ev.projectId) : '',
+      allDay: ev.allDay,
+    })
+    setEditSessionId((s) => s + 1)
     setShowEditModal(true)
   }
 
-  const handleEdit = async () => {
-    if (!editingEvent) return
-    setFormLoading(true)
-    setFormError('')
-    try {
-      const startDate = new Date(`${formDate}T${formTime}:00`).toISOString()
-      const endDate = new Date(new Date(`${formDate}T${formTime}:00`).getTime() + Number(formDuration) * 60000).toISOString()
-      await calendarApi.update(editingEvent.id, {
-        title: formTitle,
-        description: formDesc,
-        startDate,
-        endDate,
-        color: formColor,
-        projectId: formProjectId ? Number(formProjectId) : null,
-        allDay: formAllDay,
-      })
-      setShowEditModal(false)
-      setEditingEvent(null)
-      await onEventsUpdated()
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Ошибка обновления')
-    } finally {
-      setFormLoading(false)
-    }
+  const submitEdit = async (values: CalendarEventFormValues) => {
+    const ev = editingEvent
+    if (!ev) throw new Error('Событие не выбрано')
+    const startDate = new Date(`${values.date}T${values.time}:00`).toISOString()
+    const endDate = new Date(new Date(`${values.date}T${values.time}:00`).getTime() + Number(values.duration) * 60000).toISOString()
+    await calendarApi.update(ev.id, {
+      title: values.title,
+      description: values.description,
+      startDate,
+      endDate,
+      color: values.color,
+      projectId: values.projectId ? Number(values.projectId) : null,
+      allDay: values.allDay,
+    })
+    setShowEditModal(false)
+    setEditingEvent(null)
+    await onEventsUpdated()
   }
 
   const handleDeleteEvent = async (eventId: number) => {
@@ -132,28 +134,14 @@ export function useCalendarEventForm({
     showEditModal,
     setShowEditModal,
     setEditingEvent,
-    formTitle,
-    setFormTitle,
-    formDesc,
-    setFormDesc,
-    formDate,
-    setFormDate,
-    formTime,
-    setFormTime,
-    formDuration,
-    setFormDuration,
-    formColor,
-    setFormColor,
-    formProjectId,
-    setFormProjectId,
-    formAllDay,
-    setFormAllDay,
-    formLoading,
-    formError,
+    createSessionId,
+    createInitial,
+    submitCreate,
+    editSessionId,
+    editInitial,
+    submitEdit,
     openCreateForDay,
-    handleCreate,
     openEditEvent,
-    handleEdit,
     handleDeleteEvent,
   }
 }

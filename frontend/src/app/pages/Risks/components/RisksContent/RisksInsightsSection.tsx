@@ -3,21 +3,26 @@ import { formatFitScore, formatImpactLabel, getCoordinationRiskExplanation } fro
 import { RISKS_PAGE_CONSTANTS } from '@/app/pages/Risks/constants'
 import type { RisksInsightsSectionProps } from '@/app/pages/Risks/types'
 
-export function RisksInsightsSection({
-  selectedTeamId,
-  selectedCard,
-  sortedTaskInsights,
-  selectedTask,
-  topRecommendedAssignees,
-  cardBg,
-  cardBorder,
-  panelMuted,
-  textSecondary,
-  divider,
-  expandedAlternativesByTaskId,
-  onSelectTask,
-  onToggleAlternatives,
-}: RisksInsightsSectionProps) {
+export function RisksInsightsSection({ ports }: RisksInsightsSectionProps) {
+  const { theme, selection, data } = ports
+  const { cardBg, cardBorder, panelMuted, textSecondary, divider } = theme
+  const {
+    selectedTeamId,
+    expandedAlternativesByTaskId,
+    setSelectedTaskId: onSelectTask,
+    setExpandedAlternativesByTaskId,
+  } = selection
+  const {
+    selectedCard,
+    sortedTaskInsights,
+    selectedTask,
+    topRecommendedAssignees,
+  } = data
+
+  const onToggleAlternatives = (taskId: number) => {
+    setExpandedAlternativesByTaskId((prev) => ({ ...prev, [taskId]: !prev[taskId] }))
+  }
+
   return (
     <div className={`xl:col-span-2 ${cardBg} border ${cardBorder} xl:h-[640px] rounded-xl p-4`}>
       <h3 className="text-base font-semibold mb-1">Задачи и аналитика ИИ</h3>

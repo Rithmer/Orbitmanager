@@ -2,30 +2,33 @@ import { ChevronRight, Lock, LogOut, Shield } from 'lucide-react'
 import { ErrorMessage } from '@/app/components/Modal'
 import type { SettingsSecuritySectionProps } from '@/app/pages/Settings/types'
 
-export function SettingsSecuritySection({
-  isDark,
-  cardBg,
-  cardBorder,
-  dividerColor,
-  sectionIconBg,
-  textPrimary,
-  textSecondary,
-  inputBg,
-  inputText,
-  isChangePasswordOpen,
-  currentPassword,
-  newPassword,
-  confirmNewPassword,
-  changePasswordLoading,
-  changePasswordError,
-  changePasswordSuccess,
-  setCurrentPassword,
-  setNewPassword,
-  setConfirmNewPassword,
-  onTogglePasswordForm,
-  onChangePassword,
-  onLogout,
-}: SettingsSecuritySectionProps) {
+export function SettingsSecuritySection({ theme, password, onLogout }: SettingsSecuritySectionProps) {
+  const {
+    isDark,
+    cardBg,
+    cardBorder,
+    dividerColor,
+    sectionIconBg,
+    textPrimary,
+    textSecondary,
+    inputBg,
+    inputText,
+  } = theme
+  const {
+    isChangePasswordOpen,
+    currentPassword,
+    newPassword,
+    confirmNewPassword,
+    changePasswordLoading,
+    changePasswordError,
+    changePasswordSuccess,
+    setCurrentPassword,
+    setNewPassword,
+    setConfirmNewPassword,
+    togglePasswordForm: onTogglePasswordForm,
+    changePassword,
+  } = password
+
   return (
     <div className={`${cardBg} border ${cardBorder} rounded-xl overflow-hidden card-hover stagger-row`}>
       <div className={`flex items-center gap-3 px-6 py-4 border-b ${dividerColor}`}>
@@ -92,7 +95,7 @@ export function SettingsSecuritySection({
             <div className="mt-4 flex justify-end">
               <button
                 type="button"
-                onClick={onChangePassword}
+                onClick={() => void changePassword()}
                 disabled={changePasswordLoading}
                 className="bg-[#4880ff] hover:bg-[#3a6fe0] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
               >

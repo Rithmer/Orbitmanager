@@ -2,20 +2,14 @@ import { CALENDAR_PAGE_CONSTANTS } from '@/app/pages/Calendar/constants'
 import type { CalendarGridProps } from '@/app/pages/Calendar/types'
 
 export function CalendarGrid({
+  ui,
   cells,
-  cardBg,
-  cardBorder,
-  dayHeaderBg,
-  dayCellBorder,
-  dayCellHover,
-  textPrimary,
-  textSecondary,
-  isDark,
   getItemsForDate,
   getEventColorById,
   isToday,
   onSelectDay,
 }: CalendarGridProps) {
+  const { cardBg, cardBorder, dayHeaderBg, dayCellBorder, dayCellHover, textPrimary, textSecondary, isDark } = ui
   return (
     <div className={`${cardBg} border ${cardBorder} rounded-xl overflow-hidden`}>
       <div className="overflow-x-auto">

@@ -5,11 +5,10 @@ import type { DashboardRiskInsightsSectionProps } from '@/app/pages/Dashboard/ty
 export function DashboardRiskInsightsSection({
   riskInsights,
   isRefreshing,
-  cardBg,
-  cardBorder,
-  textSecondary,
-  insightStyles,
+  ui,
 }: DashboardRiskInsightsSectionProps) {
+  const { cardBg, cardBorder, textSecondary, insightStyles } = ui
+
   return (
     <PageSection
       title="AI аналитика рисков"

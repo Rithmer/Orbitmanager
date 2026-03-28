@@ -1,3 +1,4 @@
+export type { DashboardPageUiTokens } from './dashboard-page-ui'
 export type { DashboardAuditLogItem, DashboardRecentActivitySectionProps } from './dashboard-recent-activity-section'
 export type { DashboardErrorStateProps } from './dashboard-error-state'
 export type { DashboardHeaderActionsProps } from './dashboard-header-actions'

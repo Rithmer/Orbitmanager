@@ -1,17 +1,15 @@
 import { ADMIN_TABS } from '@/app/pages/Admin/constants'
-import type { AdminTab } from '@/app/pages/Admin/types'
+import type { AdminPageTabsPort, AdminPageUiTokens } from '@/app/pages/Admin/types'
 
-export function AdminTabs({
-  activeTab,
-  onTabChange,
-  tabActive,
-  tabInactive,
-}: {
-  activeTab: AdminTab
-  onTabChange: (tab: AdminTab) => void
-  tabActive: string
-  tabInactive: string
-}) {
+type AdminTabsProps = {
+  ui: Pick<AdminPageUiTokens, 'tabActive' | 'tabInactive'>
+  tabs: Pick<AdminPageTabsPort, 'activeTab' | 'setActiveTab'>
+}
+
+export function AdminTabs({ ui, tabs }: AdminTabsProps) {
+  const { tabActive, tabInactive } = ui
+  const { activeTab, setActiveTab: onTabChange } = tabs
+
   return (
     <div className="flex gap-2 mb-6 flex-wrap">
       {ADMIN_TABS.map((tab) => (
