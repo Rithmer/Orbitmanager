@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildQuery, isAbortError, resolveAuthStorageMode } from '../client'
+import { buildQuery, isAbortError, resolveAuthStorageMode } from '@/app/api/client'
 
 describe('api client helpers', () => {
   it('builds query string and skips empty values', () => {

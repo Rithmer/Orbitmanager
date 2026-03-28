@@ -1,5 +1,5 @@
-import { api, buildQuery, type ApiRequestOptions } from './client'
-import type { RiskProjectOption } from '../features/risks'
+import { api, buildQuery, type ApiRequestOptions } from '@/app/api/client'
+import type { RiskProjectOption } from '@/app/features/risks'
 
 export type RisksProjectRiskResponse = Record<number, {
   riskScore: number

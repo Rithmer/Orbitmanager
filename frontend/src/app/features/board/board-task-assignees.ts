@@ -1,4 +1,4 @@
-import type { ProjectBoardMember, ProjectBoardTask } from './types'
+import type { ProjectBoardMember, ProjectBoardTask } from '@/app/features/board/types'
 
 export function getTaskAssigneeIds(task: ProjectBoardTask): number[] {
   const ids =

@@ -38,4 +38,5 @@ export interface ReportsSummaryResponse {
 export interface ReportsAccessibleProject {
   id: number
   name: string
+  teamId?: number
 }

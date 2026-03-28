@@ -15,14 +15,14 @@ import {
   RiskLevel,
   TASK_STATUS_LABELS,
   TaskStatus,
-} from '../../types'
+} from '@/app/types'
 import {
   getOverdueLabel,
   getRiskBadgeClasses,
   KANBAN_COLUMN_PREVIEW_TASKS,
-} from './board-view.constants'
-import { formatBoardDateLabel } from './board-page-formatters'
-import type { ProjectBoardTask, ProjectBoardView } from './types'
+} from '@/app/features/board/board-view.constants'
+import { formatBoardDateLabel } from '@/app/features/board/board-page-formatters'
+import type { ProjectBoardTask, ProjectBoardView } from '@/app/features/board/types'
 
 export type BoardColumnVm = {
   status: TaskStatus

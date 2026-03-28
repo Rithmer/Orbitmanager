@@ -1,6 +1,6 @@
-import { api, buildQuery, type ApiRequestOptions } from './client'
-import type { Task, PaginatedResult, QueryParams } from '../types'
-import { TaskStatus } from '../types'
+import { api, buildQuery, type ApiRequestOptions } from '@/app/api/client'
+import type { Task, PaginatedResult, QueryParams } from '@/app/types'
+import { TaskStatus } from '@/app/types'
 
 export const tasksApi = {
   list(params: QueryParams = {}, options: ApiRequestOptions = {}): Promise<PaginatedResult<Task>> {

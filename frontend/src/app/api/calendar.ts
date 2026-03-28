@@ -1,5 +1,5 @@
-import { api, buildQuery, type ApiRequestOptions } from './client'
-import type { CalendarEvent, PaginatedResult, QueryParams } from '../types'
+import { api, buildQuery, type ApiRequestOptions } from '@/app/api/client'
+import type { CalendarEvent, PaginatedResult, QueryParams } from '@/app/types'
 
 export const calendarApi = {
   list(

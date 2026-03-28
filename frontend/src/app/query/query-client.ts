@@ -1,6 +1,6 @@
 import { MutationCache, QueryClient } from '@tanstack/react-query'
-import { ApiError } from '../api/client'
-import { dispatchApiError } from '../api/api-error-dispatch'
+import { ApiError } from '@/app/api/client'
+import { dispatchApiError } from '@/app/api/api-error-dispatch'
 
 function getHttpStatus(error: unknown): number | undefined {
   if (!error || typeof error !== 'object') {

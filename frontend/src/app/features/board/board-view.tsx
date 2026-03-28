@@ -1,4 +1,4 @@
-import { PROJECT_BOARD_COLUMNS } from './board-view.constants'
+import { PROJECT_BOARD_COLUMNS } from '@/app/features/board/board-view.constants'
 
 const PROJECT_BOARD_SKELETON_CARD_COUNTS = [4, 5, 4, 5, 3] as const
 

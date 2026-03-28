@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
-import { useNavMembershipBatch } from './useNavMembershipBatch'
-import { ProjectRole, TeamRole } from '../types'
+import { useNavMembershipBatch } from '@/app/hooks/useNavMembershipBatch'
+import { ProjectRole, TeamRole } from '@/app/types'
 
 
 export function useAnalyticsSectionAccess() {

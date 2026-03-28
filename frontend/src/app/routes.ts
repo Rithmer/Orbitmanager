@@ -7,25 +7,25 @@ import {
   type ReactElement,
 } from 'react'
 import { createBrowserRouter } from 'react-router'
-import { Layout } from './components/Layout'
-import { ProtectedRoute } from './components/ProtectedRoute'
+import { Layout } from '@/app/components/Layout'
+import { ProtectedRoute } from '@/app/components/ProtectedRoute'
 import {
   PageShell,
   PageShellHeaderSkeleton,
   PageShellSectionSkeleton,
-} from './components/PageShell'
+} from '@/app/components/PageShell'
 
-const LoginPage = lazyRoute(() => import('./pages/Login'), 'Login')
-const RegisterPage = lazyRoute(() => import('./pages/Register'), 'Register')
-const DashboardPage = lazyRoute(() => import('./pages/Dashboard'), 'Dashboard')
-const ProjectsPage = lazyRoute(() => import('./pages/Projects'), 'Projects')
-const BoardPage = lazyRoute(() => import('./pages/Board'), 'Board')
-const TeamsPage = lazyRoute(() => import('./pages/Teams'), 'Teams')
-const CalendarPage = lazyRoute(() => import('./pages/Calendar'), 'Calendar')
-const ReportsPage = lazyRoute(() => import('./pages/Reports'), 'Reports')
-const RisksPage = lazyRoute(() => import('./pages/Risks'), 'Risks')
-const SettingsPage = lazyRoute(() => import('./pages/Settings'), 'Settings')
-const AdminPage = lazyRoute(() => import('./pages/Admin'), 'Admin')
+const LoginPage = lazyRoute(() => import('@/app/pages/Login'), 'Login')
+const RegisterPage = lazyRoute(() => import('@/app/pages/Register'), 'Register')
+const DashboardPage = lazyRoute(() => import('@/app/pages/Dashboard'), 'Dashboard')
+const ProjectsPage = lazyRoute(() => import('@/app/pages/Projects'), 'Projects')
+const BoardPage = lazyRoute(() => import('@/app/pages/Board'), 'Board')
+const TeamsPage = lazyRoute(() => import('@/app/pages/Teams'), 'Teams')
+const CalendarPage = lazyRoute(() => import('@/app/pages/Calendar'), 'Calendar')
+const ReportsPage = lazyRoute(() => import('@/app/pages/Reports'), 'Reports')
+const RisksPage = lazyRoute(() => import('@/app/pages/Risks'), 'Risks')
+const SettingsPage = lazyRoute(() => import('@/app/pages/Settings'), 'Settings')
+const AdminPage = lazyRoute(() => import('@/app/pages/Admin'), 'Admin')
 
 export const router = createBrowserRouter([
   {

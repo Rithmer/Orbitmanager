@@ -1,5 +1,5 @@
-import { api, buildQuery, type ApiRequestOptions } from './client'
-import type { CalendarMonthView, CalendarMonthViewQueryParams } from '../features/calendar'
+import { api, buildQuery, type ApiRequestOptions } from '@/app/api/client'
+import type { CalendarMonthView, CalendarMonthViewQueryParams } from '@/app/features/calendar'
 
 export const calendarViewApi = {
   getMonthView(

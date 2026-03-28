@@ -1,5 +1,5 @@
-import { AccountRole, ProjectRole, TeamRole, type ProjectMember, type Team, type TeamMember } from '../../types'
-import type { RiskProjectOption } from './types'
+import { AccountRole, ProjectRole, TeamRole, type ProjectMember, type Team, type TeamMember } from '@/app/types'
+import type { RiskProjectOption } from '@/app/features/risks/types'
 
 export function getOwnedTeamIds(uid: number, membersByTeam: Record<number, TeamMember[]>): number[] {
   return Object.entries(membersByTeam)

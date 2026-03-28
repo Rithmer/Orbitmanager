@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { riskAdminApi } from '../risk-admin'
-import { api } from '../client'
+import { riskAdminApi } from '@/app/api/risk-admin'
+import { api } from '@/app/api/client'
 
 vi.mock('../client', () => ({
   api: {

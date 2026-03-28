@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { calendarViewApi } from '../../api/calendar-view'
-import { appQueryKeys } from '../../query'
-import type { CalendarMonthViewQueryParams } from './types'
+import { calendarViewApi } from '@/app/api/calendar-view'
+import { appQueryKeys } from '@/app/query'
+import type { CalendarMonthViewQueryParams } from '@/app/features/calendar/types'
 
 export function useCalendarMonthViewQuery(params: CalendarMonthViewQueryParams) {
   const queryParams = {

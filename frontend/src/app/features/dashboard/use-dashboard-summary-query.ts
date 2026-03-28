@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { appQueryKeys } from '../../query'
-import { dashboardApi } from '../../api/dashboard'
+import { appQueryKeys } from '@/app/query'
+import { dashboardApi } from '@/app/api/dashboard'
 
 export function useDashboardSummaryQuery() {
   return useQuery({

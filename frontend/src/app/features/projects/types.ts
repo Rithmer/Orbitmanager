@@ -1,4 +1,4 @@
-import type { PaginatedResult, ProjectRiskOutput, ProjectStatus, TeamMember } from '../../types'
+import type { PaginatedResult, ProjectRiskOutput, ProjectStatus, TeamMember } from '@/app/types'
 
 export interface ProjectsListViewItem {
   id: number

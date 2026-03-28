@@ -1,4 +1,4 @@
-import { DAY_NAMES } from './calendar-view.constants'
+import { DAY_NAMES } from '@/app/features/calendar/calendar-view.constants'
 
 export function CalendarMonthViewSkeleton() {
   return (

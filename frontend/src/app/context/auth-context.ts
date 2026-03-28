@@ -1,5 +1,5 @@
 import { createContext } from 'react'
-import type { LoginDto, RegisterDto, User } from '../types'
+import type { LoginDto, RegisterDto, User } from '@/app/types'
 
 export interface AuthContextType {
   user: User | null

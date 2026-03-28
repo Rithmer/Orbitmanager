@@ -1,11 +1,6 @@
-/**
- * Набор спецсимволов как в `validator.isStrongPassword` (validator.js),
- * чтобы фронт совпадал с `@IsStrongPassword` на backend.
- */
 const PASSWORD_SYMBOL_CHAR_RE =
-  /^[-#!$@£%^&*()_+|~=`{}\[\]:";'<>?,.\/\\ ]$/
+  /^[-#!$@£%^&*()_+|~=`{}[\]:";'<>?,./\\ ]$/
 
-/** Соответствует правилам backend (`IsStrongPassword`, minSymbols: 1). */
 export const PASSWORD_POLICY_HINT =
   'Минимум 8 символов: строчные и прописные латинские буквы, цифра и спецсимвол (!@#$% и т.д.)'
 

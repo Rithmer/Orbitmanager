@@ -1,6 +1,6 @@
-import { api, buildQuery, type ApiRequestOptions } from './client'
-import type { PaginatedResult } from '../types'
-import type { TeamsListViewItem, TeamsListViewQueryParams } from '../features/teams'
+import { api, buildQuery, type ApiRequestOptions } from '@/app/api/client'
+import type { PaginatedResult } from '@/app/types'
+import type { TeamsListViewItem, TeamsListViewQueryParams } from '@/app/features/teams'
 
 export const teamsListViewApi = {
   getListView(

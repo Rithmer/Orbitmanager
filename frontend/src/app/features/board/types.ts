@@ -1,6 +1,6 @@
-import type { TaskRiskOutput } from '../../types'
-import { ProjectStatus } from '../../types'
-import { TaskStatus } from '../../types'
+import type { TaskRiskOutput } from '@/app/types'
+import { ProjectStatus } from '@/app/types'
+import { TaskStatus } from '@/app/types'
 
 export interface ProjectBoardUserSummary {
   id: number
@@ -25,15 +25,12 @@ export interface ProjectBoardTask {
   deadline: string
   status: TaskStatus
   difficulty: number
-  // Multi-assignees (new contract)
   assigneeIds?: number[] | null
   assignees?: ProjectBoardUserSummary[]
-  // Legacy single-assignee (old contract)
   assigneeId?: number | null
   createdById: number
   createdAt: string
   updatedAt: string
-  // Legacy single-assignee summary (old contract)
   assignee?: ProjectBoardUserSummary | null
 }
 

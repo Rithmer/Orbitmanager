@@ -1,12 +1,7 @@
-import type { RiskLevel } from '../../types'
-import type { RisksProjectRiskResponse } from '../../api/risks'
-import type { RisksProjectCard } from './types'
+import type { RiskLevel } from '@/app/types'
+import type { RisksProjectRiskResponse } from '@/app/api/risks'
+import type { RisksProjectCard } from '@/app/features/risks/types'
 
-/**
- * Thin mapper: server provides all computed fields (successProbability,
- * taskInsights with assigneeBreakdown/recommendedAssignees, riskFactors,
- * recommendations). No client-side heuristics.
- */
 export function adaptProjectRisksPayload(
   raw: RisksProjectRiskResponse | undefined,
   projectNamesById: Record<number, string>,
