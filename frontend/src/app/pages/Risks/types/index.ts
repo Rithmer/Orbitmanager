@@ -1,3 +1,4 @@
+export type { RisksPageContentPorts } from './risks-page-content-ports'
 export type { RisksAccessDeniedStateProps } from './risks-access-denied-state'
 export type { RisksErrorStateProps } from './risks-error-state'
 export type { RisksInsightAssignee, RisksInsightsSectionProps } from './risks-insights-section'

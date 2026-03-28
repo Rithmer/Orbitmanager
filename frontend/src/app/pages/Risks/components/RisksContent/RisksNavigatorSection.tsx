@@ -1,19 +1,22 @@
 import type { RisksNavigatorSectionProps } from '@/app/pages/Risks/types'
 
-export function RisksNavigatorSection({
-  selectedTeamId,
-  sortedTeams,
-  sortedProjects,
-  effectiveProjectId,
-  cardBg,
-  cardBorder,
-  textSecondary,
-  divider,
-  isDark,
-  onSelectTeam,
-  onSelectProject,
-  onBackToTeams,
-}: RisksNavigatorSectionProps) {
+export function RisksNavigatorSection({ ports }: RisksNavigatorSectionProps) {
+  const { theme, selection, data } = ports
+  const {
+    cardBg,
+    cardBorder,
+    textSecondary,
+    divider,
+    isDark,
+  } = theme
+  const {
+    selectedTeamId,
+    selectTeam: onSelectTeam,
+    selectProject: onSelectProject,
+    goBackToTeams: onBackToTeams,
+  } = selection
+  const { sortedTeams, sortedProjects, effectiveProjectId } = data
+
   return (
     <div className={`${cardBg} border ${cardBorder} xl:h-[640px] rounded-xl p-4`}>
       <h3 className="text-base font-semibold mb-1">{selectedTeamId === undefined ? 'Команды' : 'Проекты'}</h3>
