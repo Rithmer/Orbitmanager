@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ProjectAccessService } from '@/common/access/project-access.service';
-import { InMemoryCacheService } from '@/common/cache/in-memory-cache.service';
+import { TtlCacheService } from '@/common/cache/ttl-cache.service';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { ProjectRole } from '@/common/enums/project-role.enum';
 import { ProjectStatus } from '@/common/enums/project-status.enum';
@@ -169,7 +169,7 @@ describe('ProjectsService', () => {
           provide: ProjectAccessService,
           useValue: mockProjectAccessService,
         },
-        { provide: InMemoryCacheService, useValue: mockCache },
+        { provide: TtlCacheService, useValue: mockCache },
       ],
     }).compile();
 

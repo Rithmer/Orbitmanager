@@ -23,16 +23,16 @@ import { TeamRoles } from '@/common/decorators/team-roles.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { TeamRole } from '@/common/enums/team-role.enum';
-import { ReadModelResponseFactory } from '@/common/read-models/read-model-response.factory';
+import {
+  normalizeIds,
+  pickGroupedByIds,
+} from '@/common/read-models/read-model-response.factory';
 
 @ApiTags('Team Members')
 @ApiAuth()
 @Controller()
 export class TeamMembersController {
-  constructor(
-    private readonly teamsService: TeamsService,
-    private readonly readModelResponseFactory: ReadModelResponseFactory,
-  ) {}
+  constructor(private readonly teamsService: TeamsService) {}
 
   @Get('teams/members/batch')
   @ApiQuery({
@@ -51,9 +51,7 @@ export class TeamMembersController {
     @Query('ids') legacyIds?: string | string[],
   ) {
     const allMembersByTeamId = await this.teamsService.findAllMembersBatch();
-    const requestedTeamIds = this.readModelResponseFactory.normalizeIds(
-      teamIds ?? legacyIds,
-    );
+    const requestedTeamIds = normalizeIds(teamIds ?? legacyIds);
 
     if (teamIds === undefined && legacyIds === undefined) {
       return allMembersByTeamId;
@@ -63,10 +61,7 @@ export class TeamMembersController {
       return {};
     }
 
-    return this.readModelResponseFactory.pickGroupedByIds(
-      allMembersByTeamId,
-      requestedTeamIds,
-    );
+    return pickGroupedByIds(allMembersByTeamId, requestedTeamIds);
   }
 
   @Get('teams/:teamId/members')

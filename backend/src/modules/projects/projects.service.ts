@@ -7,7 +7,7 @@ import {
   ConflictException,
   BadRequestException,
 } from '@nestjs/common';
-import { InMemoryCacheService } from '@/common/cache/in-memory-cache.service';
+import { TtlCacheService } from '@/common/cache/ttl-cache.service';
 import { ProjectAccessService } from '@/common/access/project-access.service';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { AuditAction } from '@/common/enums/audit-action.enum';
@@ -52,7 +52,7 @@ export class ProjectsService {
     private readonly teamRepository: ITeamRepository,
     private readonly auditService: AuditService,
     private readonly projectAccessService: ProjectAccessService,
-    private readonly cache: InMemoryCacheService,
+    private readonly cache: TtlCacheService,
     @Optional() private readonly prisma?: PrismaService,
   ) {}
 

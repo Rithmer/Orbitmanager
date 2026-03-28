@@ -2,7 +2,7 @@ import { Test } from '@nestjs/testing';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { TaskStatus } from '@/common/enums/task-status.enum';
 import { TeamRole } from '@/common/enums/team-role.enum';
-import { InMemoryCacheService } from '@/common/cache/in-memory-cache.service';
+import { TtlCacheService } from '@/common/cache/ttl-cache.service';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { ReportsService } from './reports.service';
 
@@ -62,7 +62,7 @@ describe('ReportsService', () => {
     const module = await Test.createTestingModule({
       providers: [
         ReportsService,
-        InMemoryCacheService,
+        TtlCacheService,
         { provide: PrismaService, useValue: mockPrisma },
       ],
     }).compile();
@@ -82,7 +82,7 @@ describe('ReportsService', () => {
     const module = await Test.createTestingModule({
       providers: [
         ReportsService,
-        InMemoryCacheService,
+        TtlCacheService,
         { provide: PrismaService, useValue: mockPrisma },
       ],
     }).compile();

@@ -10,7 +10,7 @@ export interface UserListQuery extends RepositoryPageParams {
 
 export interface IUserRepository {
   findAll(): Promise<User[]>;
-  findPage?(params: UserListQuery): Promise<RepositoryPageResult<User>>;
+  findPage(params: UserListQuery): Promise<RepositoryPageResult<User>>;
   findById(id: number): Promise<User | null>;
   findByLogin(login: string): Promise<User | null>;
   create(user: Omit<User, 'id'>): Promise<User>;

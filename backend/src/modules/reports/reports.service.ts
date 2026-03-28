@@ -3,7 +3,7 @@ import { AccountRole } from '@/common/enums/account-role.enum';
 import { ProjectRole } from '@/common/enums/project-role.enum';
 import { TeamRole } from '@/common/enums/team-role.enum';
 import { TaskStatus } from '@/common/enums/task-status.enum';
-import { InMemoryCacheService } from '@/common/cache/in-memory-cache.service';
+import { TtlCacheService } from '@/common/cache/ttl-cache.service';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { ReportsSummaryResponseDto } from './dto/reports-summary-response.dto';
 
@@ -33,7 +33,7 @@ export interface ProjectNameRow {
 export class ReportsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly cache: InMemoryCacheService,
+    private readonly cache: TtlCacheService,
   ) {}
 
   async getSummary(
@@ -45,10 +45,10 @@ export class ReportsService {
       projectId ?? 'all'
     }`;
 
-    return this.cache.remember(
+    return this.cache.getOrSet(
       cacheKey,
-      async () => this.buildSummary(userId, accountRole, projectId),
-      { ttlMs: REPORTS_CACHE_TTL_MS },
+      () => this.buildSummary(userId, accountRole, projectId),
+      REPORTS_CACHE_TTL_MS,
     );
   }
 

@@ -45,7 +45,6 @@ describe('RiskMlService', () => {
   let stubService: {
     assessTask: jest.Mock;
     assessProject: jest.Mock;
-    assessProjectsBatch: jest.Mock;
   };
   let taskRepo: { findByProject: jest.Mock; findByProjects: jest.Mock };
   let projectRepo: { findById: jest.Mock };
@@ -65,7 +64,6 @@ describe('RiskMlService', () => {
         tasksAtRisk: [],
         summary: 'stub fallback',
       }),
-      assessProjectsBatch: jest.fn().mockResolvedValue({}),
     };
 
     taskRepo = {
@@ -166,42 +164,6 @@ describe('RiskMlService', () => {
       await service.assessProject(1);
 
       expect(stubService.assessProject).toHaveBeenCalledWith(1);
-    });
-  });
-
-  describe('assessProjectsBatch', () => {
-    it('should return empty object for empty project list', async () => {
-      const result = await service.assessProjectsBatch([]);
-      expect(result).toEqual({});
-    });
-
-    it('should fallback to stub when ML is unavailable', async () => {
-      taskRepo.findByProjects.mockResolvedValue([
-        {
-          id: 10,
-          projectId: 1,
-          name: 'Task',
-          status: TaskStatus.IN_PROGRESS,
-          difficulty: 3,
-          deadline: '2026-04-10',
-          createdAt: '2026-03-01',
-          assigneeIds: [],
-        },
-      ]);
-      mlClient.predictBatch.mockResolvedValue(null);
-      stubService.assessProjectsBatch.mockResolvedValue({
-        1: {
-          riskScore: 20,
-          riskLevel: 'low',
-          tasksAtRisk: [],
-          summary: 'stub',
-        },
-      });
-
-      const result = await service.assessProjectsBatch([1]);
-
-      expect(stubService.assessProjectsBatch).toHaveBeenCalledWith([1]);
-      expect(result[1]?.riskScore).toBe(20);
     });
   });
 });

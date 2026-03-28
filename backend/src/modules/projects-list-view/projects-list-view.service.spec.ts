@@ -44,7 +44,6 @@ const mockRiskAssessment = {
     recommendation: 'On track',
   }),
   assessProject: jest.fn(),
-  assessProjectsBatch: jest.fn().mockResolvedValue({}),
 };
 
 const mockProjectAccessService = {

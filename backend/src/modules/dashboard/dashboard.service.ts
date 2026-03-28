@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
-import { InMemoryCacheService } from '@/common/cache/in-memory-cache.service';
+import { TtlCacheService } from '@/common/cache/ttl-cache.service';
 import { AccountRole } from '@/common/enums/account-role.enum';
 import { AuditAction } from '@/common/enums/audit-action.enum';
 import { TaskStatus } from '@/common/enums/task-status.enum';
@@ -9,6 +9,10 @@ import { RISK_ASSESSMENT_SERVICE } from '@/domain/services/risk-assessment.inter
 import type { IRiskAssessmentService } from '@/domain/services/risk-assessment.interface';
 import type { Task } from '@/domain/models/task.model';
 import { buildTaskRiskInput } from '../risk/helpers/build-task-risk-input';
+import {
+  RISK_THRESHOLD_AT_RISK,
+  RISK_THRESHOLD_HIGH,
+} from '../risk/risk.constants';
 import {
   DashboardRecentTaskItemDto,
   DashboardRiskInsightDto,
@@ -72,7 +76,7 @@ interface DashboardActiveTaskRow {
 export class DashboardService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly cache: InMemoryCacheService,
+    private readonly cache: TtlCacheService,
     private readonly projectAccessService: ProjectAccessService,
     @Inject(RISK_ASSESSMENT_SERVICE)
     private readonly riskAssessmentService: IRiskAssessmentService,
@@ -84,10 +88,10 @@ export class DashboardService {
   ): Promise<DashboardSummaryResponseDto> {
     const cacheKey = `dashboard:summary:${userId}:${accountRole}`;
 
-    return this.cache.remember(
+    return this.cache.getOrSet(
       cacheKey,
-      async () => this.buildSummary(userId, accountRole),
-      { ttlMs: DASHBOARD_CACHE_TTL_MS },
+      () => this.buildSummary(userId, accountRole),
+      DASHBOARD_CACHE_TTL_MS,
     );
   }
 
@@ -118,10 +122,7 @@ export class DashboardService {
 
     const [
       projectCount,
-      totalTasks,
-      doneTasks,
-      inProgressTasks,
-      reviewTasks,
+      statusGroups,
       overdueTasks,
       recentTaskRows,
       activeTaskRows,
@@ -129,26 +130,10 @@ export class DashboardService {
       this.prisma.project.count({
         where: { id: { in: visibleProjectIds } },
       }),
-      this.prisma.task.count({
+      this.prisma.task.groupBy({
+        by: ['status'],
         where: { projectId: { in: visibleProjectIds } },
-      }),
-      this.prisma.task.count({
-        where: {
-          projectId: { in: visibleProjectIds },
-          status: TaskStatus.DONE,
-        },
-      }),
-      this.prisma.task.count({
-        where: {
-          projectId: { in: visibleProjectIds },
-          status: TaskStatus.IN_PROGRESS,
-        },
-      }),
-      this.prisma.task.count({
-        where: {
-          projectId: { in: visibleProjectIds },
-          status: TaskStatus.REVIEW,
-        },
+        _count: true,
       }),
       this.prisma.task.count({
         where: {
@@ -222,6 +207,14 @@ export class DashboardService {
       }),
     ]);
 
+    const statusCountMap = new Map(
+      statusGroups.map((g) => [g.status, g._count]),
+    );
+    const totalTasks = statusGroups.reduce((sum, g) => sum + g._count, 0);
+    const doneTasks = statusCountMap.get(TaskStatus.DONE) ?? 0;
+    const inProgressTasks = statusCountMap.get(TaskStatus.IN_PROGRESS) ?? 0;
+    const reviewTasks = statusCountMap.get(TaskStatus.REVIEW) ?? 0;
+
     const activeTaskIds = activeTaskRows.map((task) => task.id);
     const statusChangeLogs =
       activeTaskIds.length === 0
@@ -291,7 +284,7 @@ export class DashboardService {
         }),
       )
     )
-      .filter(({ risk }) => risk.delayProbability > 0.3)
+      .filter(({ risk }) => risk.delayProbability > RISK_THRESHOLD_AT_RISK)
       .sort(
         (left, right) =>
           right.risk.delayProbability - left.risk.delayProbability,
@@ -374,9 +367,9 @@ export class DashboardService {
     risk: Awaited<ReturnType<IRiskAssessmentService['assessTask']>>,
   ): DashboardRiskInsightDto {
     const type =
-      risk.delayProbability > 0.6
+      risk.delayProbability > RISK_THRESHOLD_HIGH
         ? 'error'
-        : risk.delayProbability > 0.3
+        : risk.delayProbability > RISK_THRESHOLD_AT_RISK
           ? 'warning'
           : 'info';
 

@@ -12,7 +12,7 @@ export interface ProjectListQuery extends RepositoryPageParams {
 
 export interface IProjectRepository {
   findAll(): Promise<Project[]>;
-  findPage?(params: ProjectListQuery): Promise<RepositoryPageResult<Project>>;
+  findPage(params: ProjectListQuery): Promise<RepositoryPageResult<Project>>;
   findById(id: number): Promise<Project | null>;
   findByIds(ids: number[]): Promise<Project[]>;
   findByTeam(teamId: number): Promise<Project[]>;

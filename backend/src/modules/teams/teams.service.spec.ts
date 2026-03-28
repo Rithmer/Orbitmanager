@@ -18,7 +18,6 @@ import { Team } from '@/domain/models/team.model';
 import { TeamMember } from '@/domain/models/team-member.model';
 import { AuditService } from '../audit-logs/audit.service';
 import { TtlCacheService } from '@/common/cache/ttl-cache.service';
-import { InMemoryCacheService } from '@/common/cache/in-memory-cache.service';
 
 const mockTeam: Team = {
   id: 1,
@@ -141,15 +140,12 @@ const mockAuditService = {
   logMany: jest.fn().mockResolvedValue(undefined),
 };
 
-const mockTtlCacheService = {
+const mockCacheService = {
   invalidate: jest.fn(),
+  invalidateByPrefix: jest.fn(),
   get: jest.fn().mockReturnValue(undefined),
   set: jest.fn(),
   getOrSet: jest.fn(),
-};
-
-const mockSummaryCache = {
-  invalidateByPrefix: jest.fn(),
 };
 
 describe('TeamsService', () => {
@@ -169,8 +165,7 @@ describe('TeamsService', () => {
         },
         { provide: TASK_REPOSITORY, useValue: mockTaskRepository },
         { provide: AuditService, useValue: mockAuditService },
-        { provide: TtlCacheService, useValue: mockTtlCacheService },
-        { provide: InMemoryCacheService, useValue: mockSummaryCache },
+        { provide: TtlCacheService, useValue: mockCacheService },
       ],
     }).compile();
 
@@ -291,13 +286,13 @@ describe('TeamsService', () => {
           }),
         ]),
       );
-      expect(mockTtlCacheService.invalidate).toHaveBeenCalledWith(
+      expect(mockCacheService.invalidate).toHaveBeenCalledWith(
         `visible_projects:${mockMember.userId}`,
       );
-      expect(mockSummaryCache.invalidateByPrefix).toHaveBeenCalledWith(
+      expect(mockCacheService.invalidateByPrefix).toHaveBeenCalledWith(
         `dashboard:summary:${mockMember.userId}:`,
       );
-      expect(mockSummaryCache.invalidateByPrefix).toHaveBeenCalledWith(
+      expect(mockCacheService.invalidateByPrefix).toHaveBeenCalledWith(
         `reports:summary:${mockMember.userId}:`,
       );
     });
@@ -362,13 +357,13 @@ describe('TeamsService', () => {
       expect(mockTeamMemberRepository.delete).toHaveBeenCalledWith(
         mockMember.id,
       );
-      expect(mockTtlCacheService.invalidate).toHaveBeenCalledWith(
+      expect(mockCacheService.invalidate).toHaveBeenCalledWith(
         `visible_projects:${mockMember.userId}`,
       );
-      expect(mockSummaryCache.invalidateByPrefix).toHaveBeenCalledWith(
+      expect(mockCacheService.invalidateByPrefix).toHaveBeenCalledWith(
         `dashboard:summary:${mockMember.userId}:`,
       );
-      expect(mockSummaryCache.invalidateByPrefix).toHaveBeenCalledWith(
+      expect(mockCacheService.invalidateByPrefix).toHaveBeenCalledWith(
         `reports:summary:${mockMember.userId}:`,
       );
     });
@@ -387,13 +382,13 @@ describe('TeamsService', () => {
         AccountRole.MEMBER,
       );
 
-      expect(mockTtlCacheService.invalidate).toHaveBeenCalledWith(
+      expect(mockCacheService.invalidate).toHaveBeenCalledWith(
         'visible_projects:20',
       );
-      expect(mockSummaryCache.invalidateByPrefix).toHaveBeenCalledWith(
+      expect(mockCacheService.invalidateByPrefix).toHaveBeenCalledWith(
         'dashboard:summary:20:',
       );
-      expect(mockSummaryCache.invalidateByPrefix).toHaveBeenCalledWith(
+      expect(mockCacheService.invalidateByPrefix).toHaveBeenCalledWith(
         'reports:summary:20:',
       );
     });

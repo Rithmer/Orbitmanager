@@ -8,7 +8,6 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { TtlCacheService } from '@/common/cache/ttl-cache.service';
-import { InMemoryCacheService } from '@/common/cache/in-memory-cache.service';
 import type { ITeamRepository } from '@/domain/repositories/team.repository';
 import { TEAM_REPOSITORY } from '@/domain/repositories/team.repository';
 import type { ITeamMemberRepository } from '@/domain/repositories/team-member.repository';
@@ -54,8 +53,7 @@ export class TeamsService {
     @Inject(TASK_REPOSITORY)
     private readonly taskRepository: ITaskRepository,
     private readonly auditService: AuditService,
-    private readonly ttlCache: TtlCacheService,
-    private readonly summaryCache: InMemoryCacheService,
+    private readonly cache: TtlCacheService,
     @Optional() private readonly prisma?: PrismaService,
   ) {}
 
@@ -576,9 +574,9 @@ export class TeamsService {
   }
 
   private invalidateAffectedUserAccessCaches(userId: number): void {
-    this.ttlCache.invalidate(`visible_projects:${userId}`);
-    this.summaryCache.invalidateByPrefix(`dashboard:summary:${userId}:`);
-    this.summaryCache.invalidateByPrefix(`reports:summary:${userId}:`);
+    this.cache.invalidate(`visible_projects:${userId}`);
+    this.cache.invalidateByPrefix(`dashboard:summary:${userId}:`);
+    this.cache.invalidateByPrefix(`reports:summary:${userId}:`);
   }
 }
 

@@ -34,13 +34,16 @@ export class ProjectAccessService {
   }
 
   private async computeVisibleProjects(userId: number): Promise<Project[]> {
-    const visibleProjectIds = await this.getVisibleProjectIds(userId);
-    if (visibleProjectIds.length === 0) {
+    const teamMemberships = await this.teamMemberRepository.findByUser(userId);
+    if (teamMemberships.length === 0) {
       return [];
     }
 
-    const teamMemberships = await this.teamMemberRepository.findByUser(userId);
-    if (teamMemberships.length === 0) {
+    const visibleProjectIds = await this.resolveVisibleProjectIds(
+      userId,
+      teamMemberships,
+    );
+    if (visibleProjectIds.length === 0) {
       return [];
     }
 
@@ -62,6 +65,17 @@ export class ProjectAccessService {
       return [];
     }
 
+    return this.resolveVisibleProjectIds(userId, teamMemberships);
+  }
+
+  /**
+   * Core logic for resolving visible project IDs from team memberships.
+   * Extracted to avoid double-loading teamMemberships (audit M4).
+   */
+  private async resolveVisibleProjectIds(
+    userId: number,
+    teamMemberships: { teamId: number; teamRole: TeamRole }[],
+  ): Promise<number[]> {
     const ownerTeamIds = [
       ...new Set(
         teamMemberships

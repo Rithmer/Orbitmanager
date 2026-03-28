@@ -20,17 +20,17 @@ import { AccountRolesGuard } from '@/common/guards/account-roles.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AccountRole } from '@/common/enums/account-role.enum';
-import { ReadModelResponseFactory } from '@/common/read-models/read-model-response.factory';
+import {
+  normalizeIds,
+  pickGroupedByIds,
+} from '@/common/read-models/read-model-response.factory';
 
 @ApiTags('Project Members')
 @ApiAuth()
 @UseGuards(AccountRolesGuard)
 @Controller()
 export class ProjectMembersController {
-  constructor(
-    private readonly projectsService: ProjectsService,
-    private readonly readModelResponseFactory: ReadModelResponseFactory,
-  ) {}
+  constructor(private readonly projectsService: ProjectsService) {}
 
   @Get('projects/members/batch')
   @Roles(AccountRole.ADMIN, AccountRole.MEMBER)
@@ -53,9 +53,7 @@ export class ProjectMembersController {
   ) {
     const allMembersByProjectId =
       await this.projectsService.findAllMembersBatch(userId, userRole);
-    const requestedProjectIds = this.readModelResponseFactory.normalizeIds(
-      projectIds ?? legacyIds,
-    );
+    const requestedProjectIds = normalizeIds(projectIds ?? legacyIds);
 
     if (projectIds === undefined && legacyIds === undefined) {
       return allMembersByProjectId;
@@ -65,10 +63,7 @@ export class ProjectMembersController {
       return {};
     }
 
-    return this.readModelResponseFactory.pickGroupedByIds(
-      allMembersByProjectId,
-      requestedProjectIds,
-    );
+    return pickGroupedByIds(allMembersByProjectId, requestedProjectIds);
   }
 
   @Get('projects/:projectId/members')

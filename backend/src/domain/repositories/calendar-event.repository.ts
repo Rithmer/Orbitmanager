@@ -13,7 +13,7 @@ export interface CalendarEventListQuery extends RepositoryPageParams {
 
 export interface ICalendarEventRepository {
   findAll(): Promise<CalendarEvent[]>;
-  findPage?(
+  findPage(
     params: CalendarEventListQuery,
   ): Promise<RepositoryPageResult<CalendarEvent>>;
   findById(id: number): Promise<CalendarEvent | null>;

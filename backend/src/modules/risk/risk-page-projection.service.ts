@@ -12,6 +12,13 @@ import type {
 import { RISK_ASSESSMENT_SERVICE } from '@/domain/services/risk-assessment.interface';
 import { MlClientService } from './ml-client.service';
 import { RiskAssigneeScoringService } from './risk-assignee-scoring.service';
+import {
+  RISK_THRESHOLD_AT_RISK,
+  RISK_THRESHOLD_HIGH,
+  getRiskLevel,
+  buildProjectRiskSummary,
+  EMPTY_PROJECT_SUMMARY,
+} from './risk.constants';
 import type {
   ProjectMemberRecord,
   RiskPageContext,
@@ -75,7 +82,7 @@ export class RiskPageProjectionService {
         taskInsights.push(insight);
 
         totalDelay += prediction.delayProbability;
-        if (prediction.delayProbability > 0.3) {
+        if (prediction.delayProbability > RISK_THRESHOLD_AT_RISK) {
           tasksAtRisk.push({
             taskId: task.id,
             taskName: task.name,
@@ -88,8 +95,7 @@ export class RiskPageProjectionService {
 
       const avgDelay = tasks.length > 0 ? totalDelay / tasks.length : 0;
       const riskScore = Math.round(avgDelay * 100);
-      const riskLevel: 'low' | 'medium' | 'high' =
-        avgDelay > 0.6 ? 'high' : avgDelay > 0.3 ? 'medium' : 'low';
+      const riskLevel = getRiskLevel(avgDelay);
       const successProbability = clamp(100 - riskScore, 0, 100);
 
       const riskFactors = this.collectProjectRiskFactors(
@@ -102,14 +108,14 @@ export class RiskPageProjectionService {
       );
 
       const highRiskCount = tasksAtRisk.filter(
-        (t) => t.delayProbability > 0.6,
+        (t) => t.delayProbability > RISK_THRESHOLD_HIGH,
       ).length;
 
       result[projectId] = {
         riskScore,
         riskLevel,
         tasksAtRisk,
-        summary: this.buildSummary(
+        summary: buildProjectRiskSummary(
           riskLevel,
           riskScore,
           tasks.length,
@@ -344,7 +350,7 @@ export class RiskPageProjectionService {
     let recIndex = 0;
 
     for (const insight of taskInsights) {
-      if (insight.delayProbability <= 0.3) continue;
+      if (insight.delayProbability <= RISK_THRESHOLD_AT_RISK) continue;
 
       const prediction = predictionsByTaskId.get(insight.taskId);
       if (!prediction) continue;
@@ -432,29 +438,13 @@ export class RiskPageProjectionService {
       riskScore: 0,
       riskLevel: 'low',
       tasksAtRisk: [],
-      summary: 'В проекте нет активных задач. Риски отсутствуют.',
+      summary: EMPTY_PROJECT_SUMMARY,
       predictionSource: this.provider === 'ml' ? 'ml' : 'stub',
       successProbability: 100,
       riskFactors: [],
       taskInsights: [],
       recommendations: [],
     };
-  }
-
-  private buildSummary(
-    riskLevel: 'low' | 'medium' | 'high',
-    riskScore: number,
-    totalActive: number,
-    atRiskCount: number,
-    highRiskCount: number,
-  ): string {
-    if (riskLevel === 'low') {
-      return `Проект в зелёной зоне (${riskScore}/100). Из ${totalActive} активных задач нет задач с высоким риском.`;
-    }
-    if (riskLevel === 'medium') {
-      return `Проект имеет средний уровень риска (${riskScore}/100). ${atRiskCount} из ${totalActive} активных задач требуют внимания.`;
-    }
-    return `Проект имеет высокий риск срыва сроков (${riskScore}/100): ${highRiskCount} задач с вероятностью задержки > 60%.`;
   }
 }
 

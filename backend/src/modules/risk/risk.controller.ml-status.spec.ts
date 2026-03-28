@@ -7,7 +7,6 @@ import { TASK_REPOSITORY } from '@/domain/repositories/task.repository';
 import { PROJECT_REPOSITORY } from '@/domain/repositories/project.repository';
 import { AUDIT_LOG_REPOSITORY } from '@/domain/repositories/audit-log.repository';
 import { ProjectAccessService } from '@/common/access/project-access.service';
-import { ReadModelResponseFactory } from '@/common/read-models/read-model-response.factory';
 import { RiskPageReadModelService } from './risk-page-read-model.service';
 import { RiskPageProjectionService } from './risk-page-projection.service';
 
@@ -37,10 +36,6 @@ describe('RiskController – getMlStatus', () => {
         { provide: PROJECT_REPOSITORY, useValue: {} },
         { provide: AUDIT_LOG_REPOSITORY, useValue: {} },
         { provide: ProjectAccessService, useValue: {} },
-        {
-          provide: ReadModelResponseFactory,
-          useValue: { normalizeIds: jest.fn() },
-        },
         { provide: RiskPageReadModelService, useValue: {} },
         { provide: RiskPageProjectionService, useValue: {} },
       ],

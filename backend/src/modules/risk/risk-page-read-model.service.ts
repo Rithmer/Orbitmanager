@@ -40,6 +40,10 @@ const ACTIVE_STATUSES = [
   TaskStatus.REVIEW,
 ];
 
+/**
+ * @architecture CQRS Query Service
+ * Direct Prisma access for multi-join risk page projections.
+ */
 @Injectable()
 export class RiskPageReadModelService {
   constructor(

@@ -8,7 +8,7 @@ export type TeamListQuery = RepositoryPageParams;
 
 export interface ITeamRepository {
   findAll(): Promise<Team[]>;
-  findPage?(params: TeamListQuery): Promise<RepositoryPageResult<Team>>;
+  findPage(params: TeamListQuery): Promise<RepositoryPageResult<Team>>;
   findById(id: number): Promise<Team | null>;
   findByCreator(userId: number): Promise<Team[]>;
   create(team: Omit<Team, 'id'>): Promise<Team>;

@@ -16,7 +16,7 @@ import { PROJECT_MEMBER_REPOSITORY } from '@/domain/repositories/project-member.
 import { PROJECT_REPOSITORY } from '@/domain/repositories/project.repository';
 import { TASK_REPOSITORY } from '@/domain/repositories/task.repository';
 import { AuditService } from '../audit-logs/audit.service';
-import { InMemoryCacheService } from '@/common/cache/in-memory-cache.service';
+import { TtlCacheService } from '@/common/cache/ttl-cache.service';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { TasksService } from './tasks.service';
 
@@ -156,7 +156,7 @@ describe('TasksService', () => {
           useValue: mockProjectAccessService,
         },
         {
-          provide: InMemoryCacheService,
+          provide: TtlCacheService,
           useValue: {
             get: jest.fn(),
             set: jest.fn(),

@@ -1,48 +1,24 @@
 import { api, buildQuery, type ApiRequestOptions } from '@/app/api/client'
-import type { RiskProjectOption } from '@/app/features/risks'
+import type {
+  RiskProjectOption,
+  RiskFactor,
+  RiskTaskInsight,
+  RiskRecommendation,
+} from '@/app/features/risks'
 
-export type RisksProjectRiskResponse = Record<number, {
+export interface RisksProjectRiskItem {
   riskScore: number
   riskLevel: 'low' | 'medium' | 'high'
   tasksAtRisk: Array<{ taskId: number; taskName: string; delayProbability: number }>
   summary: string
   predictionSource: 'ml' | 'stub'
   successProbability: number
-  riskFactors: Array<{ id: string; label: string; severity: 'low' | 'medium' | 'high' }>
-  taskInsights: Array<{
-    taskId: number
-    taskName: string
-    predictedCompletionDate: string
-    delayProbability: number
-    riskLevel: 'low' | 'medium' | 'high'
-    riskFactors: string[]
-    recommendation: string
-    taskSuccessProbability: number
-    coordinationPenalty: number
-    assigneeBreakdown: Array<{
-      userId: number
-      userName: string
-      impactScore: number
-      confidence: number
-      note: string
-    }>
-    recommendedAssignees: Array<{
-      userId: number
-      fullName: string
-      profession: string
-      role: string
-      fitScore: number
-      reason: string
-    }>
-  }>
-  recommendations: Array<{
-    id: string
-    type: 'add_member' | 'swap_members' | 'rebalance_load'
-    title: string
-    reason: string
-    taskId: number | null
-  }>
-}>
+  riskFactors: RiskFactor[]
+  taskInsights: RiskTaskInsight[]
+  recommendations: RiskRecommendation[]
+}
+
+export type RisksProjectRiskResponse = Record<number, RisksProjectRiskItem>
 
 export const risksApi = {
   getProjects(

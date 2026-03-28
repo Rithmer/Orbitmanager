@@ -28,7 +28,7 @@ import type { ITaskRepository } from '@/domain/repositories/task.repository';
 import { TASK_REPOSITORY } from '@/domain/repositories/task.repository';
 import type { IRiskAssessmentService } from '@/domain/services/risk-assessment.interface';
 import { RISK_ASSESSMENT_SERVICE } from '@/domain/services/risk-assessment.interface';
-import { ReadModelResponseFactory } from '@/common/read-models/read-model-response.factory';
+import { normalizeIds } from '@/common/read-models/read-model-response.factory';
 import { ProjectRiskOutputDto, TaskRiskOutputDto } from './dto';
 import type { RiskPageProjectDto, RiskPageTaskDto } from './dto';
 import { MlClientService } from './ml-client.service';
@@ -52,7 +52,6 @@ export class RiskController {
     @Inject(AUDIT_LOG_REPOSITORY)
     private readonly auditLogRepository: IAuditLogRepository,
     private readonly projectAccessService: ProjectAccessService,
-    private readonly readModelResponseFactory: ReadModelResponseFactory,
     private readonly mlClient: MlClientService,
     private readonly configService: ConfigService,
     private readonly riskPageReadModel: RiskPageReadModelService,
@@ -192,9 +191,7 @@ export class RiskController {
     @Query('projectIds') projectIdsParam?: string | string[],
     @Query('ids') legacyIds?: string | string[],
   ): Promise<Record<number, RiskPageProjectDto>> {
-    const requestedProjectIds = this.readModelResponseFactory.normalizeIds(
-      projectIdsParam ?? legacyIds,
-    );
+    const requestedProjectIds = normalizeIds(projectIdsParam ?? legacyIds);
 
     const context = await this.riskPageReadModel.loadContext(
       userId,

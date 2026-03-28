@@ -16,6 +16,13 @@ import { TaskStatus } from '@/common/enums/task-status.enum';
 import { MlClientService } from './ml-client.service';
 import { RiskStubService } from './risk-stub.service';
 import { buildTaskRiskInput } from './helpers/build-task-risk-input';
+import {
+  RISK_THRESHOLD_AT_RISK,
+  RISK_THRESHOLD_HIGH,
+  getRiskLevel,
+  buildProjectRiskSummary,
+  EMPTY_PROJECT_SUMMARY,
+} from './risk.constants';
 
 @Injectable()
 export class RiskMlService implements IRiskAssessmentService {
@@ -65,7 +72,7 @@ export class RiskMlService implements IRiskAssessmentService {
         riskScore: 0,
         riskLevel: 'low',
         tasksAtRisk: [],
-        summary: 'В проекте нет активных задач. Риски отсутствуют.',
+        summary: EMPTY_PROJECT_SUMMARY,
       };
     }
 
@@ -113,99 +120,6 @@ export class RiskMlService implements IRiskAssessmentService {
     return this.stubService.assessProject(projectId);
   }
 
-  async assessProjectsBatch(
-    projectIds: number[],
-  ): Promise<Record<number, ProjectRiskOutput>> {
-    if (projectIds.length === 0) return {};
-
-    // Try ML path: gather all tasks, batch predict, then aggregate per project
-    const allTasks = await this.taskRepository.findByProjects(projectIds);
-
-    const tasksByProject = new Map<number, typeof allTasks>();
-    for (const task of allTasks) {
-      const list = tasksByProject.get(task.projectId) ?? [];
-      list.push(task);
-      tasksByProject.set(task.projectId, list);
-    }
-
-    const allActiveTasks = allTasks.filter(
-      (t) => t.status !== TaskStatus.DONE && t.status !== TaskStatus.CANCELLED,
-    );
-    const allActiveTaskIds = allActiveTasks.map((t) => t.id);
-
-    const allAuditLogs =
-      allActiveTaskIds.length > 0
-        ? await this.auditLogRepository.findByEntityIds(
-            'task',
-            allActiveTaskIds,
-          )
-        : [];
-
-    // Build inputs for all active tasks
-    const allInputs: TaskRiskInput[] = allActiveTasks.map((task) => {
-      const statusChangesCount = allAuditLogs.filter(
-        (l) => l.entityId === task.id && l.action === AuditAction.STATUS_CHANGE,
-      ).length;
-
-      const projectTasks = tasksByProject.get(task.projectId) ?? [];
-      const assigneeLoad =
-        task.assigneeIds.length > 0
-          ? Math.max(
-              ...task.assigneeIds.map(
-                (uid) =>
-                  projectTasks.filter(
-                    (t) =>
-                      t.assigneeIds.includes(uid) &&
-                      t.status !== TaskStatus.DONE &&
-                      t.status !== TaskStatus.CANCELLED &&
-                      t.id !== task.id,
-                  ).length,
-              ),
-            )
-          : 0;
-
-      return buildTaskRiskInput(task, statusChangesCount, assigneeLoad);
-    });
-
-    const mlResults =
-      allInputs.length > 0 ? await this.mlClient.predictBatch(allInputs) : null;
-
-    if (!mlResults) {
-      this.logger.warn(
-        'ML service unavailable for assessProjectsBatch, falling back to stub',
-      );
-      return this.stubService.assessProjectsBatch(projectIds);
-    }
-
-    // Aggregate per project
-    const result: Record<number, ProjectRiskOutput> = {};
-
-    for (const projectId of projectIds) {
-      const tasks = tasksByProject.get(projectId) ?? [];
-      const activeTasks = tasks.filter(
-        (t) =>
-          t.status !== TaskStatus.DONE && t.status !== TaskStatus.CANCELLED,
-      );
-
-      if (activeTasks.length === 0) {
-        result[projectId] = {
-          riskScore: 0,
-          riskLevel: 'low',
-          tasksAtRisk: [],
-          summary: 'В проекте нет активных задач. Риски отсутствуют.',
-        };
-        continue;
-      }
-
-      result[projectId] = this.buildProjectRiskFromResults(
-        activeTasks,
-        mlResults,
-      );
-    }
-
-    return result;
-  }
-
   private buildProjectRiskFromResults(
     activeTasks: { id: number; name: string; status: string }[],
     mlResults: Record<
@@ -227,7 +141,7 @@ export class RiskMlService implements IRiskAssessmentService {
       if (!prediction) continue;
 
       totalDelay += prediction.delayProbability;
-      if (prediction.delayProbability > 0.3) {
+      if (prediction.delayProbability > RISK_THRESHOLD_AT_RISK) {
         tasksAtRisk.push({
           taskId: task.id,
           taskName: task.name,
@@ -241,21 +155,19 @@ export class RiskMlService implements IRiskAssessmentService {
     const avgDelay =
       activeTasks.length > 0 ? totalDelay / activeTasks.length : 0;
     const riskScore = Math.round(avgDelay * 100);
-    const riskLevel: 'low' | 'medium' | 'high' =
-      avgDelay > 0.6 ? 'high' : avgDelay > 0.3 ? 'medium' : 'low';
+    const riskLevel = getRiskLevel(avgDelay);
 
     const highRiskCount = tasksAtRisk.filter(
-      (t) => t.delayProbability > 0.6,
+      (t) => t.delayProbability > RISK_THRESHOLD_HIGH,
     ).length;
 
-    let summary: string;
-    if (riskLevel === 'low') {
-      summary = `Проект в зелёной зоне (${riskScore}/100). Из ${activeTasks.length} активных задач нет задач с высоким риском.`;
-    } else if (riskLevel === 'medium') {
-      summary = `Проект имеет средний уровень риска (${riskScore}/100). ${tasksAtRisk.length} из ${activeTasks.length} активных задач требуют внимания.`;
-    } else {
-      summary = `Проект имеет высокий риск срыва сроков (${riskScore}/100): ${highRiskCount} задач с вероятностью задержки > 60%.`;
-    }
+    const summary = buildProjectRiskSummary(
+      riskLevel,
+      riskScore,
+      activeTasks.length,
+      tasksAtRisk.length,
+      highRiskCount,
+    );
 
     return { riskScore, riskLevel, tasksAtRisk, summary };
   }
