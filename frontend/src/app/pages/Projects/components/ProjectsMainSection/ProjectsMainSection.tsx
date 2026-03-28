@@ -5,14 +5,14 @@ import {
   RefreshBadge,
 } from '@/app/components/PageShell'
 import { CARD_COLORS } from '@/app/pages/Projects/constants'
-import { ProjectsToolbar } from '@/app/pages/Projects/components/ProjectsToolbar'
-import { ProjectsEmptyState } from '@/app/pages/Projects/components/ProjectsEmptyState'
-import { ProjectsErrorState } from '@/app/pages/Projects/components/ProjectsErrorState'
-import { ProjectsProjectCard } from '@/app/pages/Projects/components/ProjectsProjectCard'
+import { ProjectsToolbar } from './ProjectsToolbar'
+import { ProjectsEmptyState } from './ProjectsEmptyState'
+import { ProjectsErrorState } from './ProjectsErrorState'
+import { ProjectsProjectCard } from './ProjectsProjectCard'
 import type { ProjectsMainSectionProps } from '@/app/pages/Projects/types'
 
 export function ProjectsMainSection({ vm }: ProjectsMainSectionProps) {
-  const { navigate, shell, list, menu, projectForm, members } = vm
+  const { navigate, shell, list, projectForm, projectActions, members } = vm
   const { isDark, theme, showInitialSkeleton } = shell
   const {
     searchInput,
@@ -28,9 +28,11 @@ export function ProjectsMainSection({ vm }: ProjectsMainSectionProps) {
     isRefreshing,
     projects,
     totalProjects,
+    openMenuId,
+    setOpenMenuId,
   } = list
-  const { openMenuId, setOpenMenuId } = menu
-  const { pendingDeleteProjectId, openEditModal, handleDeleteProject } = projectForm
+  const { pendingDeleteProjectId } = projectForm
+  const { openEditModal, handleDeleteProject } = projectActions
 
   if (showInitialSkeleton) {
     return (
