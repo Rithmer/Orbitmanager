@@ -8,34 +8,14 @@ import {
   Trash2,
   Users,
 } from 'lucide-react'
-import { PROJECT_STATUS_LABELS, ProjectStatus, RiskLevel, type ProjectStatus as ProjectStatusType } from '@/app/types'
-import type { ProjectsListViewItem } from '@/app/features/projects/types'
+import { PROJECT_STATUS_LABELS, ProjectStatus, RiskLevel } from '@/app/types'
+import type { ProjectsProjectCardProps } from '@/app/pages/Projects/types'
 
 function formatShortDate(value: string) {
   return new Date(value).toLocaleDateString('ru-RU', {
     day: 'numeric',
     month: 'short',
   })
-}
-
-type ProjectsProjectCardProps = {
-  cardColor: string
-  dividerColor: string
-  isDark: boolean
-  isDeletePending: boolean
-  isMenuOpen: boolean
-  moreIconColor: string
-  project: ProjectsListViewItem
-  projectIndex: number
-  statusClassMap: Record<ProjectStatusType, { bg: string; text: string }>
-  textPrimary: string
-  textSecondary: string
-  onCloseMenu: () => void
-  onDelete: () => void
-  onNavigateToBoard: () => void
-  onOpenEdit: () => void
-  onOpenMembers: () => void
-  onToggleMenu: () => void
 }
 
 export function ProjectsProjectCard({

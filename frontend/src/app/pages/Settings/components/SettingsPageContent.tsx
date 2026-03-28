@@ -4,9 +4,11 @@ import { useSettingsThemeTokens } from '@/app/pages/Settings/hooks/useSettingsTh
 import { useProfileSettings } from '@/app/pages/Settings/hooks/useProfileSettings'
 import { usePasswordSettings } from '@/app/pages/Settings/hooks/usePasswordSettings'
 import { SettingsPageHeader } from '@/app/pages/Settings/components/SettingsPageHeader'
-import { SettingsProfileSection } from '@/app/pages/Settings/components/SettingsProfileSection'
-import { SettingsAppearanceSection } from '@/app/pages/Settings/components/SettingsAppearanceSection'
-import { SettingsSecuritySection } from '@/app/pages/Settings/components/SettingsSecuritySection'
+import {
+  SettingsProfileSection,
+  SettingsAppearanceSection,
+  SettingsSecuritySection,
+} from '@/app/pages/Settings/components/SettingsSections'
 
 export function SettingsPageContent() {
   const { logout } = useAuth()

@@ -1,7 +1,4 @@
-type SettingsPageHeaderProps = {
-  textPrimary: string
-  textSecondary: string
-}
+import type { SettingsPageHeaderProps } from '@/app/pages/Settings/types'
 
 export function SettingsPageHeader({ textPrimary, textSecondary }: SettingsPageHeaderProps) {
   return (

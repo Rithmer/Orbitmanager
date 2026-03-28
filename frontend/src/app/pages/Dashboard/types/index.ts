@@ -1,0 +1,6 @@
+export type { DashboardAuditLogItem, DashboardRecentActivitySectionProps } from './dashboard-recent-activity-section'
+export type { DashboardErrorStateProps } from './dashboard-error-state'
+export type { DashboardHeaderActionsProps } from './dashboard-header-actions'
+export type { DashboardRiskInsightsSectionProps } from './dashboard-risk-insights-section'
+export type { DashboardSkeletonStateProps } from './dashboard-skeleton-state'
+export type { DashboardStat, DashboardStatsSectionProps } from './dashboard-stats-section'

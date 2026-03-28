@@ -1,16 +1,5 @@
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
-
-type CalendarHeaderProps = {
-  title: string
-  subtitle: string
-  isDark: boolean
-  textPrimary: string
-  textSecondary: string
-  canManageCalendar: boolean
-  onPrevMonth: () => void
-  onNextMonth: () => void
-  onCreateEvent: () => void
-}
+import type { CalendarHeaderProps } from '@/app/pages/Calendar/types'
 
 export function CalendarHeader({
   title,

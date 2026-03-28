@@ -1,7 +1,6 @@
 import { AlertCircle } from 'lucide-react'
 import { PageSection, PageShell } from '@/app/components/PageShell'
-
-type ReportsAccessDeniedProps = { textSecondary: string }
+import type { ReportsAccessDeniedProps } from '@/app/pages/Reports/types'
 
 export function ReportsAccessDenied({ textSecondary }: ReportsAccessDeniedProps) {
   return (

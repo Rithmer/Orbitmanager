@@ -18,12 +18,11 @@ import {
 import { ProjectBoardSkeleton } from '@/app/features/board/board-view'
 import type { TaskRiskOutput } from '@/app/types'
 import { clearLastBoardProjectId } from '@/app/utils/lastBoardProjectStorage'
-import { BoardPageActions } from '@/app/pages/Board/components/BoardPageActions'
+import { BoardPageActions, BoardPageLoadedBody } from '@/app/pages/Board/components/BoardPageLoaded'
 import { useBoardTaskFormController } from '@/app/pages/Board/hooks/useBoardTaskFormController'
 import { useBoardTaskMenuDismiss } from '@/app/pages/Board/hooks/useBoardTaskMenuDismiss'
 import { useBoardProjectPickerRouting } from '@/app/pages/Board/hooks/useBoardProjectPickerRouting'
 import { useBoardPageSurfaceTokens } from '@/app/pages/Board/hooks/useBoardPageSurfaceTokens'
-import { BoardPageLoadedBody } from '@/app/pages/Board/components/BoardPageLoadedBody'
 
 export function BoardPageContent() {
   const { isDark } = useTheme()

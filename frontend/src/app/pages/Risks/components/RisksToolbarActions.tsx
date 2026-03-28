@@ -1,10 +1,6 @@
 import { RefreshCw } from 'lucide-react'
 import { RefreshBadge } from '@/app/components/PageShell'
-
-type RisksToolbarActionsProps = {
-  isRefreshing: boolean
-  onRefresh: () => void
-}
+import type { RisksToolbarActionsProps } from '@/app/pages/Risks/types'
 
 export function RisksToolbarActions({ isRefreshing, onRefresh }: RisksToolbarActionsProps) {
   return (

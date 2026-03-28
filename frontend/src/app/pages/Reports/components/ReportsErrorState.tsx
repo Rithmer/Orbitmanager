@@ -1,10 +1,5 @@
 import { PageShellQueryError } from '@/app/components/PageShell'
-
-export type ReportsErrorStateProps = {
-  errorMessage: string
-  textSecondary: string
-  onRetry: () => void
-}
+import type { ReportsErrorStateProps } from '@/app/pages/Reports/types'
 
 export function ReportsErrorState({ errorMessage, textSecondary, onRetry }: ReportsErrorStateProps) {
   return (

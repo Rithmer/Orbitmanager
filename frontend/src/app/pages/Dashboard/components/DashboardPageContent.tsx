@@ -4,12 +4,13 @@ import { useSmoothPageSkeleton } from '@/app/hooks/useSmoothPageSkeleton'
 import { DASHBOARD_PAGE_CONSTANTS } from '@/app/pages/Dashboard/constants'
 import { useDashboardData } from '@/app/pages/Dashboard/hooks/useDashboardData'
 import { useDashboardThemeTokens } from '@/app/pages/Dashboard/hooks/useDashboardThemeTokens'
-import { DashboardSkeletonState } from '@/app/pages/Dashboard/components/DashboardSkeletonState'
-import { DashboardErrorState } from '@/app/pages/Dashboard/components/DashboardErrorState'
+import { DashboardSkeletonState, DashboardErrorState } from '@/app/pages/Dashboard/components/DashboardStates'
 import { DashboardHeaderActions } from '@/app/pages/Dashboard/components/DashboardHeaderActions'
-import { DashboardStatsSection } from '@/app/pages/Dashboard/components/DashboardStatsSection'
-import { DashboardRecentActivitySection } from '@/app/pages/Dashboard/components/DashboardRecentActivitySection'
-import { DashboardRiskInsightsSection } from '@/app/pages/Dashboard/components/DashboardRiskInsightsSection'
+import {
+  DashboardStatsSection,
+  DashboardRecentActivitySection,
+  DashboardRiskInsightsSection,
+} from '@/app/pages/Dashboard/components/DashboardSections'
 
 export function DashboardPageContent() {
   const navigate = useNavigate()

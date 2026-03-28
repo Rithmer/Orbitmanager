@@ -1,29 +1,5 @@
 import { CALENDAR_PAGE_CONSTANTS } from '@/app/pages/Calendar/constants'
-import type { CalItem } from '@/app/pages/Calendar/types'
-
-type Cell = {
-  year: number
-  month: number
-  day: number
-  inCurrentMonth: boolean
-  isNextMonth: boolean
-}
-
-type CalendarGridProps = {
-  cells: Cell[]
-  cardBg: string
-  cardBorder: string
-  dayHeaderBg: string
-  dayCellBorder: string
-  dayCellHover: string
-  textPrimary: string
-  textSecondary: string
-  isDark: boolean
-  getItemsForDate: (year: number, month: number, day: number) => CalItem[]
-  getEventColorById: (eventId: number | undefined) => string
-  isToday: (year: number, month: number, day: number) => boolean
-  onSelectDay: (day: number) => void
-}
+import type { CalendarGridProps } from '@/app/pages/Calendar/types'
 
 export function CalendarGrid({
   cells,

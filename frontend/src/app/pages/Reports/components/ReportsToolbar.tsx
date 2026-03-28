@@ -1,22 +1,6 @@
 import { RefreshCw } from 'lucide-react'
 import { RefreshBadge } from '@/app/components/PageShell'
-
-type TeamOption = { id: number; name: string }
-type ProjectOption = { id: number; name: string }
-
-type ReportsToolbarProps = {
-  isDark: boolean
-  textSecondary: string
-  selectedTeamId: number | undefined
-  selectedProjectId: number | undefined
-  teamOptions: TeamOption[]
-  projectOptions: ProjectOption[]
-  filtersPending: boolean
-  isRefreshing: boolean
-  onChangeTeam: (teamId: number | undefined) => void
-  onChangeProject: (projectId: number | undefined) => void
-  onRefresh: () => void
-}
+import type { ReportsToolbarProps } from '@/app/pages/Reports/types'
 
 export function ReportsToolbar(props: ReportsToolbarProps) {
   const {

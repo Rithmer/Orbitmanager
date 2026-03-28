@@ -1,11 +1,5 @@
 import { Search } from 'lucide-react'
-
-type TeamsSearchBarProps = {
-  value: string
-  onChange: (value: string) => void
-  textSecondary: string
-  inputBg: string
-}
+import type { TeamsSearchBarProps } from '@/app/pages/Teams/types'
 
 export function TeamsSearchBar({ value, onChange, textSecondary, inputBg }: TeamsSearchBarProps) {
   return (

@@ -1,12 +1,6 @@
 import { Plus } from 'lucide-react'
 import { RefreshBadge } from '@/app/components/PageShell'
-
-type DashboardHeaderActionsProps = {
-  isRefreshing: boolean
-  projectsAccessLoading: boolean
-  canUseProjectsSection: boolean
-  onCreateProject: () => void
-}
+import type { DashboardHeaderActionsProps } from '@/app/pages/Dashboard/types'
 
 export function DashboardHeaderActions({
   isRefreshing,

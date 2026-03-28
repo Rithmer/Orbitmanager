@@ -1,9 +1,9 @@
 import { ErrorMessage } from '@/app/components/Modal'
 import { useTeamsPageController } from '@/app/pages/Teams/hooks/useTeamsPageController'
-import { TeamsCardsSection } from '@/app/pages/Teams/components/TeamsCardsSection'
+import { TeamsCardsSection } from '@/app/pages/Teams/components/TeamsCards'
 import { TeamsLoadingState } from '@/app/pages/Teams/components/TeamsLoadingState'
 import { TeamsPageHeader } from '@/app/pages/Teams/components/TeamsPageHeader'
-import { TeamsPageModals } from '@/app/pages/Teams/components/TeamsPageModals'
+import { TeamsPageModals } from '@/app/pages/Teams/components/TeamsModals'
 import { TeamsSearchBar } from '@/app/pages/Teams/components/TeamsSearchBar'
 
 export function TeamsPageContent() {

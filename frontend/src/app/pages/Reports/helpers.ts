@@ -1,12 +1,5 @@
 import type { ReportsStatusDistributionItem, ReportsSummaryResponse } from '@/app/features/reports'
 
-export type GanttTask = {
-  id: number
-  projectId: number
-  name: string
-  deadline: string
-}
-
 export function sameStatusRow(
   a: ReportsStatusDistributionItem | null | undefined,
   b: ReportsStatusDistributionItem | null | undefined,
@@ -65,4 +58,10 @@ export function formatDeadline(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleDateString('ru-RU')
+}
+
+export const RADIAN = Math.PI / 180
+
+export function percentOfTotal(value: number, total: number): number {
+  return total > 0 ? Math.round((value / total) * 100) : 0
 }

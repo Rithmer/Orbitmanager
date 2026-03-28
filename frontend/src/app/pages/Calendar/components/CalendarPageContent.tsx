@@ -12,8 +12,7 @@ import type { EventFilterType } from '@/app/pages/Calendar/types'
 import { CalendarFilters } from '@/app/pages/Calendar/components/CalendarFilters'
 import { CalendarGrid } from '@/app/pages/Calendar/components/CalendarGrid'
 import { CalendarHeader } from '@/app/pages/Calendar/components/CalendarHeader'
-import { EventFormModal } from '@/app/pages/Calendar/components/EventFormModal'
-import { SelectedDayModal } from '@/app/pages/Calendar/components/SelectedDayModal'
+import { EventFormModal, SelectedDayModal } from '@/app/pages/Calendar/components/CalendarModals'
 
 export function CalendarPageContent() {
   const { isDark } = useTheme()
