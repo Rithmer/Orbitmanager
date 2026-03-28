@@ -1,4 +1,5 @@
 import type { CalItem } from './calendar'
+import type { CalendarUiTokens } from '@/app/pages/Calendar/types/calendar-ui-tokens'
 
 export type CalendarGridCell = {
   year: number
@@ -9,15 +10,8 @@ export type CalendarGridCell = {
 }
 
 export type CalendarGridProps = {
+  ui: CalendarUiTokens
   cells: CalendarGridCell[]
-  cardBg: string
-  cardBorder: string
-  dayHeaderBg: string
-  dayCellBorder: string
-  dayCellHover: string
-  textPrimary: string
-  textSecondary: string
-  isDark: boolean
   getItemsForDate: (year: number, month: number, day: number) => CalItem[]
   getEventColorById: (eventId: number | undefined) => string
   isToday: (year: number, month: number, day: number) => boolean
