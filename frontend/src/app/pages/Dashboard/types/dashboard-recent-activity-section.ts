@@ -1,5 +1,6 @@
 import type { DashboardRecentTaskItem } from '@/app/features/dashboard/types'
 import type { AuditAction } from '@/app/types'
+import type { DashboardPageUiTokens } from '@/app/pages/Dashboard/types/dashboard-page-ui'
 
 export type DashboardAuditLogItem = {
   id: number
@@ -16,12 +17,6 @@ export type DashboardRecentActivitySectionProps = {
   recentAudit: DashboardAuditLogItem[]
   isRefreshing: boolean
   isAuditRefreshing: boolean
-  cardBg: string
-  cardBorder: string
-  dividerColor: string
-  textPrimary: string
-  textSecondary: string
-  isDark: boolean
-  statusStyles: Record<string, { color: string; bg: string; dot: string }>
+  ui: DashboardPageUiTokens
   onOpenProjectBoard: (projectId: number) => void
 }
