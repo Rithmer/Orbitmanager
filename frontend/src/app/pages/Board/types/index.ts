@@ -6,3 +6,4 @@ export type {
   ProjectBoardViewData,
   TaskPendingAction,
 } from './board-page-loaded-body'
+export type { BoardPageShellPort, BoardPageViewModel } from './board-page-view'
