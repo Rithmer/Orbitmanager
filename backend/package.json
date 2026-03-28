@@ -40,7 +40,7 @@
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
-    "@nestjs/swagger": "^11.2.6",
+    "@nestjs/swagger": "^11.0.0",
     "@nestjs/throttler": "^6.5.0",
     "@prisma/adapter-pg": "^7.4.2",
     "@prisma/client": "^7.4.2",
@@ -89,7 +89,16 @@
     "@hono/node-server": "1.19.11",
     "hono": "4.12.8",
     "@mrleebo/prisma-ast": "0.15.0",
-    "chevrotain": "11.1.2"
+    "chevrotain": "11.1.2",
+    "path-to-regexp": "8.4.0",
+    "@angular-devkit/core": {
+      "ajv": "8.18.0",
+      "picomatch": "4.0.4"
+    },
+    "@nestjs/schematics": {
+      "ajv": "8.18.0",
+      "picomatch": "4.0.4"
+    }
   },
   "jest": {
     "moduleFileExtensions": [
