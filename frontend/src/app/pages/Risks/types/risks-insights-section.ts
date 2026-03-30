@@ -20,6 +20,9 @@ export type RisksInsightsSectionProps = {
   textSecondary: string
   divider: string
   expandedAlternativesByTaskId: Record<number, boolean>
+  llmRecommendation: string | null
+  isLoadingLlmRec: boolean
+  onRefreshRecommendation: () => void
   onSelectTask: (taskId: number) => void
   onToggleAlternatives: (taskId: number) => void
 }

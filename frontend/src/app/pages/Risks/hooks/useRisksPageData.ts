@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { teamsApi } from '@/app/api/teams'
+import { riskApi } from '@/app/api/risk'
 import { useAuth } from '@/app/context/useAuth'
 import { useNavMembershipBatch } from '@/app/hooks/useNavMembershipBatch'
 import { useRisksSectionAccess } from '@/app/hooks/useRisksSectionAccess'
@@ -99,6 +100,14 @@ export function useRisksPageData({ selectedTeamId, selectedProjectId, selectedTa
     [selectedCard?.taskInsights],
   )
   const selectedTask = selectedTaskId ? sortedTaskInsights.find((task) => task.taskId === selectedTaskId) : sortedTaskInsights[0]
+
+  const selectedTaskRiskQuery = useQuery({
+    queryKey: appQueryKeys.risks.taskRisk(selectedTask?.taskId),
+    queryFn: ({ signal }) => riskApi.getTaskRisk(selectedTask!.taskId, { signal }),
+    enabled: risksApiEnabled && selectedTask !== undefined,
+    staleTime: Infinity,
+  })
+
   const topRecommendedAssignees = useMemo(
     () =>
       (selectedTask?.recommendedAssignees ?? [])
@@ -121,6 +130,9 @@ export function useRisksPageData({ selectedTeamId, selectedProjectId, selectedTa
   return {
     isAdmin,
     canUseRisks,
+    llmRecommendation: selectedTaskRiskQuery.data?.recommendation ?? null,
+    isLoadingLlmRec: selectedTaskRiskQuery.isFetching,
+    refetchLlmRec: selectedTaskRiskQuery.refetch,
     risksAccessLoading,
     waitingForAccess,
     projectsQuery,

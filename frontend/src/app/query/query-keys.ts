@@ -52,6 +52,7 @@ export const appQueryKeys = {
     projectRisks: (params?: Record<string, unknown>) =>
       ['risks', 'project-risks', params ?? null] as const,
     taskRisks: (projectId?: number) => ['risks', 'task-risks', projectId ?? null] as const,
+    taskRisk: (taskId?: number) => ['risks', 'task-risk', taskId ?? null] as const,
   },
   admin: {
     usersRoot: ['admin', 'users'] as const,

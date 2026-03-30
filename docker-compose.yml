@@ -25,6 +25,10 @@ services:
     restart: unless-stopped
     environment:
       MODELS_DIR: /app/models
+      LLM_ENABLED: ${LLM_ENABLED:-true}
+      LLM_URL: ${LLM_URL:-http://host.docker.internal:1234/v1}
+      LLM_MODEL: ${LLM_MODEL:-openai/gpt-oss-20b}
+      LLM_TIMEOUT: ${LLM_TIMEOUT:-30}
     volumes:
       - ./models:/app/models
     ports:

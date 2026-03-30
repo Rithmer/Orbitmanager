@@ -1,4 +1,4 @@
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, RefreshCw } from 'lucide-react'
 import { formatFitScore, formatImpactLabel, getCoordinationRiskExplanation } from '@/app/pages/Risks/helpers'
 import { RISKS_PAGE_CONSTANTS } from '@/app/pages/Risks/constants'
 import type { RisksInsightsSectionProps } from '@/app/pages/Risks/types'
@@ -15,6 +15,9 @@ export function RisksInsightsSection({
   textSecondary,
   divider,
   expandedAlternativesByTaskId,
+  llmRecommendation,
+  isLoadingLlmRec,
+  onRefreshRecommendation,
   onSelectTask,
   onToggleAlternatives,
 }: RisksInsightsSectionProps) {
@@ -74,6 +77,24 @@ export function RisksInsightsSection({
                       <p className={`text-xs mt-1 ${textSecondary}`}>{getCoordinationRiskExplanation(selectedTask.coordinationPenalty)}</p>
                     </div>
                     <div className={`rounded-xl ${panelMuted} p-3`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs uppercase tracking-wider font-semibold">Рекомендация ИИ</p>
+                        <button
+                          type="button"
+                          onClick={onRefreshRecommendation}
+                          disabled={isLoadingLlmRec}
+                          className={`text-[#4880ff] disabled:opacity-40 transition-opacity`}
+                          title="Перегенерировать"
+                        >
+                          <RefreshCw className={`h-3 w-3 ${isLoadingLlmRec ? 'animate-spin' : ''}`} />
+                        </button>
+                      </div>
+                      {isLoadingLlmRec
+                        ? <p className={`text-xs ${textSecondary} animate-pulse`}>Анализирую задачу...</p>
+                        : <p className={`text-xs ${textSecondary}`}>{llmRecommendation ?? '—'}</p>
+                      }
+                    </div>
+                    <div className={`rounded-xl ${panelMuted} p-3`}>
                       {selectedTask.recommendedAssignees.length > 0 ? (
                         <button
                           type="button"
@@ -115,6 +136,24 @@ export function RisksInsightsSection({
                 ) : (
                   <div className="space-y-2">
                     <p className="text-sm font-medium">Исполнитель не назначен</p>
+                    <div className={`rounded-xl ${panelMuted} p-3`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs uppercase tracking-wider font-semibold">Рекомендация ИИ</p>
+                        <button
+                          type="button"
+                          onClick={onRefreshRecommendation}
+                          disabled={isLoadingLlmRec}
+                          className={`text-[#4880ff] disabled:opacity-40 transition-opacity`}
+                          title="Перегенерировать"
+                        >
+                          <RefreshCw className={`h-3 w-3 ${isLoadingLlmRec ? 'animate-spin' : ''}`} />
+                        </button>
+                      </div>
+                      {isLoadingLlmRec
+                        ? <p className={`text-xs ${textSecondary} animate-pulse`}>Анализирую задачу...</p>
+                        : <p className={`text-xs ${textSecondary}`}>{llmRecommendation ?? '—'}</p>
+                      }
+                    </div>
                     <div className={`rounded-xl ${panelMuted} p-3`}>
                       <button type="button" onClick={() => onToggleAlternatives(selectedTask.taskId)} className="w-full flex items-center justify-between text-sm">
                         <span>Есть свободные альтернативы: <span className="font-semibold">{selectedTask.recommendedAssignees.length}</span></span>

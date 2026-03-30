@@ -114,6 +114,16 @@ export class RiskController {
 
     const input = buildTaskRiskInput(task, statusChangesCount, assigneeLoad);
 
+    const mlResult = await this.mlClient.predict(input, true);
+    if (mlResult) {
+      return {
+        predictedCompletionDate: mlResult.predictedCompletionDate,
+        delayProbability: mlResult.delayProbability,
+        riskLevel: mlResult.riskLevel as 'low' | 'medium' | 'high',
+        riskFactors: mlResult.riskFactors,
+        recommendation: mlResult.recommendation,
+      };
+    }
     return this.riskService.assessTask(input);
   }
 

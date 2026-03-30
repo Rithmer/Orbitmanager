@@ -26,6 +26,7 @@ class TaskRiskOutput(BaseModel):
 
 class PredictRequest(BaseModel):
     task: TaskRiskInput
+    llm: bool = False
 
 
 class PredictResponse(BaseModel):

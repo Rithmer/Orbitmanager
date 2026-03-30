@@ -9,6 +9,7 @@ import joblib
 import numpy as np
 
 from .features import extract_features, extract_features_batch, FEATURE_NAMES
+from .llm import llm_interpreter
 from .schemas import TaskRiskInput, TaskRiskOutput
 from .training import train_model
 
@@ -122,7 +123,7 @@ class ModelManager:
         logger.info("Model retrained and saved successfully.")
         return new_metadata
 
-    def predict(self, task: TaskRiskInput) -> TaskRiskOutput:
+    def predict(self, task: TaskRiskInput, llm: bool = False) -> TaskRiskOutput:
         """Run prediction for a single task."""
         with self._lock:
             model = self._model
@@ -139,13 +140,20 @@ class ModelManager:
         recommendation = _get_recommendation(risk_factors, risk_level)
         predicted_date = _predict_completion_date(task, delay_probability)
 
-        return TaskRiskOutput(
+        ml_output = TaskRiskOutput(
             predictedCompletionDate=predicted_date,
             delayProbability=delay_probability,
             riskLevel=risk_level,
             riskFactors=risk_factors,
             recommendation=recommendation,
         )
+
+        if llm:
+            llm_rec = llm_interpreter.interpret(task, ml_output)
+            if llm_rec:
+                ml_output = ml_output.model_copy(update={"recommendation": llm_rec})
+
+        return ml_output
 
     def predict_batch(self, tasks: List[TaskRiskInput]) -> Dict[int, TaskRiskOutput]:
         """Run prediction for multiple tasks in one call."""

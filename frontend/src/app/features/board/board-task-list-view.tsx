@@ -1,6 +1,5 @@
-import { AlertTriangle, Calendar, Tag, User as UserIcon } from 'lucide-react'
-import { RISK_LEVEL_LABELS, RiskLevel } from '@/app/types'
-import { getOverdueLabel, getRiskBadgeClasses, PROJECT_BOARD_COLUMNS } from '@/app/features/board/board-view.constants'
+import { Calendar, Tag, User as UserIcon } from 'lucide-react'
+import { getOverdueLabel, PROJECT_BOARD_COLUMNS } from '@/app/features/board/board-view.constants'
 import { formatBoardDateLabel } from '@/app/features/board/board-page-formatters'
 import type { ProjectBoardTask, ProjectBoardView } from '@/app/features/board/types'
 
@@ -17,7 +16,6 @@ type BoardTaskListViewProps = {
 
 export function BoardTaskListView({
   boardTasks,
-  projectBoardView,
   isDark,
   cardBorder,
   textPrimary,
@@ -25,8 +23,6 @@ export function BoardTaskListView({
   formatTaskAssigneesShort,
   onOpenTaskDetails,
 }: BoardTaskListViewProps) {
-  const riskByTaskId = projectBoardView.riskByTaskId
-
   return (
     <div
       className={`mt-2 overflow-hidden rounded-xl border ${cardBorder} ${
@@ -53,7 +49,6 @@ export function BoardTaskListView({
             return order.indexOf(a.status) - order.indexOf(b.status)
           })
           .map((task) => {
-            const risk = riskByTaskId[task.id]
             const overdue = getOverdueLabel(task)
             const columnMeta = PROJECT_BOARD_COLUMNS.find((c) => c.status === task.status)
 
@@ -78,14 +73,6 @@ export function BoardTaskListView({
                       <Tag className="h-2.5 w-2.5" />
                       {task.difficulty}/5
                     </span>
-                    {risk && risk.riskLevel !== RiskLevel.LOW && (
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${getRiskBadgeClasses(risk.riskLevel).background} ${getRiskBadgeClasses(risk.riskLevel).text}`}
-                      >
-                        <AlertTriangle className="h-2.5 w-2.5" />
-                        {RISK_LEVEL_LABELS[risk.riskLevel]}
-                      </span>
-                    )}
                     {overdue && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold text-red-500">
                         Просрочено

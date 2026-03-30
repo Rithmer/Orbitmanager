@@ -36,4 +36,6 @@ export const envValidationSchema = Joi.object({
     then: Joi.string().uri().required(),
     otherwise: Joi.string().default('http://ml-service:8000'),
   }),
+
+  LLM_ENABLED: Joi.boolean().default(false),
 });

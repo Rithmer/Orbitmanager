@@ -79,6 +79,9 @@ export function RisksPageContent() {
               textSecondary={theme.textSecondary}
               divider={theme.divider}
               expandedAlternativesByTaskId={selection.expandedAlternativesByTaskId}
+              llmRecommendation={data.llmRecommendation}
+              isLoadingLlmRec={data.isLoadingLlmRec}
+              onRefreshRecommendation={() => void data.refetchLlmRec()}
               onSelectTask={selection.setSelectedTaskId}
               onToggleAlternatives={(taskId) =>
                 selection.setExpandedAlternativesByTaskId((prev) => ({ ...prev, [taskId]: !prev[taskId] }))

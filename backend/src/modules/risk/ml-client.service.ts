@@ -61,12 +61,13 @@ export class MlClientService {
 
   async predict(
     task: TaskRiskInput,
+    llm = false,
   ): Promise<MlPredictResponse['prediction'] | null> {
     try {
       const response = await this.fetchWithTimeout(`${this.baseUrl}/predict`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ task }),
+        body: JSON.stringify({ task, llm }),
       });
 
       if (!response.ok) {

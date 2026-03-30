@@ -63,7 +63,7 @@ async def predict(request: PredictRequest):
         raise HTTPException(status_code=503, detail="Model not loaded")
 
     try:
-        prediction = model_manager.predict(request.task)
+        prediction = model_manager.predict(request.task, llm=request.llm)
         return PredictResponse(prediction=prediction)
     except Exception as e:
         logger.error("Prediction error: %s", e)
