@@ -1,111 +1,125 @@
-import random
-import numpy as np
-from datetime import datetime, timedelta
+import logging
+import os
+from dataclasses import dataclass, field
 
+import numpy as np
+import pandas as pd
+import psycopg2
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.model_selection import cross_val_score
 
 from .schemas import TaskRiskInput
 from .features import extract_features_batch, FEATURE_NAMES
 
-STATUSES = ["new", "in_progress", "review", "done", "cancelled"]
-ACTIVE_STATUSES = ["new", "in_progress", "review"]
+logger = logging.getLogger(__name__)
+
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 
-def generate_synthetic_sample() -> tuple[TaskRiskInput, float]:
-    """Generate a single synthetic task with a known delay probability label."""
-    difficulty = random.randint(1, 5)
-    assignee_count = random.choice([0, 1, 1, 2, 2, 3])
-    assignee_load = random.randint(0, 10) if assignee_count > 0 else 0
-    status_changes = random.randint(0, 8)
-    status = random.choice(ACTIVE_STATUSES)
-
-    days_since_creation = random.randint(1, 60)
-    days_until_deadline = random.randint(-10, 30)
-
-    now = datetime.utcnow()
-    created_at = now - timedelta(days=days_since_creation)
-    deadline = now + timedelta(days=days_until_deadline)
-
-    task = TaskRiskInput(
-        taskId=random.randint(1, 10000),
-        difficulty=difficulty,
-        deadline=deadline.isoformat(),
-        createdAt=created_at.isoformat(),
-        status=status,
-        assigneeCount=assignee_count,
-        assigneeLoad=assignee_load,
-        statusChangesCount=status_changes,
-        daysSinceCreation=days_since_creation,
-        daysUntilDeadline=days_until_deadline,
-    )
-
-    # Generate label based on rules (matching RiskStubService logic)
-    if days_until_deadline < 0:
-        delay_prob = 0.90 + random.uniform(0, 0.1)
-    elif days_until_deadline <= 2 and status != "review":
-        delay_prob = 0.60 + random.uniform(0, 0.2)
-    elif difficulty >= 4 and assignee_load > 5:
-        delay_prob = 0.50 + random.uniform(0, 0.2)
-    elif difficulty >= 3 and days_until_deadline <= 5:
-        delay_prob = 0.30 + random.uniform(0, 0.2)
-    else:
-        delay_prob = 0.05 + difficulty * 0.05 + random.uniform(0, 0.1)
-
-    # Additional factors
-    if assignee_count == 0:
-        delay_prob = min(delay_prob + 0.1, 1.0)
-    if status_changes > 3:
-        delay_prob = min(delay_prob + 0.05, 1.0)
-
-    delay_prob = round(min(max(delay_prob, 0.0), 1.0), 4)
-
-    return task, delay_prob
+@dataclass
+class ModelConfig:
+    n_estimators: int = 200
+    max_depth: int = 5
+    learning_rate: float = 0.1
+    subsample: float = 0.8
+    random_state: int = 42
+    cv_folds: int = 5
 
 
-def generate_synthetic_dataset(
-    n_samples: int = 5000,
-) -> tuple[np.ndarray, np.ndarray, list[TaskRiskInput]]:
-    """Generate a synthetic dataset for training."""
-    tasks = []
-    labels = []
-    for _ in range(n_samples):
-        task, label = generate_synthetic_sample()
-        tasks.append(task)
-        labels.append(label)
+@dataclass
+class TrainResult:
+    model: GradientBoostingRegressor
+    cv_rmse_mean: float
+    cv_rmse_std: float
+    n_samples: int
+    n_features: int
+    feature_names: list[str] = field(default_factory=list)
+
+    def metrics(self) -> dict:
+        return {
+            "cv_rmse_mean": self.cv_rmse_mean,
+            "cv_rmse_std": self.cv_rmse_std,
+            "n_samples": self.n_samples,
+            "n_features": self.n_features,
+            "feature_names": self.feature_names,
+        }
+
+
+def load_dataset() -> tuple[np.ndarray, np.ndarray]:
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL environment variable is not set.")
+
+    logger.info("Loading dataset from database...")
+    conn = psycopg2.connect(DATABASE_URL)
+    try:
+        df = pd.read_sql(
+            'SELECT task_id AS "taskId", difficulty, deadline, created_at AS "createdAt",'
+            ' status, assignee_count AS "assigneeCount", assignee_load AS "assigneeLoad",'
+            ' status_changes_count AS "statusChangesCount",'
+            ' days_since_creation AS "daysSinceCreation",'
+            ' days_until_deadline AS "daysUntilDeadline",'
+            " delay_probability FROM ml_task_samples",
+            conn,
+        )
+    finally:
+        conn.close()
+
+    logger.info("Loaded %d rows from database", len(df))
+    if df.empty:
+        raise ValueError("ml_task_samples table is empty.")
+
+    tasks = [
+        TaskRiskInput(
+            taskId=int(row["taskId"]),
+            difficulty=int(row["difficulty"]),
+            deadline=str(row["deadline"]),
+            createdAt=str(row["createdAt"]),
+            status=str(row["status"]),
+            assigneeCount=int(row["assigneeCount"]),
+            assigneeLoad=int(row["assigneeLoad"]),
+            statusChangesCount=int(row["statusChangesCount"]),
+            daysSinceCreation=int(row["daysSinceCreation"]),
+            daysUntilDeadline=int(row["daysUntilDeadline"]),
+        )
+        for _, row in df.iterrows()
+    ]
 
     X = extract_features_batch(tasks)
-    y = np.array(labels)
-    return X, y, tasks
+    y = df["delay_probability"].to_numpy(dtype=float)
+
+    logger.info("Dataset ready: X=%s, y=%s", X.shape, y.shape)
+    return X, y
 
 
-def train_model(
-    n_samples: int = 5000,
-) -> tuple[GradientBoostingRegressor, dict]:
-    """Train a GradientBoosting model on synthetic data and return model + metrics."""
-    X, y, _ = generate_synthetic_dataset(n_samples)
+def train_model(model_cfg: ModelConfig | None = None) -> TrainResult:
+    if model_cfg is None:
+        model_cfg = ModelConfig()
+
+    X, y = load_dataset()
 
     model = GradientBoostingRegressor(
-        n_estimators=200,
-        max_depth=5,
-        learning_rate=0.1,
-        subsample=0.8,
-        random_state=42,
+        n_estimators=model_cfg.n_estimators,
+        max_depth=model_cfg.max_depth,
+        learning_rate=model_cfg.learning_rate,
+        subsample=model_cfg.subsample,
+        random_state=model_cfg.random_state,
     )
 
-    # Cross-validate
-    cv_scores = cross_val_score(model, X, y, cv=5, scoring="neg_mean_squared_error")
+    logger.info("Running %d-fold cross-validation...", model_cfg.cv_folds)
+    cv_scores = cross_val_score(
+        model, X, y, cv=model_cfg.cv_folds, scoring="neg_mean_squared_error"
+    )
     rmse_scores = np.sqrt(-cv_scores)
+    logger.info("CV RMSE: %.4f ± %.4f", rmse_scores.mean(), rmse_scores.std())
 
-    # Train on full dataset
     model.fit(X, y)
+    logger.info("Model trained on full dataset.")
 
-    metrics = {
-        "cv_rmse_mean": round(float(rmse_scores.mean()), 4),
-        "cv_rmse_std": round(float(rmse_scores.std()), 4),
-        "n_samples": n_samples,
-        "n_features": X.shape[1],
-        "feature_names": FEATURE_NAMES,
-    }
-
-    return model, metrics
+    return TrainResult(
+        model=model,
+        cv_rmse_mean=round(float(rmse_scores.mean()), 4),
+        cv_rmse_std=round(float(rmse_scores.std()), 4),
+        n_samples=len(y),
+        n_features=X.shape[1],
+        feature_names=FEATURE_NAMES,
+    )

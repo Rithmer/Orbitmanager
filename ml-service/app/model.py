@@ -76,19 +76,19 @@ class ModelManager:
                 logger.warning("Failed to load model from disk: %s", e)
 
         logger.info("No model found on disk. Training initial model...")
-        self.retrain(sample_size=5000)
+        self.retrain()
 
-    def retrain(self, sample_size: int = 5000) -> dict:
+    def retrain(self) -> dict:
         """Train a new model. Only replaces the active model on success."""
-        logger.info("Starting model training with %d samples...", sample_size)
+        logger.info("Starting model training...")
 
-        new_model, metrics = train_model(n_samples=sample_size)
+        result = train_model()
 
         trained_at = datetime.utcnow().isoformat()
         new_metadata = {
             "trained_at": trained_at,
-            "sample_size": sample_size,
-            "metrics": metrics,
+            "sample_size": result.n_samples,
+            "metrics": result.metrics(),
             "version": self._version,
         }
 
@@ -100,7 +100,7 @@ class ModelManager:
         tmp_meta_path = meta_path + ".tmp"
 
         try:
-            joblib.dump(new_model, tmp_model_path)
+            joblib.dump(result.model, tmp_model_path)
             with open(tmp_meta_path, "w") as f:
                 json.dump(new_metadata, f, indent=2)
 
@@ -117,7 +117,7 @@ class ModelManager:
 
         # Only swap in-memory model after disk save succeeds
         with self._lock:
-            self._model = new_model
+            self._model = result.model
             self._metadata = new_metadata
 
         logger.info("Model retrained and saved successfully.")
