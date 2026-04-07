@@ -691,9 +691,6 @@ function buildProjectStatus(
   currentProjectCount: number,
 ): string {
   if (projectIndex < historyProjectCount) {
-    if (projectIndex === 1) {
-      return 'archived';
-    }
     return 'completed';
   }
 
@@ -792,7 +789,7 @@ function queueProjectLifecycleLogs(
     timestamp: createdAt,
   });
 
-  if (status === 'completed' || status === 'archived' || status === 'on_hold') {
+  if (status === 'completed' || status === 'on_hold') {
     queueAuditLog(auditBuffer, counters, {
       userId: ownerId,
       action: 'update',

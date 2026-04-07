@@ -72,10 +72,6 @@ export function BoardProjectPicker({
       bg: isDark ? 'bg-[#4880ff]/10' : 'bg-blue-50',
       text: 'text-[#4880ff]',
     },
-    [ProjectStatus.ARCHIVED]: {
-      bg: isDark ? 'bg-[#94a3b8]/10' : 'bg-gray-50',
-      text: 'text-[#94a3b8]',
-    },
   }
 
   const isPickerRefreshing = projectPickerQuery.isFetching && !!projectPickerQuery.data
@@ -156,9 +152,7 @@ export function BoardProjectPicker({
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 page-load-stagger">
               {pickerProjects.map((project, index) => {
                 const colorIndex = index % BOARD_PROJECT_CARD_COLORS.length
-                const normalizedStatus =
-                  project.status === ProjectStatus.ARCHIVED ? ProjectStatus.COMPLETED : project.status
-                const statusStyle = statusClassMap[normalizedStatus]
+                const statusStyle = statusClassMap[project.status]
                 const isHighRisk = project.riskSummary.riskLevel === RiskLevel.HIGH
                 const riskBadgeClasses = getRiskBadgeClasses(project.riskSummary.riskLevel)
 
@@ -194,7 +188,7 @@ export function BoardProjectPicker({
                             <span
                               className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusStyle.bg} ${statusStyle.text}`}
                             >
-                              {PROJECT_STATUS_LABELS[normalizedStatus] || normalizedStatus}
+                              {PROJECT_STATUS_LABELS[project.status] || project.status}
                             </span>
                             {project.riskSummary.riskLevel !== RiskLevel.LOW ? (
                               <span

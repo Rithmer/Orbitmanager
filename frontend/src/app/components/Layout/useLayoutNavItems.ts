@@ -7,6 +7,7 @@ import {
   Users,
   CalendarDays,
   PieChart,
+  Building2,
   TriangleAlert,
   Settings2,
   ShieldCheck,
@@ -48,6 +49,7 @@ export function useLayoutNavItems(
       ...(isAdmin
         ? [{ path: '/admin', label: 'Админ-панель', icon: ShieldCheck, end: false as const }]
         : []),
+      { path: '/about', label: 'О нас', icon: Building2, end: false },
     ],
     [
       boardNavPath,
