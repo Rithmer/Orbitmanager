@@ -23,10 +23,6 @@ export function useProjectsPageThemeTokens(isDark: boolean) {
       bg: isDark ? 'bg-[#4880ff]/10' : 'bg-blue-50',
       text: 'text-[#4880ff]',
     },
-    [ProjectStatus.ARCHIVED]: {
-      bg: isDark ? 'bg-[#94a3b8]/10' : 'bg-gray-50',
-      text: 'text-[#94a3b8]',
-    },
   }
 
   return {
