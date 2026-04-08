@@ -78,7 +78,7 @@ class ModelManager:
         logger.info("No model found on disk. Training initial model...")
         self.retrain()
 
-    def retrain(self) -> dict:
+    def retrain(self, sample_size: Optional[int] = None) -> dict:
         """Train a new model. Only replaces the active model on success."""
         logger.info("Starting model training...")
 
