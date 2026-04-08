@@ -3,10 +3,10 @@ import type { ReportsAccessibleProject, ReportsSummaryResponse } from '@/app/fea
 
 export const reportsApi = {
   getSummary(
-    params: { projectId?: number } = {},
+    params: { projectId?: number; teamId?: number } = {},
     options: ApiRequestOptions = {},
   ): Promise<ReportsSummaryResponse> {
-    return api.get(`/reports/summary${buildQuery({ projectId: params.projectId })}`, options)
+    return api.get(`/reports/summary${buildQuery({ projectId: params.projectId, teamId: params.teamId })}`, options)
   },
 
   getProjects(

@@ -3,15 +3,19 @@ import { appQueryKeys } from '@/app/query'
 import { reportsApi } from '@/app/api/reports'
 
 export function useReportsSummaryQuery(
-  projectId?: number,
+  params: { projectId?: number; teamId?: number } = {},
   options?: { enabled?: boolean },
 ) {
   const resolvedProjectId =
-    projectId !== undefined && Number.isInteger(projectId) ? projectId : undefined
+    params.projectId !== undefined && Number.isInteger(params.projectId) ? params.projectId : undefined
+  const resolvedTeamId =
+    resolvedProjectId === undefined && params.teamId !== undefined && Number.isInteger(params.teamId)
+      ? params.teamId
+      : undefined
 
   return useQuery({
-    queryKey: appQueryKeys.reports.summary({ projectId: resolvedProjectId }),
-    queryFn: ({ signal }) => reportsApi.getSummary({ projectId: resolvedProjectId }, { signal }),
+    queryKey: appQueryKeys.reports.summary({ projectId: resolvedProjectId ?? null, teamId: resolvedTeamId ?? null }),
+    queryFn: ({ signal }) => reportsApi.getSummary({ projectId: resolvedProjectId, teamId: resolvedTeamId }, { signal }),
     staleTime: 60_000,
     enabled: options?.enabled !== false,
   })

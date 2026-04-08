@@ -24,11 +24,13 @@ export class ReportsController {
     @CurrentUser('id') userId: number,
     @CurrentUser('accountRole') accountRole: AccountRole,
     @Query('projectId') projectId?: string,
+    @Query('teamId') teamId?: string,
   ) {
     return this.reportsService.getSummary(
       userId,
       accountRole,
       parseOptionalInt(projectId),
+      parseOptionalInt(teamId),
     );
   }
 

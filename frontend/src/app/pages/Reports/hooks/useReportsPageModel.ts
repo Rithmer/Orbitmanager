@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useQueries, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/app/context/useAuth'
 import { useTheme } from '@/app/context/useTheme'
 import { useAnalyticsSectionAccess } from '@/app/hooks/useAnalyticsSectionAccess'
@@ -7,17 +7,14 @@ import { useSmoothPageSkeleton } from '@/app/hooks/useSmoothPageSkeleton'
 import {
   useReportsProjectsQuery,
   useReportsSummaryQuery,
-  type ReportsSummaryResponse,
   type ReportsDifficultyDistributionItem,
   type ReportsStatusDistributionItem,
 } from '@/app/features/reports'
-import { reportsApi } from '@/app/api/reports'
 import { tasksApi } from '@/app/api/tasks'
 import { teamsApi } from '@/app/api/teams'
 import { appQueryKeys } from '@/app/query'
 import type { Task } from '@/app/types'
 import { REPORTS_PAGE_CONSTANTS } from '@/app/pages/Reports/constants'
-import { aggregateReportsSummaries } from '@/app/pages/Reports/helpers'
 import type { GanttTask } from '@/app/pages/Reports/types'
 import { useReportsFilterState } from '@/app/pages/Reports/hooks/useReportsFilterState'
 import { useReportsThemeTokens } from '@/app/pages/Reports/hooks/useReportsThemeTokens'
@@ -50,27 +47,14 @@ export function useReportsPageModel() {
   const filters = useReportsFilterState(projects, teamsMap)
   const scopedProjectIds = filters.teamScopedProjects.map((project) => project.id)
 
-  const singleProjectSummaryQuery = useReportsSummaryQuery(filters.effectiveProjectId, {
-    enabled: reportsApiEnabled && filters.effectiveProjectId !== undefined,
-  })
-  const aggregatedSummaryQueries = useQueries({
-    queries:
-      reportsApiEnabled && filters.effectiveProjectId === undefined
-        ? scopedProjectIds.map((projectId) => ({
-            queryKey: appQueryKeys.reports.summary({ projectId }),
-            queryFn: ({ signal }: { signal: AbortSignal }) => reportsApi.getSummary({ projectId }, { signal }),
-            staleTime: 60_000,
-          }))
-        : [],
-  })
-  const aggregatedSummary = useMemo(
-    () =>
-      aggregateReportsSummaries(
-        aggregatedSummaryQueries.map((query) => query.data).filter((row): row is ReportsSummaryResponse => row !== undefined),
-      ),
-    [aggregatedSummaryQueries],
+  const summaryQuery = useReportsSummaryQuery(
+    {
+      projectId: filters.effectiveProjectId,
+      teamId: filters.effectiveProjectId === undefined ? filters.selectedTeamId : undefined,
+    },
+    { enabled: reportsApiEnabled && scopedProjectIds.length > 0 },
   )
-  const summary = filters.effectiveProjectId !== undefined ? singleProjectSummaryQuery.data : aggregatedSummary
+  const summary = summaryQuery.data
 
   const tasksQuery = useQuery({
     queryKey: appQueryKeys.reports.ganttTasks({
@@ -127,21 +111,15 @@ export function useReportsPageModel() {
 
   const statusDistribution: ReportsStatusDistributionItem[] = summary?.statusDistribution ?? []
   const statusTotal = statusDistribution.reduce((sum: number, item: ReportsStatusDistributionItem) => sum + item.value, 0)
-  const aggregatedErrors = aggregatedSummaryQueries.map((query) => query.error).find((error): error is Error => error instanceof Error)
-  const summaryError = singleProjectSummaryQuery.error instanceof Error ? singleProjectSummaryQuery.error : aggregatedErrors
-  const isAggregatePending = filters.effectiveProjectId === undefined && aggregatedSummaryQueries.some((query) => query.isPending)
-  const isAggregateFetching = filters.effectiveProjectId === undefined && aggregatedSummaryQueries.some((query) => query.isFetching)
-  const isInitialLoading =
-    reportsApiEnabled && (filters.effectiveProjectId !== undefined ? singleProjectSummaryQuery.isPending : isAggregatePending) && !summary
-  const isRefreshing =
-    reportsApiEnabled && (filters.effectiveProjectId !== undefined ? singleProjectSummaryQuery.isFetching : isAggregateFetching) && !!summary
+  const summaryError = summaryQuery.error instanceof Error ? summaryQuery.error : null
+  const isInitialLoading = reportsApiEnabled && summaryQuery.isPending && !summary
+  const isRefreshing = reportsApiEnabled && summaryQuery.isFetching && !!summary
   const errorMessage =
     summaryError instanceof Error ? summaryError.message : 'Не удалось загрузить данные аналитики. Попробуйте обновить страницу.'
   const showInitialSkeleton = useSmoothPageSkeleton((!isAdmin && reportsAccessLoading) || isInitialLoading)
 
   const refreshAll = () => {
-    if (filters.effectiveProjectId !== undefined) void singleProjectSummaryQuery.refetch()
-    else aggregatedSummaryQueries.forEach((query) => { void query.refetch() })
+    void summaryQuery.refetch()
     void tasksQuery.refetch()
   }
 
