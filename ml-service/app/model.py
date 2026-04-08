@@ -59,8 +59,8 @@ class ModelManager:
     @property
     def metadata(self) -> Optional[dict]:
         return self._metadata
-12345678912344576789012345687901234567890123456879012344576879011222222222222223tdyhjkiol;khgyuftdr5ewqtr45i098
-7    def load_or_init(self) -> None:
+
+    def load_or_init(self) -> None:
         """Load model from disk, or train a new one if not found."""
         model_path = os.path.join(MODELS_DIR, MODEL_FILE)
         meta_path = os.path.join(MODELS_DIR, META_FILE)
