@@ -14,7 +14,7 @@ desktop.ini
 *.njsproj
 *.sln
 *.sw?
-
+backups/
 # === Node ===
 node_modules/
 
