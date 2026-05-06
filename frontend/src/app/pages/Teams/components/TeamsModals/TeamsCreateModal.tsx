@@ -1,7 +1,8 @@
 import { ErrorMessage, InputField, Modal, SubmitButton } from '@/app/components/Modal'
 import type { TeamsCreateModalProps } from '@/app/pages/Teams/types'
 
-export function TeamsCreateModal({ vm }: TeamsCreateModalProps) {
+export function TeamsCreateModal({ model }: TeamsCreateModalProps) {
+  const { teamForm, handlers, ui } = model
   const {
     showCreateModal,
     setShowCreateModal,
@@ -11,9 +12,8 @@ export function TeamsCreateModal({ vm }: TeamsCreateModalProps) {
     formDesc,
     setFormDesc,
     formLoading,
-    handleCreate,
-    tokens,
-  } = vm
+  } = teamForm
+  const { handleCreate } = handlers
 
   return (
     <Modal open={showCreateModal} onClose={() => setShowCreateModal(false)} title="Новая команда">
@@ -31,7 +31,7 @@ export function TeamsCreateModal({ vm }: TeamsCreateModalProps) {
           <button
             type="button"
             onClick={() => setShowCreateModal(false)}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold ${tokens.textSecondary}`}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold ${ui.textSecondary}`}
           >
             Отмена
           </button>

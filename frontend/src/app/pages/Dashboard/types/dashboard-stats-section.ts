@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
+import type { DashboardPageUiTokens } from '@/app/pages/Dashboard/types/dashboard-page-ui'
 
 export type DashboardStat = {
   label: string
@@ -12,8 +13,5 @@ export type DashboardStat = {
 export type DashboardStatsSectionProps = {
   stats: DashboardStat[]
   isRefreshing: boolean
-  cardBg: string
-  cardBorder: string
-  textPrimary: string
-  textSecondary: string
+  ui: Pick<DashboardPageUiTokens, 'cardBg' | 'cardBorder' | 'textPrimary' | 'textSecondary'>
 }

@@ -4,7 +4,7 @@ import { VISIBLE_PROJECT_STATUSES } from '@/app/pages/Projects/constants'
 import type { ProjectsCreateProjectModalProps } from '@/app/pages/Projects/types'
 
 export function ProjectsCreateProjectModal({ vm }: ProjectsCreateProjectModalProps) {
-  const { projectForm, list, shell } = vm
+  const { projectForm, projectActions, list, shell } = vm
   const {
     showCreateModal,
     setShowCreateModal,
@@ -18,8 +18,8 @@ export function ProjectsCreateProjectModal({ vm }: ProjectsCreateProjectModalPro
     formStatus,
     setFormStatus,
     formLoading,
-    handleCreateProject,
   } = projectForm
+  const { handleCreateProject } = projectActions
   const { teamsOptionsQuery } = list
   const { theme } = shell
 

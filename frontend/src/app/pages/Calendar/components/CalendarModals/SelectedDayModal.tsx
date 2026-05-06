@@ -6,15 +6,12 @@ import type { SelectedDayModalProps } from '@/app/pages/Calendar/types'
 
 export function SelectedDayModal(props: SelectedDayModalProps) {
   const {
+    ui,
     selectedDay,
     currentMonth,
     currentYear,
     selectedDayItems,
     canManageCalendar,
-    isDark,
-    modalBg,
-    textPrimary,
-    textSecondary,
     getDayOfWeek,
     isToday,
     getEventColorById,
@@ -23,6 +20,8 @@ export function SelectedDayModal(props: SelectedDayModalProps) {
     onEditEvent,
     onDeleteEvent,
   } = props
+
+  const { isDark, modalBg, textPrimary, textSecondary } = ui
 
   if (selectedDay === null) return null
 
@@ -39,11 +38,11 @@ export function SelectedDayModal(props: SelectedDayModalProps) {
           </div>
           <div className="flex items-center gap-2">
             {canManageCalendar ? (
-              <button onClick={() => onCreateForDay(selectedDay)} className="p-2 rounded-lg bg-[#4880ff] text-white hover:bg-[#3a6fe0] transition-colors">
+              <button type="button" onClick={() => onCreateForDay(selectedDay)} className="p-2 rounded-lg bg-[#4880ff] text-white hover:bg-[#3a6fe0] transition-colors">
                 <Plus className="w-4 h-4" />
               </button>
             ) : null}
-            <button onClick={onClose} className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-[#1c2534] text-[#94a3b8]' : 'hover:bg-gray-100 text-gray-400'}`}>
+            <button type="button" onClick={onClose} className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-[#1c2534] text-[#94a3b8]' : 'hover:bg-gray-100 text-gray-400'}`}>
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -75,8 +74,8 @@ export function SelectedDayModal(props: SelectedDayModalProps) {
                     </div>
                     {item.type === 'event' && canManageCalendar && item.eventId ? (
                       <div className="flex items-center gap-1 mt-2">
-                        <button onClick={(e) => { e.stopPropagation(); onEditEvent(item.eventId!) }} className="p-1 rounded hover:bg-[#4880ff]/10 text-[#4880ff] transition-colors"><Edit3 className="w-3.5 h-3.5" /></button>
-                        <button onClick={(e) => { e.stopPropagation(); onDeleteEvent(item.eventId!) }} className="p-1 rounded hover:bg-red-500/10 text-red-500 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); onEditEvent(item.eventId!) }} className="p-1 rounded hover:bg-[#4880ff]/10 text-[#4880ff] transition-colors"><Edit3 className="w-3.5 h-3.5" /></button>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); onDeleteEvent(item.eventId!) }} className="p-1 rounded hover:bg-red-500/10 text-red-500 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
                     ) : null}
                   </div>

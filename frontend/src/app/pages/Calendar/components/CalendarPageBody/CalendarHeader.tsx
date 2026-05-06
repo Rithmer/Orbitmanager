@@ -2,16 +2,15 @@ import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import type { CalendarHeaderProps } from '@/app/pages/Calendar/types'
 
 export function CalendarHeader({
+  ui,
   title,
   subtitle,
-  isDark,
-  textPrimary,
-  textSecondary,
   canManageCalendar,
   onPrevMonth,
   onNextMonth,
   onCreateEvent,
 }: CalendarHeaderProps) {
+  const { isDark, textPrimary, textSecondary } = ui
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4 page-load-stagger">
       <div>

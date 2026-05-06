@@ -1,6 +1,5 @@
+import type { TeamsPageViewModel } from '@/app/pages/Teams/hooks/useTeamsPageController'
+
 export type TeamsPageHeaderProps = {
-  textPrimary: string
-  textSecondary: string
-  teamsCount: number
-  onCreate: () => void
+  model: Pick<TeamsPageViewModel, 'ui' | 'data' | 'handlers'>
 }

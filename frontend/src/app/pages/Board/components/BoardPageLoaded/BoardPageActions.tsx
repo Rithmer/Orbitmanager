@@ -1,16 +1,16 @@
 import { ArrowLeft, LoaderCircle, Plus } from 'lucide-react'
 import type { BoardPageActionsProps } from '@/app/pages/Board/types'
 
-export function BoardPageActions({
-  isDark,
-  viewMode,
-  onToggleViewMode,
-  isRefreshing,
-  onRefresh,
-  canEditTasks,
-  onCreateTask,
-  onOpenProjectPicker,
-}: BoardPageActionsProps) {
+export function BoardPageActions({ shell, body }: BoardPageActionsProps) {
+  const {
+    onToggleViewMode,
+    boardIsFetching: isRefreshing,
+    onBoardRefresh: onRefresh,
+    onCreateTask,
+    onOpenProjectPicker,
+  } = shell
+  const { isDark, viewMode, canEditTasks } = body
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       <button

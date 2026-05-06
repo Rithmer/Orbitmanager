@@ -1,10 +1,7 @@
+import type { BoardPageLoadedBodyProps } from '@/app/pages/Board/types/board-page-loaded-body'
+import type { BoardPageShellPort } from '@/app/pages/Board/types/board-page-view'
+
 export type BoardPageActionsProps = {
-  isDark: boolean
-  viewMode: 'board' | 'list'
-  onToggleViewMode: () => void
-  isRefreshing: boolean
-  onRefresh: () => void
-  canEditTasks: boolean
-  onCreateTask: () => void
-  onOpenProjectPicker: () => void
+  shell: BoardPageShellPort
+  body: Pick<BoardPageLoadedBodyProps, 'isDark' | 'viewMode' | 'canEditTasks'>
 }

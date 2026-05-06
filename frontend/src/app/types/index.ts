@@ -28,7 +28,6 @@ export enum ProjectStatus {
   ACTIVE = 'active',
   ON_HOLD = 'on_hold',
   COMPLETED = 'completed',
-  ARCHIVED = 'archived',
 }
 
 export enum RiskLevel {
@@ -202,7 +201,6 @@ export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
   [ProjectStatus.ACTIVE]: 'Активный',
   [ProjectStatus.ON_HOLD]: 'Приостановлен',
   [ProjectStatus.COMPLETED]: 'Завершён',
-  [ProjectStatus.ARCHIVED]: 'Завершён',
 }
 
 export const ACCOUNT_ROLE_LABELS: Record<AccountRole, string> = {
