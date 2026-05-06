@@ -40,14 +40,15 @@ export class ReportsService {
     userId: number,
     accountRole: AccountRole,
     projectId?: number,
+    teamId?: number,
   ): Promise<ReportsSummaryResponseDto> {
     const cacheKey = `reports:summary:${userId}:${accountRole}:${
       projectId ?? 'all'
-    }`;
+    }:team:${teamId ?? 'all'}`;
 
     return this.cache.getOrSet(
       cacheKey,
-      () => this.buildSummary(userId, accountRole, projectId),
+      () => this.buildSummary(userId, accountRole, projectId, teamId),
       REPORTS_CACHE_TTL_MS,
     );
   }
@@ -56,6 +57,7 @@ export class ReportsService {
     userId: number,
     accountRole: AccountRole,
     projectId?: number,
+    teamId?: number,
   ): Promise<ReportsSummaryResponseDto> {
     const accessibleProjectIds = await this.getAccessibleProjectIds(
       userId,
@@ -66,11 +68,19 @@ export class ReportsService {
       throw new ForbiddenException('Нет прав на аналитику');
     }
 
-    const targetProjectIds =
-      projectId !== undefined ? [projectId] : accessibleProjectIds;
-
     if (projectId !== undefined && !accessibleProjectIds.includes(projectId)) {
       throw new ForbiddenException('Нет прав на выбранный проект');
+    }
+
+    let targetProjectIds =
+      projectId !== undefined ? [projectId] : accessibleProjectIds;
+
+    if (projectId === undefined && teamId !== undefined) {
+      const teamProjects = await this.prisma.project.findMany({
+        where: { id: { in: targetProjectIds }, teamId },
+        select: { id: true },
+      });
+      targetProjectIds = teamProjects.map((p) => p.id);
     }
 
     const where = {

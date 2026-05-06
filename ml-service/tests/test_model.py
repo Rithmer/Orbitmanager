@@ -73,7 +73,7 @@ def test_predict_high_risk_task(manager):
 def test_retrain_preserves_model_on_success(manager):
     manager.load_or_init()
     old_meta = manager.metadata
-    new_meta = manager.retrain(sample_size=100)
+    new_meta = manager.retrain()
     assert new_meta is not None
     assert manager.is_loaded
     assert manager.metadata["trained_at"] != old_meta["trained_at"]

@@ -173,6 +173,23 @@ model CalendarEvent {
   @@map("calendar_events")
 }
 
+model MlTaskSample {
+  id                 Int      @id @default(autoincrement())
+  taskId             Int      @map("task_id")
+  difficulty         Int
+  deadline           DateTime
+  createdAt          DateTime @map("created_at")
+  status             String
+  assigneeCount      Int      @map("assignee_count")
+  assigneeLoad       Int      @map("assignee_load")
+  statusChangesCount Int      @map("status_changes_count")
+  daysSinceCreation  Int      @map("days_since_creation")
+  daysUntilDeadline  Int      @map("days_until_deadline")
+  delayProbability   Float    @map("delay_probability")
+
+  @@map("ml_task_samples")
+}
+
 model RefreshToken {
   id        Int       @id @default(autoincrement())
   userId    Int       @map("user_id")
