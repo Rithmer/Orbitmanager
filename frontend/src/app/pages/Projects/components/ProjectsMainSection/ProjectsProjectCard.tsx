@@ -8,7 +8,7 @@ import {
   Trash2,
   Users,
 } from 'lucide-react'
-import { PROJECT_STATUS_LABELS, ProjectStatus, RiskLevel } from '@/app/types'
+import { PROJECT_STATUS_LABELS, RiskLevel } from '@/app/types'
 import type { ProjectsProjectCardProps } from '@/app/pages/Projects/types'
 
 function formatShortDate(value: string) {
@@ -37,9 +37,7 @@ export function ProjectsProjectCard({
   onOpenMembers,
   onToggleMenu,
 }: ProjectsProjectCardProps) {
-  const normalizedStatus =
-    project.status === ProjectStatus.ARCHIVED ? ProjectStatus.COMPLETED : project.status
-  const statusStyle = statusClassMap[normalizedStatus]
+  const statusStyle = statusClassMap[project.status]
   const isHighRisk = project.riskSummary.riskLevel === RiskLevel.HIGH
 
   return (
@@ -62,7 +60,7 @@ export function ProjectsProjectCard({
               <span
                 className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusStyle.bg} ${statusStyle.text}`}
               >
-                {PROJECT_STATUS_LABELS[normalizedStatus] || normalizedStatus}
+                {PROJECT_STATUS_LABELS[project.status] || project.status}
               </span>
               {project.riskSummary.riskLevel !== RiskLevel.LOW ? (
                 <span

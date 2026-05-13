@@ -3,24 +3,31 @@ import { formatFitScore, formatImpactLabel, getCoordinationRiskExplanation } fro
 import { RISKS_PAGE_CONSTANTS } from '@/app/pages/Risks/constants'
 import type { RisksInsightsSectionProps } from '@/app/pages/Risks/types'
 
-export function RisksInsightsSection({
-  selectedTeamId,
-  selectedCard,
-  sortedTaskInsights,
-  selectedTask,
-  topRecommendedAssignees,
-  cardBg,
-  cardBorder,
-  panelMuted,
-  textSecondary,
-  divider,
-  expandedAlternativesByTaskId,
-  llmRecommendation,
-  isLoadingLlmRec,
-  onRefreshRecommendation,
-  onSelectTask,
-  onToggleAlternatives,
-}: RisksInsightsSectionProps) {
+export function RisksInsightsSection({ ports }: RisksInsightsSectionProps) {
+  const { theme, selection, data } = ports
+  const { cardBg, cardBorder, panelMuted, textSecondary, divider } = theme
+  const {
+    selectedTeamId,
+    expandedAlternativesByTaskId,
+    setSelectedTaskId: onSelectTask,
+    setExpandedAlternativesByTaskId,
+  } = selection
+  const {
+    selectedCard,
+    sortedTaskInsights,
+    selectedTask,
+    topRecommendedAssignees,
+    llmRecommendation,
+    isLoadingLlmRec,
+    refetchLlmRec,
+  } = data
+
+  const onRefreshRecommendation = () => void refetchLlmRec()
+
+  const onToggleAlternatives = (taskId: number) => {
+    setExpandedAlternativesByTaskId((prev) => ({ ...prev, [taskId]: !prev[taskId] }))
+  }
+
   return (
     <div className={`xl:col-span-2 ${cardBg} border ${cardBorder} xl:h-[640px] rounded-xl p-4`}>
       <h3 className="text-base font-semibold mb-1">Задачи и аналитика ИИ</h3>
@@ -83,16 +90,17 @@ export function RisksInsightsSection({
                           type="button"
                           onClick={onRefreshRecommendation}
                           disabled={isLoadingLlmRec}
-                          className={`text-[#4880ff] disabled:opacity-40 transition-opacity`}
+                          className="text-[#4880ff] disabled:opacity-40 transition-opacity"
                           title="Перегенерировать"
                         >
                           <RefreshCw className={`h-3 w-3 ${isLoadingLlmRec ? 'animate-spin' : ''}`} />
                         </button>
                       </div>
-                      {isLoadingLlmRec
-                        ? <p className={`text-xs ${textSecondary} animate-pulse`}>Анализирую задачу...</p>
-                        : <p className={`text-xs ${textSecondary}`}>{llmRecommendation ?? '—'}</p>
-                      }
+                      {isLoadingLlmRec ? (
+                        <p className={`text-xs ${textSecondary} animate-pulse`}>Анализирую задачу...</p>
+                      ) : (
+                        <p className={`text-xs ${textSecondary}`}>{llmRecommendation ?? '—'}</p>
+                      )}
                     </div>
                     <div className={`rounded-xl ${panelMuted} p-3`}>
                       {selectedTask.recommendedAssignees.length > 0 ? (
@@ -143,16 +151,17 @@ export function RisksInsightsSection({
                           type="button"
                           onClick={onRefreshRecommendation}
                           disabled={isLoadingLlmRec}
-                          className={`text-[#4880ff] disabled:opacity-40 transition-opacity`}
+                          className="text-[#4880ff] disabled:opacity-40 transition-opacity"
                           title="Перегенерировать"
                         >
                           <RefreshCw className={`h-3 w-3 ${isLoadingLlmRec ? 'animate-spin' : ''}`} />
                         </button>
                       </div>
-                      {isLoadingLlmRec
-                        ? <p className={`text-xs ${textSecondary} animate-pulse`}>Анализирую задачу...</p>
-                        : <p className={`text-xs ${textSecondary}`}>{llmRecommendation ?? '—'}</p>
-                      }
+                      {isLoadingLlmRec ? (
+                        <p className={`text-xs ${textSecondary} animate-pulse`}>Анализирую задачу...</p>
+                      ) : (
+                        <p className={`text-xs ${textSecondary}`}>{llmRecommendation ?? '—'}</p>
+                      )}
                     </div>
                     <div className={`rounded-xl ${panelMuted} p-3`}>
                       <button type="button" onClick={() => onToggleAlternatives(selectedTask.taskId)} className="w-full flex items-center justify-between text-sm">

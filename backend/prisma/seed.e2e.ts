@@ -41,14 +41,19 @@ const projectStatuses = [
   'active',
   'completed',
   'active',
-  'archived',
+  'completed',
   'active',
   'on_hold',
   'active',
 ] as const;
 
 const taskTemplates = [
-  { suffix: 'Backlog Grooming', difficulty: 1, status: 'new', deadlineShiftDays: 5 },
+  {
+    suffix: 'Backlog Grooming',
+    difficulty: 1,
+    status: 'new',
+    deadlineShiftDays: 5,
+  },
   {
     suffix: 'API Delivery',
     difficulty: 3,
@@ -61,7 +66,12 @@ const taskTemplates = [
     status: 'review',
     deadlineShiftDays: 4,
   },
-  { suffix: 'Regression Fix', difficulty: 4, status: 'done', deadlineShiftDays: -2 },
+  {
+    suffix: 'Regression Fix',
+    difficulty: 4,
+    status: 'done',
+    deadlineShiftDays: -2,
+  },
   {
     suffix: 'Legacy Cleanup',
     difficulty: 5,
@@ -235,6 +245,12 @@ async function main(): Promise<void> {
     const createdTasks = [];
     for (let i = 0; i < taskTemplates.length; i++) {
       const template = taskTemplates[i];
+      const assignee = taskAssignees[i];
+      if (!assignee) {
+        throw new Error(
+          `Missing task assignee for index ${i} in team ${team.name}.`,
+        );
+      }
       const task = await prisma.task.create({
         data: {
           projectId: project.id,
@@ -245,7 +261,7 @@ async function main(): Promise<void> {
           difficulty: template.difficulty,
           createdById: owner.id,
           assignees: {
-            create: { userId: taskAssignees[i]!.id },
+            create: { userId: assignee.id },
           },
         },
       });
@@ -279,24 +295,26 @@ async function main(): Promise<void> {
     });
 
     const assignedLogins = members.map((member) => member.login).join(', ');
-    console.log(
+    console.warn(
       `Seeded ${team.name}: users [${assignedLogins}], project ${project.name}, tasks ${TASKS_PER_TEAM}`,
     );
   }
 
-  const [usersCount, teamsCount, projectsCount, tasksCount] = await Promise.all([
-    prisma.user.count(),
-    prisma.team.count(),
-    prisma.project.count(),
-    prisma.task.count(),
-  ]);
+  const [usersCount, teamsCount, projectsCount, tasksCount] = await Promise.all(
+    [
+      prisma.user.count(),
+      prisma.team.count(),
+      prisma.project.count(),
+      prisma.task.count(),
+    ],
+  );
 
-  console.log(`E2E seed complete for ${databaseName}`);
-  console.log(
+  console.warn(`E2E seed complete for ${databaseName}`);
+  console.warn(
     `Users: ${usersCount}, teams: ${teamsCount}, projects: ${projectsCount}, tasks: ${tasksCount}`,
   );
-  console.log(`Password for all seeded users: ${TEST_PASSWORD}`);
-  console.log(`Admin user: admin / ${ADMIN_PASSWORD}`);
+  console.warn(`Password for all seeded users: ${TEST_PASSWORD}`);
+  console.warn(`Admin user: admin / ${ADMIN_PASSWORD}`);
 }
 
 main()

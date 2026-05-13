@@ -1,4 +1,4 @@
-import type { RiskTaskInsight } from '@/app/features/risks/types'
+import type { RisksPageContentPorts } from '@/app/pages/Risks/types/risks-page-content-ports'
 
 export type RisksInsightAssignee = {
   userId: number
@@ -9,20 +9,5 @@ export type RisksInsightAssignee = {
 }
 
 export type RisksInsightsSectionProps = {
-  selectedTeamId: number | undefined
-  selectedCard: { taskInsights: RiskTaskInsight[] } | undefined
-  sortedTaskInsights: RiskTaskInsight[]
-  selectedTask: RiskTaskInsight | undefined
-  topRecommendedAssignees: RisksInsightAssignee[]
-  cardBg: string
-  cardBorder: string
-  panelMuted: string
-  textSecondary: string
-  divider: string
-  expandedAlternativesByTaskId: Record<number, boolean>
-  llmRecommendation: string | null
-  isLoadingLlmRec: boolean
-  onRefreshRecommendation: () => void
-  onSelectTask: (taskId: number) => void
-  onToggleAlternatives: (taskId: number) => void
+  ports: RisksPageContentPorts
 }

@@ -1,14 +1,8 @@
 import type { DashboardRiskInsight } from '@/app/features/dashboard/types'
+import type { DashboardPageUiTokens } from '@/app/pages/Dashboard/types/dashboard-page-ui'
 
 export type DashboardRiskInsightsSectionProps = {
   riskInsights: DashboardRiskInsight[]
   isRefreshing: boolean
-  cardBg: string
-  cardBorder: string
-  textSecondary: string
-  insightStyles: {
-    error: { bg: string; border: string; text: string; dot: string }
-    warning: { bg: string; border: string; text: string; dot: string }
-    info: { bg: string; border: string; text: string; dot: string }
-  }
+  ui: Pick<DashboardPageUiTokens, 'cardBg' | 'cardBorder' | 'textSecondary' | 'insightStyles'>
 }

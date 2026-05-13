@@ -1,29 +1,26 @@
+import type { CalendarUiTokens } from '@/app/pages/Calendar/types/calendar-ui-tokens'
+
 export type CalendarProjectOption = { value: string; label: string }
+
+export type CalendarEventFormValues = {
+  title: string
+  description: string
+  date: string
+  time: string
+  duration: string
+  projectId: string
+  color: string
+  allDay: boolean
+}
 
 export type EventFormModalProps = {
   open: boolean
   title: string
-  formError: string
-  formTitle: string
-  formDesc: string
-  formDate: string
-  formTime: string
-  formDuration: string
-  formProjectId: string
-  formColor: string
-  formAllDay: boolean
-  formLoading: boolean
-  isDark: boolean
-  textSecondary: string
+  submitLabel: string
+  ui: CalendarUiTokens
+  resetSessionId: number
+  initialValues: CalendarEventFormValues
   projectOptions: CalendarProjectOption[]
   onClose: () => void
-  onSubmit: () => void
-  setFormTitle: (v: string) => void
-  setFormDesc: (v: string) => void
-  setFormDate: (v: string) => void
-  setFormTime: (v: string) => void
-  setFormDuration: (v: string) => void
-  setFormProjectId: (v: string) => void
-  setFormColor: (v: string) => void
-  setFormAllDay: (v: boolean) => void
+  onSubmit: (values: CalendarEventFormValues) => Promise<void>
 }

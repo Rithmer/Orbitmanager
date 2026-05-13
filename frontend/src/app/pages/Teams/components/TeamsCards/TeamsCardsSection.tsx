@@ -4,38 +4,34 @@ import { TeamCard } from './TeamCard'
 import { TeamsGrid } from './TeamsGrid'
 import type { TeamsCardsSectionProps } from '@/app/pages/Teams/types'
 
-export function TeamsCardsSection({ vm }: TeamsCardsSectionProps) {
+export function TeamsCardsSection({ model }: TeamsCardsSectionProps) {
+  const { ui, data, search, menu, teamForm, memberModal, handlers, isDark, currentUser } = model
   const {
     filteredTeams,
     teamMembers,
-    tokens,
-    isDark,
-    searchQuery,
-    openMenuId,
-    setOpenMenuId,
-    isTeamOwner,
-    currentUser,
     getUserName,
     getUserRole,
+    isTeamOwner,
+  } = data
+  const { query: searchQuery } = search
+  const { openMenuId, setOpenMenuId } = menu
+  const {
     setEditingTeam,
     setFormName,
     setFormDesc,
     setFormError,
     setShowEditModal,
-    setSelectedTeamId,
-    setMemberRole,
-    setAddMemberSearch,
-    setShowAddMemberModal,
-    handleDelete,
-  } = vm
+  } = teamForm
+  const { setSelectedTeamId, setMemberRole, setAddMemberSearch, setShowAddMemberModal } = memberModal
+  const { handleDelete } = handlers
 
   return (
     <TeamsGrid
       teams={filteredTeams}
       teamMembers={teamMembers}
-      cardBg={tokens.cardBg}
-      cardBorder={tokens.cardBorder}
-      textSecondary={tokens.textSecondary}
+      cardBg={ui.cardBg}
+      cardBorder={ui.cardBorder}
+      textSecondary={ui.textSecondary}
       isDark={isDark}
       searchQuery={searchQuery}
       renderCard={(team, members, idx) => {
@@ -48,12 +44,12 @@ export function TeamsCardsSection({ vm }: TeamsCardsSectionProps) {
             members={members}
             idx={idx}
             isDark={isDark}
-            cardBg={tokens.cardBg}
-            cardBorder={tokens.cardBorder}
-            textPrimary={tokens.textPrimary}
-            textSecondary={tokens.textSecondary}
-            dividerColor={tokens.dividerColor}
-            avatarBg={tokens.avatarBg}
+            cardBg={ui.cardBg}
+            cardBorder={ui.cardBorder}
+            textPrimary={ui.textPrimary}
+            textSecondary={ui.textSecondary}
+            dividerColor={ui.dividerColor}
+            avatarBg={ui.avatarBg}
             color={TEAMS_PAGE_CONSTANTS.AVATAR_COLORS[ci]}
             textColor={TEAMS_PAGE_CONSTANTS.AVATAR_TEXT_COLORS[ci]}
             lightBg={lightBg}

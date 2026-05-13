@@ -1,13 +1,8 @@
 import { Filter } from 'lucide-react'
 import type { CalendarFiltersProps } from '@/app/pages/Calendar/types'
 
-export function CalendarFilters({
-  textSecondary,
-  isDark,
-  filterType,
-  filterButtons,
-  onChange,
-}: CalendarFiltersProps) {
+export function CalendarFilters({ ui, filterType, filterButtons, onChange }: CalendarFiltersProps) {
+  const { isDark, textSecondary } = ui
   return (
     <div className="flex items-center gap-2 mb-4 flex-wrap page-load-stagger">
       <Filter className={`w-4 h-4 ${textSecondary}`} />

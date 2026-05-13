@@ -1,24 +1,8 @@
+import type { usePasswordSettings } from '@/app/pages/Settings/hooks/usePasswordSettings'
+import type { useSettingsThemeTokens } from '@/app/pages/Settings/hooks/useSettingsThemeTokens'
+
 export type SettingsSecuritySectionProps = {
-  isDark: boolean
-  cardBg: string
-  cardBorder: string
-  dividerColor: string
-  sectionIconBg: string
-  textPrimary: string
-  textSecondary: string
-  inputBg: string
-  inputText: string
-  isChangePasswordOpen: boolean
-  currentPassword: string
-  newPassword: string
-  confirmNewPassword: string
-  changePasswordLoading: boolean
-  changePasswordError: string
-  changePasswordSuccess: string
-  setCurrentPassword: (value: string) => void
-  setNewPassword: (value: string) => void
-  setConfirmNewPassword: (value: string) => void
-  onTogglePasswordForm: () => void
-  onChangePassword: () => void
+  theme: ReturnType<typeof useSettingsThemeTokens>
+  password: ReturnType<typeof usePasswordSettings>
   onLogout: () => void
 }

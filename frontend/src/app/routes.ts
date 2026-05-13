@@ -22,6 +22,7 @@ const ProjectsPage = lazyRoute(() => import('@/app/pages/Projects'), 'Projects')
 const BoardPage = lazyRoute(() => import('@/app/pages/Board'), 'Board')
 const TeamsPage = lazyRoute(() => import('@/app/pages/Teams'), 'Teams')
 const CalendarPage = lazyRoute(() => import('@/app/pages/Calendar'), 'Calendar')
+const AboutPage = lazyRoute(() => import('@/app/pages/About'), 'About')
 const ReportsPage = lazyRoute(() => import('@/app/pages/Reports'), 'Reports')
 const RisksPage = lazyRoute(() => import('@/app/pages/Risks'), 'Risks')
 const SettingsPage = lazyRoute(() => import('@/app/pages/Settings'), 'Settings')
@@ -48,6 +49,7 @@ export const router = createBrowserRouter([
           { path: 'board/:projectId', element: renderLazyRoute(BoardPage) },
           { path: 'teams', element: renderLazyRoute(TeamsPage) },
           { path: 'calendar', element: renderLazyRoute(CalendarPage) },
+          { path: 'about', element: renderLazyRoute(AboutPage) },
           { path: 'reports', element: renderLazyRoute(ReportsPage) },
           { path: 'risks', element: renderLazyRoute(RisksPage) },
           { path: 'settings', element: renderLazyRoute(SettingsPage) },

@@ -10,15 +10,11 @@ export function DashboardRecentActivitySection({
   recentAudit,
   isRefreshing,
   isAuditRefreshing,
-  cardBg,
-  cardBorder,
-  dividerColor,
-  textPrimary,
-  textSecondary,
-  isDark,
-  statusStyles,
+  ui,
   onOpenProjectBoard,
 }: DashboardRecentActivitySectionProps) {
+  const { cardBg, cardBorder, dividerColor, textPrimary, textSecondary, isDark, statusStyles } = ui
+
   return (
     <PageSection
       title={isAdmin ? 'Последние действия' : 'Последние задачи'}
