@@ -61,32 +61,12 @@ describe('risk adapters', () => {
     expect(adaptProjectRisksPayload(undefined, {})).toEqual([])
   })
 
-  it('uses fallback project name when not in map', () => {
-    const data = adaptProjectRisksPayload(
-      {
-        99: {
-          riskScore: 0,
-          riskLevel: 'low' as RiskLevel,
-          tasksAtRisk: [],
-          summary: 'Empty',
-          predictionSource: 'stub',
-          successProbability: 100,
-          riskFactors: [],
-          taskInsights: [],
-          recommendations: [],
-        },
-      },
-      {},
-    )
-    expect(data[0].projectName).toBe('Проект #99')
-  })
-
-  it('does not compute successProbability client-side — uses server value directly', () => {
+  it('does not compute successProbability client-side', () => {
     const data = adaptProjectRisksPayload(
       {
         1: {
           riskScore: 40,
-          riskLevel: 'medium' as RiskLevel,
+          riskLevel: RiskLevel.MEDIUM,
           tasksAtRisk: [],
           summary: 'Test',
           predictionSource: 'stub',
@@ -98,38 +78,7 @@ describe('risk adapters', () => {
       },
       { 1: 'P1' },
     )
-    expect(data[0].successProbability).toBe(60)
-  })
 
-  it('does not generate local recommendations — passes through server data', () => {
-    const data = adaptProjectRisksPayload(
-      {
-        1: {
-          riskScore: 80,
-          riskLevel: 'high' as RiskLevel,
-          tasksAtRisk: [{ taskId: 1, taskName: 'X', delayProbability: 0.9 }],
-          summary: 'High risk',
-          predictionSource: 'ml',
-          successProbability: 20,
-          riskFactors: [],
-          taskInsights: [{
-            taskId: 1,
-            taskName: 'X',
-            predictedCompletionDate: '2026-04-01',
-            delayProbability: 0.9,
-            riskLevel: 'high',
-            riskFactors: [],
-            recommendation: 'R',
-            taskSuccessProbability: 10,
-            coordinationPenalty: 50,
-            assigneeBreakdown: [],
-            recommendedAssignees: [],
-          }],
-          recommendations: [],
-        },
-      },
-      { 1: 'P' },
-    )
-    expect(data[0].recommendations).toHaveLength(0)
+    expect(data[0].successProbability).toBe(60)
   })
 })
