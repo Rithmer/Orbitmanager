@@ -1,0 +1,104 @@
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  NotFoundException,
+  Inject,
+} from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import {
+  AuthenticatedRequest,
+  getAuthenticatedUser,
+  getRouteParamAsNumber,
+} from '@/common/http/authenticated-request';
+import { AccountRole } from '../enums/account-role.enum';
+import { ProjectRole } from '../enums/project-role.enum';
+import { TeamRole } from '../enums/team-role.enum';
+import { PROJECT_ROLES_KEY } from '../decorators/project-roles.decorator';
+import type { IProjectMemberRepository } from '@/domain/repositories/project-member.repository';
+import { PROJECT_MEMBER_REPOSITORY } from '@/domain/repositories/project-member.repository';
+import type { ITeamMemberRepository } from '@/domain/repositories/team-member.repository';
+import { TEAM_MEMBER_REPOSITORY } from '@/domain/repositories/team-member.repository';
+import type { IProjectRepository } from '@/domain/repositories/project.repository';
+import { PROJECT_REPOSITORY } from '@/domain/repositories/project.repository';
+
+@Injectable()
+export class ProjectRolesGuard implements CanActivate {
+  constructor(
+    private readonly reflector: Reflector,
+    @Inject(PROJECT_MEMBER_REPOSITORY)
+    private readonly projectMemberRepository: IProjectMemberRepository,
+    @Inject(TEAM_MEMBER_REPOSITORY)
+    private readonly teamMemberRepository: ITeamMemberRepository,
+    @Inject(PROJECT_REPOSITORY)
+    private readonly projectRepository: IProjectRepository,
+  ) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const requiredRoles = this.reflector.getAllAndOverride<ProjectRole[]>(
+      PROJECT_ROLES_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+
+    if (!requiredRoles || requiredRoles.length === 0) {
+      return true;
+    }
+
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const user = getAuthenticatedUser(request);
+
+    if (!user) {
+      throw new ForbiddenException('Доступ запрещён');
+    }
+
+    if (user.accountRole === AccountRole.ADMIN) {
+      return true;
+    }
+
+    const projectId = getRouteParamAsNumber(request, 'projectId', 'id');
+    if (!projectId) {
+      throw new ForbiddenException('Не указан ID проекта');
+    }
+
+    const project = await this.projectRepository.findById(projectId);
+    if (!project) {
+      throw new NotFoundException('Проект не найден');
+    }
+
+    const teamMembership = await this.teamMemberRepository.findByUserAndTeam(
+      user.id,
+      project.teamId,
+    );
+
+    const projectMembership =
+      teamMembership?.teamRole === TeamRole.OWNER
+        ? null
+        : await this.projectMemberRepository.findByUserAndProject(
+            user.id,
+            projectId,
+          );
+
+    request.projectAccessCache = {
+      project,
+      teamMembership: teamMembership ?? undefined,
+      projectMembership: projectMembership ?? undefined,
+    };
+
+    if (teamMembership?.teamRole === TeamRole.OWNER) {
+      return true;
+    }
+
+    if (!projectMembership) {
+      throw new ForbiddenException('Вы не являетесь участником этого проекта');
+    }
+
+    if (!requiredRoles.includes(projectMembership.role)) {
+      throw new ForbiddenException(
+        `Требуется проектная роль: ${requiredRoles.join(', ')}`,
+      );
+    }
+
+    return true;
+  }
+}

@@ -1,59 +1,168 @@
-# 🗂 Orbitmanager — Сервис управления проектами и задачами
+# Сервис управления проектами и задачами
 
-Современная full-stack платформа для управления проектами и задачами: создание проектов, распределение задач, отслеживание статусов и аналитика.
+Fullstack-курсовой проект для управления командами, проектами, задачами и календарными событиями. Репозиторий содержит NestJS backend с PostgreSQL/Prisma, JWT-аутентификацией, RBAC, аудитом и модулем оценки рисков, а также React/Vite frontend с экранами авторизации, проектов, канбан-доски, календаря и административных разделов.
 
-**Frontend**: React + TypeScript + Vite + Tailwind CSS
-**Backend**: NestJS + TypeScript + JWT
-**База данных**: PostgreSQL / MySQL
+## Стек
 
-[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react\&logoColor=white\&style=flat-square)](https://react.dev/)
-[![Vite](https://img.shields.io/badge/Vite-%5E5-646CFF?logo=vite\&logoColor=white\&style=flat-square)](https://vite.dev/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-38B2AC?logo=tailwindcss\&logoColor=white\&style=flat-square)](https://tailwindcss.com/)
-[![NestJS](https://img.shields.io/badge/NestJS-v10-E0234E?logo=nestjs\&logoColor=white\&style=flat-square)](https://nestjs.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
+- Backend: NestJS, Prisma, PostgreSQL, JWT, Swagger, Jest
+- Frontend: React, TypeScript, Vite, TanStack React Query
+- ML Service: Python, FastAPI, scikit-learn, joblib
+- Infra: Docker, Docker Compose, Nginx
 
-<p align="center">
-  <img src="https://via.placeholder.com/1200x600/0ea5e9/ffffff?text=Orbitmanager+—+Главный+экран" alt="Главный экран Orbitmanager" width="800"/>
-  <br/>
-  <em>Современный и адаптивный дизайн с Tailwind CSS</em>
-</p>
+## Что реализовано
 
----
+- Пользователи, команды, проекты и задачи
+- Роли на уровне аккаунта, команды и проекта
+- Канбан-доска проекта
+- Календарь событий и дедлайнов
+- Аудит действий
+- Risk API с ML-моделью (GradientBoosting) и fallback на rule-based логику
+- ML-микросервис для оценки рисков задач (FastAPI, отдельный контейнер)
+- Админ-панель: управление пользователями, аудит, мониторинг и переобучение ML-модели
+- Docker-окружение для локального запуска
 
-## 2️⃣ Основной функционал
+## Быстрый старт
 
-### Пользователь (менеджер / сотрудник)
+Самый простой запуск:
 
-* Создание и просмотр проектов
-* Создание, редактирование и удаление задач
-* Назначение задач участникам
-* Отслеживание статусов задач (To Do, In Progress, Done)
-* Фильтрация и сортировка задач по:
+Unix/macOS:
 
-  * Проекту
-  * Статусу
-  * Дате создания / дедлайну
-* Регистрация / авторизация
-* Просмотр личного профиля и своих задач
+```bash
+sh scripts/bootstrap.sh
+```
 
-### Администратор / руководитель
+Windows:
 
-* Управление пользователями: добавление, редактирование, удаление
-* Просмотр всех проектов и задач
-* Назначение ролей и прав доступа
-* Просмотр аналитики:
+```bat
+scripts\bootstrap.cmd
+```
 
-  * Задачи по статусу
-  * Прогресс проекта
+Bootstrap-скрипты создают `.env` из [.env.example](.env.example), при необходимости создают `backend/.env` из [backend/.env.example](backend/.env.example) и запускают `docker compose up -d --build`.
 
-### Системная логика (backend)
+Если скрипты не нужны, можно запустить стек напрямую:
 
-* Управление проектами и задачами:
+```bash
+docker compose up -d --build
+```
 
-  * Проверка авторизации и прав доступа
-  * Валидация данных
-  * Создание / редактирование / удаление записей
-  * Обновление статусов задач
+После запуска доступны:
 
+- Frontend: `http://localhost:5173`
+- Backend API: `http://localhost:3000`
+- Swagger: `http://localhost:5173/api/docs`
+- ML Service: `http://localhost:8000`
+- PostgreSQL: `localhost:5433`
 
----
+## Переменные окружения
+
+Root [.env.example](.env.example) используется `docker compose` и уже содержит dev-friendly значения по умолчанию.
+
+Один [docker-compose.yml](docker-compose.yml) теперь содержит обычный стек по умолчанию и отдельный профиль:
+
+- обычный стек - основной production-like запуск без профиля
+- `e2e` - изолированный e2e-стек на отдельных портах
+
+Ключевые переменные:
+
+- `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`, `DB_PORT`
+- `E2E_DB_NAME`, `E2E_DB_USERNAME`, `E2E_DB_PASSWORD`, `E2E_DB_PORT`
+- `PORT`, `NODE_ENV`
+- `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`
+- `CORS_ORIGIN`
+- `THROTTLE_TTL`, `THROTTLE_LIMIT`
+- `DB_POOL_MAX`, `DB_POOL_IDLE_TIMEOUT`, `DB_POOL_CONNECTION_TIMEOUT`
+- `AUTO_SEED`
+- `RISK_PROVIDER` - провайдер оценки рисков: `stub` (по умолчанию, rule-based) или `ml` (ML-модель)
+- `ML_SERVICE_URL` - адрес ML-сервиса (по умолчанию `http://ml-service:8000`)
+- `ML_SERVICE_PORT` - внешний порт ML-сервиса (по умолчанию `8000`)
+
+Файл [backend/.env.example](backend/.env.example) нужен для локального запуска backend-команд вне Docker.
+
+## Основные команды
+
+Backend:
+
+```bash
+cd backend
+npm run db:generate
+npm run build
+npm run test
+npm run test:e2e
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm run dev
+npm run build
+npm run test
+```
+
+ML Service (внутри контейнера или при наличии Python 3.10+):
+
+```bash
+cd ml-service
+pip install -r requirements.txt
+python -m pytest tests/
+```
+
+## Docker Compose
+
+Основной стек:
+
+```bash
+docker compose up -d --build
+```
+
+E2E-стек:
+
+```bash
+docker compose -p taskmanager-e2e --profile e2e up -d --build frontend-e2e
+```
+
+Остановка нужного стека:
+
+```bash
+docker compose down
+docker compose -p taskmanager-e2e down
+```
+
+Полный сброс e2e-базы:
+
+```bash
+docker compose -p taskmanager-e2e down -v
+```
+
+Для `e2e` используется адресный запуск сервиса `frontend-e2e`: Compose поднимет его зависимости (`backend-e2e` и `postgres-e2e`), но не затронет обычный стек без профиля.
+
+## Структура
+
+- [backend](backend) - NestJS API, Prisma, тесты и скрипты
+- [frontend](frontend) - React/Vite клиент
+- [ml-service](ml-service) - Python FastAPI ML-микросервис для оценки рисков
+- [docker-compose.yml](docker-compose.yml) - единый docker-compose файл с обычным стеком и профилем `e2e`
+
+## ML-модуль оценки рисков
+
+Система оценки рисков поддерживает два режима работы, переключаемых через переменную `RISK_PROVIDER`:
+
+- **`stub`** (по умолчанию) - детерминированная rule-based логика, не требует ML-сервиса
+- **`ml`** - GradientBoosting-модель, обученная на синтетических данных; для страницы `/risks` действует strict-режим: при недоступности ML-сервиса endpoint отвечает 503 (`RISK_ML_UNAVAILABLE`), silent fallback на stub не применяется. Для остальных модулей (dashboard, board, projects-list) сохраняется автоматический fallback на stub.
+
+ML-сервис запускается как отдельный Docker-контейнер. Модель обучается при первом запуске и сохраняется в volume `./models`. Переобучение доступно из админ-панели (вкладка "ML Модель") или через `POST /risk/retrain`.
+
+### API ML-сервиса
+
+| Метод | Путь | Описание |
+|---|---|---|
+| GET | `/health` | Проверка доступности |
+| GET | `/model/info` | Информация о модели (версия, метрики, признаки) |
+| POST | `/predict` | Оценка риска одной задачи |
+| POST | `/predict/batch` | Пакетная оценка рисков (до 1000 задач) |
+| POST | `/retrain` | Переобучение модели |
+
+## Ограничения
+
+- ML-модель обучается на синтетических данных; для production-качества необходимы реальные исторические данные.
+- UI рабочий, но остаётся учебным и продолжает дорабатываться.

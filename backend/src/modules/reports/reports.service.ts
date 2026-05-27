@@ -1,0 +1,327 @@
+import { ForbiddenException, Injectable } from '@nestjs/common';
+import { AccountRole } from '@/common/enums/account-role.enum';
+import { ProjectRole } from '@/common/enums/project-role.enum';
+import { TeamRole } from '@/common/enums/team-role.enum';
+import { TaskStatus } from '@/common/enums/task-status.enum';
+import { TtlCacheService } from '@/common/cache/ttl-cache.service';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service';
+import { ReportsSummaryResponseDto } from './dto/reports-summary-response.dto';
+
+const REPORTS_CACHE_TTL_MS = 60_000;
+const DONE_TASK_STATUSES = new Set<string>([TaskStatus.DONE]);
+const OWNER_TEAM_ROLES = new Set<string>([TeamRole.OWNER]);
+
+export interface ProjectNameRow {
+  id: number;
+  name: string;
+  teamId: number;
+}
+
+/**
+ * @architecture CQRS Query Service
+ *
+ * Сервис агрегированного чтения данных. Использует PrismaService напрямую —
+ * намеренное архитектурное решение: запросы включают сложные агрегации
+ * (count, groupBy, многотабличные JOIN), которые не выражаются через
+ * CRUD-репозитории без значительного усложнения их интерфейсов.
+ *
+ * Паттерн: CQRS-light — command-сервисы (TasksService, ProjectsService и др.)
+ * работают через репозитории; query-сервисы (этот класс) обращаются к БД
+ * напрямую для оптимальных read-path запросов.
+ */
+@Injectable()
+export class ReportsService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cache: TtlCacheService,
+  ) {}
+
+  async getSummary(
+    userId: number,
+    accountRole: AccountRole,
+    projectId?: number,
+    teamId?: number,
+  ): Promise<ReportsSummaryResponseDto> {
+    const cacheKey = `reports:summary:${userId}:${accountRole}:${
+      projectId ?? 'all'
+    }:team:${teamId ?? 'all'}`;
+
+    return this.cache.getOrSet(
+      cacheKey,
+      () => this.buildSummary(userId, accountRole, projectId, teamId),
+      REPORTS_CACHE_TTL_MS,
+    );
+  }
+
+  private async buildSummary(
+    userId: number,
+    accountRole: AccountRole,
+    projectId?: number,
+    teamId?: number,
+  ): Promise<ReportsSummaryResponseDto> {
+    const accessibleProjectIds = await this.getAccessibleProjectIds(
+      userId,
+      accountRole,
+    );
+
+    if (accessibleProjectIds.length === 0) {
+      throw new ForbiddenException('Нет прав на аналитику');
+    }
+
+    if (projectId !== undefined && !accessibleProjectIds.includes(projectId)) {
+      throw new ForbiddenException('Нет прав на выбранный проект');
+    }
+
+    let targetProjectIds =
+      projectId !== undefined ? [projectId] : accessibleProjectIds;
+
+    if (projectId === undefined && teamId !== undefined) {
+      const teamProjects = await this.prisma.project.findMany({
+        where: { id: { in: targetProjectIds }, teamId },
+        select: { id: true },
+      });
+      targetProjectIds = teamProjects.map((p) => p.id);
+    }
+
+    const where = {
+      projectId: {
+        in: targetProjectIds,
+      },
+    };
+
+    const [
+      totalTasks,
+      doneTasks,
+      inProgressTasks,
+      reviewTasks,
+      newTasks,
+      overdueTasks,
+      projectTaskGroups,
+      difficultyGroups,
+    ] = await Promise.all([
+      this.prisma.task.count({ where }),
+      this.prisma.task.count({
+        where: {
+          ...where,
+          status: TaskStatus.DONE,
+        },
+      }),
+      this.prisma.task.count({
+        where: {
+          ...where,
+          status: TaskStatus.IN_PROGRESS,
+        },
+      }),
+      this.prisma.task.count({
+        where: {
+          ...where,
+          status: TaskStatus.REVIEW,
+        },
+      }),
+      this.prisma.task.count({
+        where: {
+          ...where,
+          status: TaskStatus.NEW,
+        },
+      }),
+      this.prisma.task.count({
+        where: {
+          ...where,
+          deadline: { lt: new Date() },
+          status: {
+            notIn: [TaskStatus.DONE, TaskStatus.CANCELLED],
+          },
+        },
+      }),
+      this.prisma.task.groupBy({
+        by: ['projectId', 'status'],
+        where,
+        _count: {
+          _all: true,
+        },
+      }),
+      this.prisma.task.groupBy({
+        by: ['difficulty'],
+        where,
+        _count: {
+          _all: true,
+        },
+        orderBy: {
+          difficulty: 'asc',
+        },
+      }),
+    ]);
+
+    const projectTaskSummary = new Map<
+      number,
+      { taskCount: number; completedTaskCount: number }
+    >();
+    for (const group of projectTaskGroups) {
+      const summary = projectTaskSummary.get(group.projectId) ?? {
+        taskCount: 0,
+        completedTaskCount: 0,
+      };
+
+      summary.taskCount += group._count._all;
+      if (DONE_TASK_STATUSES.has(group.status)) {
+        summary.completedTaskCount += group._count._all;
+      }
+
+      projectTaskSummary.set(group.projectId, summary);
+    }
+
+    const topProjectEntries = [...projectTaskSummary.entries()]
+      .sort((left, right) => right[1].taskCount - left[1].taskCount)
+      .slice(0, 6);
+
+    const topProjectIds = topProjectEntries.map(([projectId]) => projectId);
+    const projectNames = await this.prisma.project.findMany({
+      where: {
+        id: {
+          in: topProjectIds,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    const projectNameById = new Map(
+      projectNames.map((project) => [project.id, project.name]),
+    );
+
+    const statusDistribution = [
+      {
+        label: 'Выполнено',
+        value: doneTasks,
+        color: '#10b981',
+      },
+      {
+        label: 'В процессе',
+        value: inProgressTasks,
+        color: '#f59e0b',
+      },
+      {
+        label: 'Тестирование',
+        value: reviewTasks,
+        color: '#a855f7',
+      },
+      {
+        label: 'Запланировано',
+        value: newTasks,
+        color: '#4880ff',
+      },
+      {
+        label: 'Просрочено',
+        value: overdueTasks,
+        color: '#ef4444',
+      },
+    ].filter((item) => item.value > 0);
+
+    const projectTaskBreakdown = topProjectEntries.map(
+      ([projectId, summary]) => ({
+        projectId,
+        projectName: projectNameById.get(projectId) ?? `Проект #${projectId}`,
+        taskCount: summary.taskCount,
+        completedTaskCount: summary.completedTaskCount,
+      }),
+    );
+
+    const difficultyDistribution = [1, 2, 3, 4, 5]
+      .map((difficulty) => {
+        const count =
+          difficultyGroups.find((group) => group.difficulty === difficulty)
+            ?._count._all ?? 0;
+
+        return {
+          difficulty,
+          label: `Сложность ${difficulty}`,
+          value: count,
+        };
+      })
+      .filter((item) => item.value > 0);
+
+    return {
+      overview: {
+        doneTasks,
+        inProgressTasks,
+        reviewTasks,
+        newTasks,
+        overdueTasks,
+        totalTasks,
+        efficiency:
+          totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0,
+        projectCount: targetProjectIds.length,
+      },
+      statusDistribution,
+      projectTaskBreakdown,
+      difficultyDistribution,
+    };
+  }
+
+  async getAccessibleProjects(
+    userId: number,
+    accountRole: AccountRole,
+  ): Promise<ProjectNameRow[]> {
+    const projectIds = await this.getAccessibleProjectIds(userId, accountRole);
+
+    if (projectIds.length === 0) {
+      throw new ForbiddenException('Нет прав на аналитику');
+    }
+
+    return this.prisma.project.findMany({
+      where: { id: { in: projectIds } },
+      select: { id: true, name: true, teamId: true },
+      orderBy: { id: 'asc' },
+    });
+  }
+
+  private async getAccessibleProjectIds(
+    userId: number,
+    accountRole: AccountRole,
+  ): Promise<number[]> {
+    if (accountRole === AccountRole.ADMIN) {
+      const projects = await this.prisma.project.findMany({
+        select: { id: true },
+        orderBy: { id: 'asc' },
+      });
+      return projects.map((project) => project.id);
+    }
+
+    const teamMemberships = await this.prisma.teamMember.findMany({
+      where: { userId },
+      select: { teamId: true, teamRole: true },
+    });
+
+    const ownerTeamIds = [
+      ...new Set(
+        teamMemberships
+          .filter((m) => OWNER_TEAM_ROLES.has(m.teamRole))
+          .map((m) => m.teamId),
+      ),
+    ];
+
+    const ownerProjects = ownerTeamIds.length
+      ? await this.prisma.project.findMany({
+          where: { teamId: { in: ownerTeamIds } },
+          select: { id: true },
+          orderBy: { id: 'asc' },
+        })
+      : [];
+
+    const leadOrObserverRows = await this.prisma.projectMember.findMany({
+      where: {
+        userId,
+        role: { in: [ProjectRole.TEAM_LEAD, ProjectRole.OBSERVER] },
+      },
+      select: { projectId: true },
+    });
+
+    const projectIdsSet = new Set<number>();
+    for (const p of ownerProjects) projectIdsSet.add(p.id);
+    for (const row of leadOrObserverRows) projectIdsSet.add(row.projectId);
+
+    return [...projectIdsSet];
+  }
+}

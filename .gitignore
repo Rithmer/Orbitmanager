@@ -1,7 +1,40 @@
+# === OS ===
 .DS_Store
 Thumbs.db
-*.log
+desktop.ini
+
+# === IDE ===
 .idea/
 .vscode/
+.vs/
 *.sublime-workspace
 *.sublime-project
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+backups/
+# === Node ===
+node_modules/
+
+# === Logs ===
+*.log
+logs/
+
+# === Environment ===
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# === Build ===
+dist/
+build/
+
+# === Test / Coverage ===
+coverage/
+
+# === TypeScript ===
+*.tsbuildinfo
+documentation_archive/
